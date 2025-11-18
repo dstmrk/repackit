@@ -355,18 +355,15 @@ Returns `unhealthy` if ANY task is stale (>2 days) or never ran.
   "tasks": {
     "scraper": {
       "status": "ok",
-      "last_run": "2024-11-18T09:00:00",
-      "healthy": true
+      "last_run": "2024-11-18T09:00:00"
     },
     "checker": {
       "status": "ok",
-      "last_run": "2024-11-18T10:00:00",
-      "healthy": true
+      "last_run": "2024-11-18T10:00:00"
     },
     "cleanup": {
       "status": "ok",
-      "last_run": "2024-11-18T02:00:00",
-      "healthy": true
+      "last_run": "2024-11-18T02:00:00"
     }
   },
   "thresholds": {

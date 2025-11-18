@@ -87,7 +87,6 @@ async def get_health_status() -> dict:
             tasks[task_name] = {
                 "status": "never_run",
                 "last_run": None,
-                "healthy": False,
             }
             all_healthy = False
         else:
@@ -100,7 +99,6 @@ async def get_health_status() -> dict:
                 tasks[task_name] = {
                     "status": "ok" if is_healthy else "stale",
                     "last_run": last_run_str,
-                    "healthy": is_healthy,
                 }
 
                 if not is_healthy:
@@ -111,7 +109,6 @@ async def get_health_status() -> dict:
                 tasks[task_name] = {
                     "status": "error",
                     "last_run": last_run_str,
-                    "healthy": False,
                 }
                 all_healthy = False
 

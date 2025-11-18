@@ -132,7 +132,6 @@ async def test_health_status_all_tasks_healthy(test_db):
 
     assert health["status"] == "healthy"
     assert health["tasks"]["scraper"]["status"] == "ok"
-    assert health["tasks"]["scraper"]["healthy"] is True
     assert health["tasks"]["checker"]["status"] == "ok"
     assert health["tasks"]["cleanup"]["status"] == "ok"
 
@@ -153,7 +152,6 @@ async def test_health_status_stale_task(test_db):
 
     assert health["status"] == "unhealthy"
     assert health["tasks"]["scraper"]["status"] == "stale"
-    assert health["tasks"]["scraper"]["healthy"] is False
     assert health["tasks"]["checker"]["status"] == "ok"
     assert health["tasks"]["cleanup"]["status"] == "ok"
 
@@ -173,9 +171,7 @@ async def test_health_status_never_run(test_db):
     assert health["status"] == "unhealthy"
     assert health["tasks"]["scraper"]["status"] == "ok"
     assert health["tasks"]["checker"]["status"] == "never_run"
-    assert health["tasks"]["checker"]["healthy"] is False
     assert health["tasks"]["cleanup"]["status"] == "never_run"
-    assert health["tasks"]["cleanup"]["healthy"] is False
 
 
 @pytest.mark.asyncio
