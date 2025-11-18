@@ -20,7 +20,6 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 
 def _should_notify(
     product_id: int,
-    asin: str,
     current_price: float,
     price_paid: float,
     min_savings: float,
@@ -31,7 +30,6 @@ def _should_notify(
 
     Args:
         product_id: Database product ID
-        asin: Amazon ASIN
         current_price: Current scraped price
         price_paid: Price user paid
         min_savings: Minimum savings threshold
@@ -141,7 +139,7 @@ async def check_and_notify() -> dict:
 
             # Check if we should notify
             should_notify, savings = _should_notify(
-                product_id, asin, current_price, price_paid, min_savings, last_notified
+                product_id, current_price, price_paid, min_savings, last_notified
             )
 
             if not should_notify:
