@@ -133,12 +133,13 @@ jobs:
 
       - name: Test docker-compose configuration
         run: |
-          # Validate docker-compose.yml syntax
-          docker-compose config
+          # Validate docker-compose.yml syntax (using Docker Compose v2)
+          docker compose config
 
       - name: Build with docker-compose
         run: |
-          docker-compose build
+          # Build using Docker Compose v2
+          docker compose build
 
       - name: Verify build succeeded
         run: |
