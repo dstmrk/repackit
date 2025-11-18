@@ -1,0 +1,152 @@
+name: Docker Build and Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  docker-build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: repackit:test
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      - name: Test Docker image structure
+        run: |
+          # Check if image was created
+          docker images | grep repackit
+
+          # Check image size (should be reasonable)
+          SIZE=$(docker image inspect repackit:test --format='{{.Size}}')
+          SIZE_MB=$((SIZE / 1024 / 1024))
+          echo "Image size: ${SIZE_MB}MB"
+
+          # Warn if image is too large (>2GB is concerning)
+          if [ $SIZE_MB -gt 2048 ]; then
+            echo "::warning::Image size is ${SIZE_MB}MB, consider optimization"
+          fi
+
+      - name: Test Docker container can start
+        run: |
+          # Create test .env file
+          cat > .env <<EOF
+          TELEGRAM_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+          WEBHOOK_URL=https://test.example.com
+          WEBHOOK_SECRET=test-secret
+          BOT_PORT=8443
+          HEALTH_PORT=8444
+          DATABASE_PATH=/app/data/users.db
+          SCRAPER_HOUR=9
+          CHECKER_HOUR=10
+          CLEANUP_HOUR=2
+          ADMIN_USER_ID=123456789
+          AMAZON_AFFILIATE_TAG=test-21
+          LOG_LEVEL=INFO
+          EOF
+
+          # Create data directory with correct permissions for repackit user (uid 1000)
+          mkdir -p data/logs
+          chmod -R 777 data  # Allow container user to write logs
+
+          # Start container without --rm to preserve logs even after exit
+          docker run -d \
+            --name repackit-test \
+            --env-file .env \
+            -v $(pwd)/data:/app/data \
+            repackit:test || echo "Container exited immediately (expected with fake token)"
+
+          # Wait for container to initialize and potentially exit
+          sleep 5
+
+          # Get container logs (works even if container has exited)
+          echo "=== Container Logs ==="
+          docker logs repackit-test 2>&1 | tee /tmp/container.log
+
+          # Check that bot at least attempted to start (should see initialization logs)
+          if grep -E "INFO|ERROR|WARNING" /tmp/container.log > /dev/null; then
+            echo "✓ Container started and bot initialized"
+            echo ""
+            echo "First 30 lines of logs:"
+            head -30 /tmp/container.log
+          else
+            echo "✗ Container failed to initialize - no logs found"
+            exit 1
+          fi
+
+          # Clean up
+          docker rm -f repackit-test 2>/dev/null || true
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+  docker-compose:
+    name: Test Docker Compose
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create test .env file
+        run: |
+          cat > .env <<EOF
+          TELEGRAM_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+          WEBHOOK_URL=https://test.example.com
+          WEBHOOK_SECRET=test-secret
+          BOT_PORT=8443
+          HEALTH_PORT=8444
+          DATABASE_PATH=/app/data/users.db
+          SCRAPER_HOUR=9
+          CHECKER_HOUR=10
+          CLEANUP_HOUR=2
+          ADMIN_USER_ID=123456789
+          AMAZON_AFFILIATE_TAG=test-21
+          LOG_LEVEL=INFO
+          EOF
+
+      - name: Create data directory
+        run: mkdir -p data/logs
+
+      - name: Test docker-compose configuration
+        run: |
+          # Validate docker-compose.yml syntax (using Docker Compose v2)
+          docker compose config
+
+      - name: Build with docker-compose
+        run: |
+          # Build using Docker Compose v2
+          docker compose build
+
+      - name: Verify build succeeded
+        run: |
+          docker images | grep repackit
