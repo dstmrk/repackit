@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 AMAZON_AFFILIATE_TAG = os.getenv("AMAZON_AFFILIATE_TAG", "")
 
 # ASIN pattern: 10 alphanumeric characters
-ASIN_PATTERN = re.compile(r"/dp/([A-Z0-9]{10})|/gp/product/([A-Z0-9]{10})")
+# Supports: /dp/, /gp/product/, and short links /d/
+ASIN_PATTERN = re.compile(r"/dp/([A-Z0-9]{10})|/gp/product/([A-Z0-9]{10})|/d/([A-Z0-9]{10})")
 
 # Marketplace pattern: extract domain suffix (it, com, de, fr, co.uk, etc.)
 MARKETPLACE_PATTERN = re.compile(r"amazon\.(?:co\.)?([a-z]{2,3})")
@@ -37,7 +38,7 @@ def extract_asin(url: str) -> tuple[str, str]:
     - https://www.amazon.it/dp/B08N5WRWNW
     - https://amazon.it/gp/product/B08N5WRWNW/ref=...
     - https://www.amazon.it/Product-Name/dp/B08N5WRWNW/...
-    - https://amzn.eu/d/B08N5WRWNW
+    - https://amzn.eu/d/B08N5WRWNW (short link)
 
     Args:
         url: Amazon product URL
@@ -54,13 +55,13 @@ def extract_asin(url: str) -> tuple[str, str]:
     if not asin_match:
         raise ValueError(f"Could not extract ASIN from URL: {url}")
 
-    # Get first non-None group (either /dp/ or /gp/product/)
-    asin = asin_match.group(1) or asin_match.group(2)
+    # Get first non-None group (/dp/, /gp/product/, or /d/ for short links)
+    asin = asin_match.group(1) or asin_match.group(2) or asin_match.group(3)
 
     # Extract marketplace
     marketplace_match = MARKETPLACE_PATTERN.search(url)
     if not marketplace_match:
-        # Default to .it if not found
+        # Default to .it if not found (common for short links)
         marketplace = "it"
         logger.warning(f"Could not extract marketplace from URL, defaulting to .it: {url}")
     else:
@@ -174,13 +175,15 @@ async def _scrape_single_price(browser: Browser, asin: str, marketplace: str) ->
 
 def _parse_price(price_text: str) -> float | None:
     """
-    Parse price from text, handling various formats.
+    Parse price from text, handling various formats including thousands separators.
 
     Examples:
     - "€59,90" -> 59.90
     - "59.90" -> 59.90
     - "59,90 €" -> 59.90
     - "$59.90" -> 59.90
+    - "1.999,99" (Italian: thousands.decimal) -> 1999.99
+    - "1,999.99" (English: thousands.decimal) -> 1999.99
 
     Args:
         price_text: Raw price text from page
@@ -192,13 +195,28 @@ def _parse_price(price_text: str) -> float | None:
         # Remove currency symbols and whitespace
         cleaned = price_text.strip().replace("€", "").replace("$", "").replace(" ", "")
 
-        # Replace comma with dot for decimal separator
-        cleaned = cleaned.replace(",", ".")
+        # Determine decimal separator by checking which appears last
+        # (decimal separator is always at the end, thousands in the middle)
+        last_comma = cleaned.rfind(",")
+        last_dot = cleaned.rfind(".")
+
+        if last_comma > last_dot:
+            # Format: "1.999,99" (Italian) - comma is decimal separator
+            cleaned = cleaned.replace(".", "").replace(",", ".")
+        elif last_dot > last_comma:
+            # Format: "1,999.99" (English) - dot is decimal separator
+            cleaned = cleaned.replace(",", "")
+        # else: no separators or only one type - handle normally
 
         # Extract first number (handles cases like "59.90 - 69.90")
         match = re.search(r"(\d+\.?\d*)", cleaned)
         if match:
-            return float(match.group(1))
+            price = float(match.group(1))
+            # Sanity check: prices should be reasonable (0.01 to 999999)
+            if 0.01 <= price <= 999999:
+                return price
+            logger.warning(f"Price {price} out of reasonable range from '{price_text}'")
+            return None
 
         return None
     except (ValueError, AttributeError) as e:

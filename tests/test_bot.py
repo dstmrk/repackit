@@ -1,7 +1,7 @@
 """Tests for bot.py."""
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -11,7 +11,7 @@ import bot
 
 def test_calculate_next_run_future():
     """Test calculate_next_run when scheduled hour is in the future today."""
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     future_hour = (now.hour + 2) % 24
 
     # If future_hour wrapped around, we need to handle it
@@ -32,7 +32,7 @@ def test_calculate_next_run_future():
 
 def test_calculate_next_run_past():
     """Test calculate_next_run when scheduled hour has already passed today."""
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     past_hour = (now.hour - 1) % 24
 
     if past_hour > now.hour:

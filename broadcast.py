@@ -14,7 +14,7 @@ import asyncio
 import logging
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 import httpx
 from dotenv import load_dotenv
@@ -159,7 +159,7 @@ async def main():  # pragma: no cover
 
     # Log broadcast initiation
     logger.info("=" * 80)
-    logger.info(f"Broadcast initiated at {datetime.now().isoformat()}")
+    logger.info(f"Broadcast initiated at {datetime.now(timezone.utc).isoformat()}")
     logger.info(f"Admin user ID: {ADMIN_USER_ID}")
     logger.info("=" * 80)
 

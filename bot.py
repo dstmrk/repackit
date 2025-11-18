@@ -5,7 +5,7 @@ import contextlib
 import logging
 import os
 import signal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from dotenv import load_dotenv
 from telegram.ext import Application, CommandHandler
@@ -66,7 +66,7 @@ def calculate_next_run(hour: int) -> datetime:
     Returns:
         Datetime of next scheduled run
     """
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     next_run = now.replace(hour=hour, minute=0, second=0, microsecond=0)
 
     # If the time has already passed today, schedule for tomorrow
@@ -93,7 +93,9 @@ async def run_scraper() -> None:
         logger.info(f"Scraper completed: {len(results)}/{len(products)} prices scraped")
 
         # Update system status
-        await database.update_system_status("last_scraper_run", datetime.now().isoformat())
+        await database.update_system_status(
+            "last_scraper_run", datetime.now(timezone.utc).isoformat()
+        )
 
     except Exception as e:
         logger.error(f"Error in scraper task: {e}", exc_info=True)
@@ -126,7 +128,7 @@ async def schedule_scraper() -> None:  # pragma: no cover
     """Schedule daily scraper runs."""
     while not shutdown_event.is_set():
         next_run = calculate_next_run(SCRAPER_HOUR)
-        sleep_seconds = (next_run - datetime.now()).total_seconds()
+        sleep_seconds = (next_run - datetime.now(timezone.utc)).total_seconds()
 
         logger.info(f"Scraper scheduled for {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -147,7 +149,7 @@ async def schedule_checker() -> None:  # pragma: no cover
     """Schedule daily checker runs."""
     while not shutdown_event.is_set():
         next_run = calculate_next_run(CHECKER_HOUR)
-        sleep_seconds = (next_run - datetime.now()).total_seconds()
+        sleep_seconds = (next_run - datetime.now(timezone.utc)).total_seconds()
 
         logger.info(f"Checker scheduled for {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -168,7 +170,7 @@ async def schedule_cleanup() -> None:  # pragma: no cover
     """Schedule daily cleanup runs."""
     while not shutdown_event.is_set():
         next_run = calculate_next_run(CLEANUP_HOUR)
-        sleep_seconds = (next_run - datetime.now()).total_seconds()
+        sleep_seconds = (next_run - datetime.now(timezone.utc)).total_seconds()
 
         logger.info(f"Cleanup scheduled for {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
 

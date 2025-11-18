@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 
@@ -66,7 +66,7 @@ async def get_health_status() -> dict:
         - stats: User and product counts
         - tasks: Status of scheduled tasks (scraper, checker, cleanup)
     """
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     threshold = now - timedelta(days=MAX_DAYS_SINCE_LAST_RUN)
 
     # Get database stats
@@ -95,6 +95,9 @@ async def get_health_status() -> dict:
             last_run_str = task_info["value"]
             try:
                 last_run = datetime.fromisoformat(last_run_str)
+                # Ensure timezone-aware for comparison (assume UTC if naive)
+                if last_run.tzinfo is None:
+                    last_run = last_run.replace(tzinfo=timezone.utc)
                 is_healthy = last_run >= threshold
 
                 tasks[task_name] = {
