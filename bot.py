@@ -47,8 +47,8 @@ SCRAPER_HOUR = int(os.getenv("SCRAPER_HOUR", "9"))
 CHECKER_HOUR = int(os.getenv("CHECKER_HOUR", "10"))
 CLEANUP_HOUR = int(os.getenv("CLEANUP_HOUR", "2"))
 
-# Global flag for graceful shutdown
-shutdown_flag = False
+# Global event for graceful shutdown
+shutdown_event = asyncio.Event()
 
 
 def calculate_next_run(hour: int) -> datetime:
@@ -119,52 +119,64 @@ async def run_cleanup() -> None:
 
 async def schedule_scraper() -> None:  # pragma: no cover
     """Schedule daily scraper runs."""
-    while not shutdown_flag:
+    while not shutdown_event.is_set():
         next_run = calculate_next_run(SCRAPER_HOUR)
         sleep_seconds = (next_run - datetime.now()).total_seconds()
 
         logger.info(f"Scraper scheduled for {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
 
-        # Sleep until next run (check shutdown flag every minute)
-        while sleep_seconds > 0 and not shutdown_flag:
-            await asyncio.sleep(min(60, sleep_seconds))
-            sleep_seconds -= 60
+        # Wait for sleep_seconds or until shutdown event is set
+        try:
+            await asyncio.wait_for(shutdown_event.wait(), timeout=sleep_seconds)
+            # If we got here, shutdown was triggered
+            break
+        except TimeoutError:
+            # Timeout is normal - time to run the scraper
+            pass
 
-        if not shutdown_flag:
+        if not shutdown_event.is_set():
             await run_scraper()
 
 
 async def schedule_checker() -> None:  # pragma: no cover
     """Schedule daily checker runs."""
-    while not shutdown_flag:
+    while not shutdown_event.is_set():
         next_run = calculate_next_run(CHECKER_HOUR)
         sleep_seconds = (next_run - datetime.now()).total_seconds()
 
         logger.info(f"Checker scheduled for {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
 
-        # Sleep until next run (check shutdown flag every minute)
-        while sleep_seconds > 0 and not shutdown_flag:
-            await asyncio.sleep(min(60, sleep_seconds))
-            sleep_seconds -= 60
+        # Wait for sleep_seconds or until shutdown event is set
+        try:
+            await asyncio.wait_for(shutdown_event.wait(), timeout=sleep_seconds)
+            # If we got here, shutdown was triggered
+            break
+        except TimeoutError:
+            # Timeout is normal - time to run the checker
+            pass
 
-        if not shutdown_flag:
+        if not shutdown_event.is_set():
             await run_checker()
 
 
 async def schedule_cleanup() -> None:  # pragma: no cover
     """Schedule daily cleanup runs."""
-    while not shutdown_flag:
+    while not shutdown_event.is_set():
         next_run = calculate_next_run(CLEANUP_HOUR)
         sleep_seconds = (next_run - datetime.now()).total_seconds()
 
         logger.info(f"Cleanup scheduled for {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
 
-        # Sleep until next run (check shutdown flag every minute)
-        while sleep_seconds > 0 and not shutdown_flag:
-            await asyncio.sleep(min(60, sleep_seconds))
-            sleep_seconds -= 60
+        # Wait for sleep_seconds or until shutdown event is set
+        try:
+            await asyncio.wait_for(shutdown_event.wait(), timeout=sleep_seconds)
+            # If we got here, shutdown was triggered
+            break
+        except TimeoutError:
+            # Timeout is normal - time to run the cleanup
+            pass
 
-        if not shutdown_flag:
+        if not shutdown_event.is_set():
             await run_cleanup()
 
 
@@ -241,9 +253,8 @@ def setup_signal_handlers() -> None:  # pragma: no cover
     """Setup signal handlers for graceful shutdown."""
 
     def signal_handler(signum, frame):
-        global shutdown_flag
         logger.info(f"Received signal {signum}, initiating graceful shutdown...")
-        shutdown_flag = True
+        shutdown_event.set()
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)

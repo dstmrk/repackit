@@ -241,42 +241,42 @@ async def test_feedback_handler():
 
 @pytest.mark.asyncio
 async def test_schedule_scraper_shutdown():
-    """Test schedule_scraper respects shutdown flag."""
-    # Set shutdown flag to stop immediately
-    bot.shutdown_flag = True
+    """Test schedule_scraper respects shutdown event."""
+    # Set shutdown event to stop immediately
+    bot.shutdown_event.set()
 
     # Create task
     task = asyncio.create_task(bot.schedule_scraper())
 
-    # Wait briefly to ensure it checks the flag
+    # Wait briefly to ensure it checks the event
     await asyncio.sleep(0.1)
 
-    # Task should complete quickly due to shutdown flag
+    # Task should complete quickly due to shutdown event
     assert task.done() or task.cancelled()
 
-    # Reset shutdown flag
-    bot.shutdown_flag = False
+    # Reset shutdown event
+    bot.shutdown_event.clear()
 
 
 @pytest.mark.asyncio
 async def test_schedule_checker_shutdown():
-    """Test schedule_checker respects shutdown flag."""
-    bot.shutdown_flag = True
+    """Test schedule_checker respects shutdown event."""
+    bot.shutdown_event.set()
 
     task = asyncio.create_task(bot.schedule_checker())
     await asyncio.sleep(0.1)
 
     assert task.done() or task.cancelled()
-    bot.shutdown_flag = False
+    bot.shutdown_event.clear()
 
 
 @pytest.mark.asyncio
 async def test_schedule_cleanup_shutdown():
-    """Test schedule_cleanup respects shutdown flag."""
-    bot.shutdown_flag = True
+    """Test schedule_cleanup respects shutdown event."""
+    bot.shutdown_event.set()
 
     task = asyncio.create_task(bot.schedule_cleanup())
     await asyncio.sleep(0.1)
 
     assert task.done() or task.cancelled()
-    bot.shutdown_flag = False
+    bot.shutdown_event.clear()
