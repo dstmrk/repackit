@@ -93,8 +93,7 @@ async def init_db() -> None:
             if "marketplace" not in column_names:
                 logger.info("Migrating database: adding marketplace column")
                 await db.execute(
-                    "ALTER TABLE products ADD COLUMN marketplace TEXT NOT NULL "
-                    "DEFAULT 'it'"
+                    "ALTER TABLE products ADD COLUMN marketplace TEXT NOT NULL DEFAULT 'it'"
                 )
 
         await db.commit()
@@ -188,14 +187,26 @@ async def add_product(
     async with aiosqlite.connect(DATABASE_PATH) as db:
         cursor = await db.execute(
             """
-            INSERT INTO products (user_id, asin, marketplace, price_paid, return_deadline, min_savings_threshold)
+            INSERT INTO products (
+                user_id, asin, marketplace, price_paid, return_deadline, min_savings_threshold
+            )
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (user_id, asin, marketplace, price_paid, return_deadline.isoformat(), min_savings_threshold),
+            (
+                user_id,
+                asin,
+                marketplace,
+                price_paid,
+                return_deadline.isoformat(),
+                min_savings_threshold,
+            ),
         )
         await db.commit()
         product_id = cursor.lastrowid
-        logger.info(f"Product {asin} from amazon.{marketplace} added for user {user_id} (ID: {product_id})")
+        logger.info(
+            f"Product {asin} from amazon.{marketplace} added for user {user_id} "
+            f"(ID: {product_id})"
+        )
         return product_id
 
 
