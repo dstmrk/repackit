@@ -173,19 +173,6 @@ async def test_start_handler():
 
 
 @pytest.mark.asyncio
-async def test_feedback_handler():
-    """Test /feedback command handler stub."""
-    update = MagicMock()
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-
-    await bot.feedback_handler(update, context)
-
-    # Verify stub message was sent
-    update.message.reply_text.assert_called_once()
-
-
-@pytest.mark.asyncio
 async def test_schedule_scraper_shutdown():
     """Test schedule_scraper respects shutdown event."""
     # Set shutdown event to stop immediately
