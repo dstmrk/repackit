@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  repackit-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: repackit-bot
+    restart: unless-stopped
+
+    # Port mapping
+    ports:
+      - "8443:8443"  # Telegram webhook
+      - "8444:8444"  # Health check endpoint
+
+    # Volume for persistent data
+    volumes:
+      - ./data:/app/data
+
+    # Environment variables (from .env file)
+    env_file:
+      - .env
+
+    # Resource limits (optional, adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8444/health', timeout=5.0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Network mode (bridge is default, change if needed)
+    network_mode: bridge
