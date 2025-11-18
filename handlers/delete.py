@@ -58,7 +58,7 @@ async def delete_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
         if not products:
             await update.message.reply_text(
-                "📭 *Non hai prodotti da eliminare*\n\n" "Usa /add per aggiungere un prodotto!",
+                "📭 *Non hai prodotti da eliminare*\n\nUsa /add per aggiungere un prodotto!",
                 parse_mode="Markdown",
             )
             return

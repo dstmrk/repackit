@@ -12,6 +12,94 @@ from handlers.add import parse_deadline
 logger = logging.getLogger(__name__)
 
 
+async def _update_price(product_id: int, asin: str, value_str: str, user_id: int, message) -> bool:
+    """Update product price. Returns True if successful."""
+    try:
+        new_price = float(value_str.replace(",", "."))
+        if new_price <= 0:
+            raise ValueError("Price must be positive")
+    except ValueError:
+        await message.reply_text(
+            f"❌ Prezzo non valido: `{value_str}`\n\nUsa un numero positivo (es. 59.90 o 59,90)",
+            parse_mode="Markdown",
+        )
+        return False
+
+    await database.update_product(product_id, price_paid=new_price)
+    await message.reply_text(
+        "✅ *Prezzo aggiornato con successo!*\n\n"
+        f"📦 ASIN: `{asin}`\n"
+        f"💰 Nuovo prezzo: €{new_price:.2f}",
+        parse_mode="Markdown",
+    )
+    logger.info(f"Price updated for user {user_id}: product_id={product_id}, new_price={new_price}")
+    return True
+
+
+async def _update_deadline(
+    product_id: int, asin: str, value_str: str, user_id: int, message
+) -> bool:
+    """Update product deadline. Returns True if successful."""
+    try:
+        new_deadline = parse_deadline(value_str)
+    except ValueError as e:
+        await message.reply_text(
+            f"❌ Scadenza non valida: {e}\n\nUsa giorni (es. 30) o data ISO (es. 2024-12-25)"
+        )
+        return False
+
+    if new_deadline < date.today():
+        await message.reply_text(
+            "❌ La scadenza deve essere nel futuro!\n\n"
+            f"Data specificata: {new_deadline.strftime('%d/%m/%Y')}"
+        )
+        return False
+
+    await database.update_product(product_id, return_deadline=new_deadline)
+
+    days_remaining = (new_deadline - date.today()).days
+    await message.reply_text(
+        "✅ *Scadenza aggiornata con successo!*\n\n"
+        f"📦 ASIN: `{asin}`\n"
+        f"📅 Nuova scadenza: {new_deadline.strftime('%d/%m/%Y')} (tra {days_remaining} giorni)",
+        parse_mode="Markdown",
+    )
+    logger.info(
+        f"Deadline updated for user {user_id}: product_id={product_id}, new_deadline={new_deadline}"
+    )
+    return True
+
+
+async def _update_threshold(
+    product_id: int, asin: str, value_str: str, current_price: float, user_id: int, message
+) -> bool:
+    """Update product threshold. Returns True if successful."""
+    try:
+        new_threshold = float(value_str.replace(",", "."))
+        if new_threshold < 0:
+            raise ValueError("Threshold must be non-negative")
+        if new_threshold >= current_price:
+            raise ValueError("Threshold must be less than price paid")
+    except ValueError as e:
+        await message.reply_text(
+            f"❌ Soglia non valida: {e}\n\n"
+            "La soglia deve essere un numero positivo minore del prezzo pagato."
+        )
+        return False
+
+    await database.update_product(product_id, min_savings_threshold=new_threshold)
+    await message.reply_text(
+        "✅ *Soglia aggiornata con successo!*\n\n"
+        f"📦 ASIN: `{asin}`\n"
+        f"🎯 Nuova soglia risparmio: €{new_threshold:.2f}",
+        parse_mode="Markdown",
+    )
+    logger.info(
+        f"Threshold updated for user {user_id}: product_id={product_id}, new_threshold={new_threshold}"
+    )
+    return True
+
+
 async def update_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handle /update command.
@@ -80,7 +168,7 @@ async def update_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
         if not products:
             await update.message.reply_text(
-                "📭 *Non hai prodotti da aggiornare*\n\n" "Usa /add per aggiungere un prodotto!",
+                "📭 *Non hai prodotti da aggiornare*\n\nUsa /add per aggiungere un prodotto!",
                 parse_mode="Markdown",
             )
             return
@@ -99,88 +187,15 @@ async def update_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         product_id = product["id"]
         asin = product["asin"]
 
-        # Parse and validate value based on field
+        # Update field based on user input
         if field == "prezzo":
-            try:
-                new_price = float(value_str.replace(",", "."))
-                if new_price <= 0:
-                    raise ValueError("Price must be positive")
-            except ValueError:
-                await update.message.reply_text(
-                    f"❌ Prezzo non valido: `{value_str}`\n\n"
-                    "Usa un numero positivo (es. 59.90 o 59,90)",
-                    parse_mode="Markdown",
-                )
-                return
-
-            await database.update_product(product_id, price_paid=new_price)
-            await update.message.reply_text(
-                "✅ *Prezzo aggiornato con successo!*\n\n"
-                f"📦 ASIN: `{asin}`\n"
-                f"💰 Nuovo prezzo: €{new_price:.2f}",
-                parse_mode="Markdown",
-            )
-            logger.info(
-                f"Price updated for user {user_id}: product_id={product_id}, new_price={new_price}"
-            )
-
+            await _update_price(product_id, asin, value_str, user_id, update.message)
         elif field == "scadenza":
-            try:
-                new_deadline = parse_deadline(value_str)
-            except ValueError as e:
-                await update.message.reply_text(
-                    f"❌ Scadenza non valida: {e}\n\n"
-                    "Usa giorni (es. 30) o data ISO (es. 2024-12-25)"
-                )
-                return
-
-            # Check deadline is in the future
-            if new_deadline < date.today():
-                await update.message.reply_text(
-                    "❌ La scadenza deve essere nel futuro!\n\n"
-                    f"Data specificata: {new_deadline.strftime('%d/%m/%Y')}"
-                )
-                return
-
-            await database.update_product(product_id, return_deadline=new_deadline)
-
-            days_remaining = (new_deadline - date.today()).days
-            await update.message.reply_text(
-                "✅ *Scadenza aggiornata con successo!*\n\n"
-                f"📦 ASIN: `{asin}`\n"
-                f"📅 Nuova scadenza: {new_deadline.strftime('%d/%m/%Y')} (tra {days_remaining} giorni)",
-                parse_mode="Markdown",
-            )
-            logger.info(
-                f"Deadline updated for user {user_id}: product_id={product_id}, new_deadline={new_deadline}"
-            )
-
+            await _update_deadline(product_id, asin, value_str, user_id, update.message)
         elif field == "soglia":
-            try:
-                new_threshold = float(value_str.replace(",", "."))
-                if new_threshold < 0:
-                    raise ValueError("Threshold must be non-negative")
-
-                # Get current price to validate threshold
-                current_price = product["price_paid"]
-                if new_threshold >= current_price:
-                    raise ValueError("Threshold must be less than price paid")
-            except ValueError as e:
-                await update.message.reply_text(
-                    f"❌ Soglia non valida: {e}\n\n"
-                    "La soglia deve essere un numero positivo minore del prezzo pagato."
-                )
-                return
-
-            await database.update_product(product_id, min_savings_threshold=new_threshold)
-            await update.message.reply_text(
-                "✅ *Soglia aggiornata con successo!*\n\n"
-                f"📦 ASIN: `{asin}`\n"
-                f"🎯 Nuova soglia risparmio: €{new_threshold:.2f}",
-                parse_mode="Markdown",
-            )
-            logger.info(
-                f"Threshold updated for user {user_id}: product_id={product_id}, new_threshold={new_threshold}"
+            current_price = product["price_paid"]
+            await _update_threshold(
+                product_id, asin, value_str, current_price, user_id, update.message
             )
 
     except Exception as e:
