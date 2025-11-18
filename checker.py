@@ -17,6 +17,41 @@ logger = logging.getLogger(__name__)
 # Get bot token from environment
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 
+# Rate limiting configuration (to avoid Telegram bans)
+NOTIFICATION_BATCH_SIZE = 10  # Send max 10 notifications at once
+DELAY_BETWEEN_BATCHES = 1.0  # 1 second delay between batches
+
+
+async def _send_notification_safe(bot: Bot, notif: dict) -> bool:
+    """
+    Safely send a notification, catching exceptions and returning success status.
+
+    Args:
+        bot: Telegram Bot instance
+        notif: Notification dict with keys: user_id, asin, marketplace, current_price,
+               price_paid, savings, return_deadline
+
+    Returns:
+        True if notification was sent successfully, False otherwise
+    """
+    try:
+        await send_price_drop_notification(
+            bot=bot,
+            user_id=notif["user_id"],
+            asin=notif["asin"],
+            marketplace=notif["marketplace"],
+            current_price=notif["current_price"],
+            price_paid=notif["price_paid"],
+            savings=notif["savings"],
+            return_deadline=notif["return_deadline"],
+        )
+        return True
+    except Exception as e:
+        logger.error(
+            f"Failed to send notification to user {notif['user_id']}: {e}", exc_info=False
+        )
+        return False
+
 
 def _should_notify(
     product_id: int,
@@ -121,7 +156,8 @@ async def check_and_notify() -> dict:
 
         bot = Bot(token=TELEGRAM_TOKEN)
 
-        # Check each product and send notifications
+        # First pass: collect all products that need notification
+        notifications_to_send = []
         for product in products:
             product_id = product["id"]
             user_id = product["user_id"]
@@ -142,38 +178,69 @@ async def check_and_notify() -> dict:
                 product_id, current_price, price_paid, min_savings, last_notified
             )
 
-            if not should_notify:
-                continue
-
-            # Send notification
-            try:
+            if should_notify:
                 marketplace = product.get("marketplace", "it")
-                await send_price_drop_notification(
-                    bot=bot,
-                    user_id=user_id,
-                    asin=asin,
-                    marketplace=marketplace,
-                    current_price=current_price,
-                    price_paid=price_paid,
-                    savings=savings,
-                    return_deadline=return_deadline,
+                notifications_to_send.append(
+                    {
+                        "product_id": product_id,
+                        "user_id": user_id,
+                        "asin": asin,
+                        "marketplace": marketplace,
+                        "current_price": current_price,
+                        "price_paid": price_paid,
+                        "savings": savings,
+                        "return_deadline": return_deadline,
+                    }
                 )
 
-                # Update last_notified_price
-                await database.update_last_notified_price(product_id, current_price)
+        logger.info(f"Found {len(notifications_to_send)} notifications to send")
 
-                stats["notifications_sent"] += 1
-                logger.info(
-                    f"Notification sent to user {user_id} for product {product_id} "
-                    f"(€{savings:.2f} savings)"
-                )
+        # Second pass: send notifications in batches with rate limiting
+        for i in range(0, len(notifications_to_send), NOTIFICATION_BATCH_SIZE):
+            batch = notifications_to_send[i : i + NOTIFICATION_BATCH_SIZE]
 
-            except Exception as e:
-                logger.error(
-                    f"Error notifying user {user_id} for product {product_id}: {e}",
-                    exc_info=True,
+            # Send batch concurrently
+            batch_results = await asyncio.gather(
+                *[
+                    _send_notification_safe(bot, notif)
+                    for notif in batch
+                ],
+                return_exceptions=True,
+            )
+
+            # Process results
+            for j, result in enumerate(batch_results):
+                notif = batch[i + j] if i + j < len(notifications_to_send) else None
+                if notif is None:
+                    continue
+
+                if isinstance(result, Exception):
+                    logger.error(
+                        f"Error notifying user {notif['user_id']} for product "
+                        f"{notif['product_id']}: {result}",
+                        exc_info=True,
+                    )
+                    stats["errors"] += 1
+                elif result:
+                    # Success: update last_notified_price
+                    await database.update_last_notified_price(
+                        notif["product_id"], notif["current_price"]
+                    )
+                    stats["notifications_sent"] += 1
+                    logger.info(
+                        f"Notification sent to user {notif['user_id']} for product "
+                        f"{notif['product_id']} (€{notif['savings']:.2f} savings)"
+                    )
+                else:
+                    stats["errors"] += 1
+
+            # Rate limiting: wait between batches (except for last batch)
+            if i + NOTIFICATION_BATCH_SIZE < len(notifications_to_send):
+                await asyncio.sleep(DELAY_BETWEEN_BATCHES)
+                logger.debug(
+                    f"Sent batch {i // NOTIFICATION_BATCH_SIZE + 1}, "
+                    f"waiting {DELAY_BETWEEN_BATCHES}s before next batch"
                 )
-                stats["errors"] += 1
 
         # Update system status for health check
         await database.update_system_status("last_checker_run", datetime.now().isoformat())
