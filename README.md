@@ -341,9 +341,3 @@ Per documentazione dettagliata su architettura, design decisions e deployment, c
 ## Supporto
 
 - 🐛 Bug reports: [GitHub Issues](https://github.com/dstmrk/repackit/issues)
-- 💬 Discussioni: [GitHub Discussions](https://github.com/dstmrk/repackit/discussions)
-- 📧 Email: support@repackit.io
-
----
-
-**Fatto con ❤️ da [@dstmrk](https://github.com/dstmrk)**
