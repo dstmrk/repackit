@@ -168,6 +168,18 @@ async def add_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         # Register user if not exists
         await database.add_user(user_id=user_id, language_code=update.effective_user.language_code)
 
+        # Check product limit (max 10 products per user)
+        user_products = await database.get_user_products(user_id)
+        if len(user_products) >= 10:
+            await update.message.reply_text(
+                "❌ *Limite prodotti raggiunto!*\n\n"
+                "Puoi monitorare al massimo *10 prodotti* contemporaneamente.\n\n"
+                "Usa `/delete <numero>` per rimuovere un prodotto e fare spazio.",
+                parse_mode="Markdown",
+            )
+            logger.info(f"User {user_id} reached product limit (10 products)")
+            return
+
         # Add product to database
         await database.add_product(
             user_id=user_id,

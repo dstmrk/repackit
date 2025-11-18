@@ -353,3 +353,51 @@ async def test_add_handler_multiple_marketplaces(test_db):
     last_call_args = update.message.reply_text.call_args
     last_message = last_call_args[0][0]
     assert "amazon.uk" in last_message  # Last added was UK
+
+
+@pytest.mark.asyncio
+async def test_add_handler_product_limit(test_db):
+    """Test /add with product limit (max 10 products per user)."""
+    user_id = 123
+    tomorrow = date.today() + timedelta(days=1)
+
+    # Add 10 products (reach the limit)
+    for i in range(10):
+        await database.add_product(
+            user_id=user_id,
+            asin=f"B08N5WRWN{i}",
+            marketplace="it",
+            price_paid=50.00 + i,
+            return_deadline=tomorrow,
+        )
+
+    # Verify we have 10 products
+    products = await database.get_user_products(user_id)
+    assert len(products) == 10
+
+    # Mock update and context
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.effective_user.language_code = "it"
+    update.message = AsyncMock()
+
+    context = MagicMock()
+    context.args = [
+        "https://www.amazon.it/dp/B08N5WRWNW",
+        "59.90",
+        "30",
+    ]
+
+    # Try to add an 11th product
+    await add_handler(update, context)
+
+    # Verify error message was sent
+    assert update.message.reply_text.called
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "Limite prodotti raggiunto" in message
+    assert "10 prodotti" in message
+
+    # Verify no product was added
+    products = await database.get_user_products(user_id)
+    assert len(products) == 10  # Still 10, not 11
