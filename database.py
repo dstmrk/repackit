@@ -95,6 +95,11 @@ async def init_db() -> None:
                 await db.execute(
                     "ALTER TABLE products ADD COLUMN marketplace TEXT NOT NULL DEFAULT 'it'"
                 )
+            if "consecutive_failures" not in column_names:
+                logger.info("Migrating database: adding consecutive_failures column")
+                await db.execute(
+                    "ALTER TABLE products ADD COLUMN consecutive_failures INTEGER DEFAULT 0"
+                )
 
         await db.commit()
         logger.info(f"Database initialized at {DATABASE_PATH}")
@@ -319,6 +324,49 @@ async def update_last_notified_price(product_id: int, price: float) -> None:
         )
         await db.commit()
         logger.debug(f"Product {product_id} last_notified_price updated to {price}")
+
+
+async def increment_consecutive_failures(product_id: int) -> int:
+    """
+    Increment consecutive failures count for a product.
+
+    Args:
+        product_id: Database product ID
+
+    Returns:
+        New consecutive failures count
+    """
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        await db.execute(
+            "UPDATE products SET consecutive_failures = consecutive_failures + 1 WHERE id = ?",
+            (product_id,),
+        )
+        await db.commit()
+
+        # Get the new count
+        async with db.execute(
+            "SELECT consecutive_failures FROM products WHERE id = ?", (product_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            count = row[0] if row else 0
+            logger.debug(f"Product {product_id} consecutive_failures incremented to {count}")
+            return count
+
+
+async def reset_consecutive_failures(product_id: int) -> None:
+    """
+    Reset consecutive failures count to 0 for a product.
+
+    Args:
+        product_id: Database product ID
+    """
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        await db.execute(
+            "UPDATE products SET consecutive_failures = 0 WHERE id = ?",
+            (product_id,),
+        )
+        await db.commit()
+        logger.debug(f"Product {product_id} consecutive_failures reset to 0")
 
 
 async def delete_product(product_id: int) -> bool:

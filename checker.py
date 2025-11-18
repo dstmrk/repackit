@@ -158,6 +158,8 @@ async def check_and_notify() -> dict:
 
         # First pass: collect all products that need notification
         notifications_to_send = []
+        unavailable_notifications = []  # Products with 3+ consecutive failures
+
         for product in products:
             product_id = product["id"]
             user_id = product["user_id"]
@@ -166,12 +168,35 @@ async def check_and_notify() -> dict:
             return_deadline = date.fromisoformat(product["return_deadline"])
             min_savings = product["min_savings_threshold"] or 0
             last_notified = product["last_notified_price"]
+            marketplace = product.get("marketplace", "it")
+            consecutive_failures = product.get("consecutive_failures", 0)
 
             # Get current price
             current_price = current_prices.get(product_id)
             if current_price is None:
-                logger.debug(f"No price data for product {product_id} (ASIN: {asin})")
+                # Scraping failed - increment consecutive failures
+                new_failure_count = await database.increment_consecutive_failures(product_id)
+                logger.debug(
+                    f"No price data for product {product_id} (ASIN: {asin}), "
+                    f"consecutive failures: {new_failure_count}"
+                )
+
+                # Notify user if product has failed 3 times
+                if new_failure_count == 3:
+                    unavailable_notifications.append(
+                        {
+                            "user_id": user_id,
+                            "asin": asin,
+                            "marketplace": marketplace,
+                            "return_deadline": return_deadline,
+                        }
+                    )
                 continue
+
+            # Scraping succeeded - reset consecutive failures if needed
+            if consecutive_failures > 0:
+                await database.reset_consecutive_failures(product_id)
+                logger.debug(f"Product {product_id} scraped successfully, failures reset")
 
             # Check if we should notify
             should_notify, savings = _should_notify(
@@ -179,7 +204,6 @@ async def check_and_notify() -> dict:
             )
 
             if should_notify:
-                marketplace = product.get("marketplace", "it")
                 notifications_to_send.append(
                     {
                         "product_id": product_id,
@@ -241,6 +265,38 @@ async def check_and_notify() -> dict:
                     f"Sent batch {i // NOTIFICATION_BATCH_SIZE + 1}, "
                     f"waiting {DELAY_BETWEEN_BATCHES}s before next batch"
                 )
+
+        # Send unavailable product notifications
+        logger.info(f"Found {len(unavailable_notifications)} unavailable products to notify")
+        for i in range(0, len(unavailable_notifications), NOTIFICATION_BATCH_SIZE):
+            batch = unavailable_notifications[i : i + NOTIFICATION_BATCH_SIZE]
+
+            # Send batch concurrently
+            batch_results = await asyncio.gather(
+                *[
+                    send_unavailable_notification(
+                        bot,
+                        notif["user_id"],
+                        notif["asin"],
+                        notif["marketplace"],
+                        notif["return_deadline"],
+                    )
+                    for notif in batch
+                ],
+                return_exceptions=True,
+            )
+
+            # Process results
+            for result in batch_results:
+                if isinstance(result, Exception):
+                    logger.error(f"Error sending unavailable notification: {result}")
+                    stats["errors"] += 1
+                else:
+                    stats["notifications_sent"] += 1
+
+            # Rate limiting: wait between batches
+            if i + NOTIFICATION_BATCH_SIZE < len(unavailable_notifications):
+                await asyncio.sleep(DELAY_BETWEEN_BATCHES)
 
         # Update system status for health check
         await database.update_system_status(
@@ -324,6 +380,72 @@ async def send_price_drop_notification(
         )
     except TelegramError as e:
         logger.error(f"Failed to send message to user {user_id}: {e}")
+        raise
+
+
+async def send_unavailable_notification(
+    bot: Bot,
+    user_id: int,
+    asin: str,
+    marketplace: str,
+    return_deadline: date,
+) -> None:
+    """
+    Send notification about potentially unavailable product.
+
+    Args:
+        bot: Telegram Bot instance
+        user_id: Telegram user ID
+        asin: Amazon product ASIN
+        marketplace: Amazon marketplace (it, com, de, etc.)
+        return_deadline: Last day to return product
+
+    Raises:
+        TelegramError: If notification fails to send
+    """
+    # Build affiliate URL
+    product_url = build_affiliate_url(asin, marketplace)
+
+    # Calculate days remaining
+    today = date.today()
+    days_remaining = (return_deadline - today).days
+    deadline_str = return_deadline.strftime("%d/%m/%Y")
+
+    # Build message
+    message = (
+        "⚠️ *Prodotto non disponibile*\n\n"
+        "Non sono riuscito a recuperare il prezzo del prodotto che stai monitorando "
+        "per 3 volte consecutive.\n\n"
+        "Il prodotto potrebbe essere:\n"
+        "• Temporaneamente non disponibile\n"
+        "• Rimosso da Amazon\n"
+        "• Bloccato geograficamente\n\n"
+        f"📅 Scadenza reso: {deadline_str}"
+    )
+
+    # Add days remaining info
+    if days_remaining > 0:
+        message += f" (tra {days_remaining} giorni)"
+    elif days_remaining == 0:
+        message += " (*oggi*)"
+    else:
+        message += " (*scaduto*)"
+
+    message += (
+        f"\n\n🔗 [Controlla il prodotto]({product_url})\n\n"
+        "_Continuerò a monitorarlo. Se il prezzo torna disponibile, riceverai una notifica._"
+    )
+
+    # Send message
+    try:
+        await bot.send_message(
+            chat_id=user_id,
+            text=message,
+            parse_mode="Markdown",
+            disable_web_page_preview=False,
+        )
+    except TelegramError as e:
+        logger.error(f"Failed to send unavailable notification to user {user_id}: {e}")
         raise
 
 
