@@ -51,13 +51,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set working directory
 WORKDIR /app
 
-# Copy virtual environment from builder (read-only for non-root users)
-COPY --from=builder --chown=root:root --chmod=755 /opt/venv /opt/venv
+# Copy virtual environment from builder (read-only for all users)
+COPY --from=builder --chown=root:root --chmod=555 /opt/venv /opt/venv
 
-# Copy application code (only necessary files, not recursive context)
-COPY --chown=repackit:repackit pyproject.toml ./
-COPY --chown=repackit:repackit *.py ./
-COPY --chown=repackit:repackit handlers/ ./handlers/
+# Copy application code (read-only for security - prevents tampering)
+COPY --chown=root:root --chmod=555 pyproject.toml ./
+COPY --chown=root:root --chmod=555 *.py ./
+COPY --chown=root:root --chmod=555 handlers/ ./handlers/
 
 # Switch to non-root user
 USER repackit

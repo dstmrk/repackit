@@ -75,27 +75,31 @@ jobs:
           # Create data directory
           mkdir -p data/logs
 
-          # Try to start container (will fail due to invalid Telegram token, but tests basic startup)
+          # Start container (will exit due to invalid Telegram token, but tests basic startup)
           docker run --rm -d \
             --name repackit-test \
             --env-file .env \
             -v $(pwd)/data:/app/data \
-            repackit:test &
+            repackit:test || true
 
-          # Wait a bit for container to start
-          sleep 5
+          # Wait for container to initialize
+          sleep 10
 
-          # Check if container started (it might exit due to webhook setup failure, that's ok)
-          if docker ps -a | grep repackit-test; then
-            echo "Container started successfully"
-            docker logs repackit-test
+          # Get container logs
+          docker logs repackit-test 2>&1 | tee /tmp/container.log || true
+
+          # Check that bot at least attempted to start (should see initialization logs)
+          if grep -q "INFO" /tmp/container.log || grep -q "ERROR" /tmp/container.log; then
+            echo "✓ Container started and bot initialized"
+            echo "Container logs:"
+            cat /tmp/container.log | head -20
           else
-            echo "Container failed to start"
+            echo "✗ Container failed to initialize - no logs found"
             exit 1
           fi
 
-          # Stop container
-          docker stop repackit-test || true
+          # Clean up
+          docker stop repackit-test 2>/dev/null || true
 
       - name: Move cache
         run: |
