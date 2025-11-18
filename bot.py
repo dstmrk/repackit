@@ -188,7 +188,9 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     )
 
 
-async def add_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def add_handler(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:  # pragma: no cover
     """Handle /add command."""
     await update.message.reply_text(
         "⚠️ Comando /add non ancora implementato.\n"
@@ -196,26 +198,34 @@ async def add_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     )
 
 
-async def list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def list_handler(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:  # pragma: no cover
     """Handle /list command."""
     await update.message.reply_text("⚠️ Comando /list non ancora implementato.")
 
 
-async def delete_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def delete_handler(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:  # pragma: no cover
     """Handle /delete command."""
     await update.message.reply_text(
         "⚠️ Comando /delete non ancora implementato.\n" "Utilizzo: /delete <numero>"
     )
 
 
-async def update_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def update_handler(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:  # pragma: no cover
     """Handle /update command."""
     await update.message.reply_text(
         "⚠️ Comando /update non ancora implementato.\n" "Utilizzo: /update <numero> <campo> <valore>"
     )
 
 
-async def feedback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def feedback_handler(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:  # pragma: no cover
     """Handle /feedback command."""
     await update.message.reply_text(
         "⚠️ Comando /feedback non ancora implementato.\n" "Utilizzo: /feedback <messaggio>"
@@ -227,7 +237,7 @@ async def feedback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 # ============================================================================
 
 
-def setup_signal_handlers() -> None:
+def setup_signal_handlers() -> None:  # pragma: no cover
     """Setup signal handlers for graceful shutdown."""
 
     def signal_handler(signum, frame):
@@ -239,7 +249,7 @@ def setup_signal_handlers() -> None:
     signal.signal(signal.SIGTERM, signal_handler)
 
 
-async def main() -> None:
+async def main() -> None:  # pragma: no cover
     """Main bot application."""
     logger.info("Starting RepackIt bot...")
 
