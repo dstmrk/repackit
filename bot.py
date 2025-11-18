@@ -210,7 +210,7 @@ async def delete_handler(
 ) -> None:  # pragma: no cover
     """Handle /delete command."""
     await update.message.reply_text(
-        "⚠️ Comando /delete non ancora implementato.\n" "Utilizzo: /delete <numero>"
+        "⚠️ Comando /delete non ancora implementato.\nUtilizzo: /delete <numero>"
     )
 
 
@@ -219,7 +219,7 @@ async def update_handler(
 ) -> None:  # pragma: no cover
     """Handle /update command."""
     await update.message.reply_text(
-        "⚠️ Comando /update non ancora implementato.\n" "Utilizzo: /update <numero> <campo> <valore>"
+        "⚠️ Comando /update non ancora implementato.\nUtilizzo: /update <numero> <campo> <valore>"
     )
 
 
@@ -228,7 +228,7 @@ async def feedback_handler(
 ) -> None:  # pragma: no cover
     """Handle /feedback command."""
     await update.message.reply_text(
-        "⚠️ Comando /feedback non ancora implementato.\n" "Utilizzo: /feedback <messaggio>"
+        "⚠️ Comando /feedback non ancora implementato.\nUtilizzo: /feedback <messaggio>"
     )
 
 
