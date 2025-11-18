@@ -173,47 +173,6 @@ async def test_start_handler():
 
 
 @pytest.mark.asyncio
-async def test_add_handler():
-    """Test /add command handler stub."""
-    update = MagicMock()
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-
-    await bot.add_handler(update, context)
-
-    # Verify stub message was sent
-    update.message.reply_text.assert_called_once()
-    call_args = update.message.reply_text.call_args[0]
-    assert "non ancora implementato" in call_args[0]
-
-
-@pytest.mark.asyncio
-async def test_list_handler():
-    """Test /list command handler stub."""
-    update = MagicMock()
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-
-    await bot.list_handler(update, context)
-
-    # Verify stub message was sent
-    update.message.reply_text.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_delete_handler():
-    """Test /delete command handler stub."""
-    update = MagicMock()
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-
-    await bot.delete_handler(update, context)
-
-    # Verify stub message was sent
-    update.message.reply_text.assert_called_once()
-
-
-@pytest.mark.asyncio
 async def test_update_handler():
     """Test /update command handler stub."""
     update = MagicMock()

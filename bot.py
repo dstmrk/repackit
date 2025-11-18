@@ -15,6 +15,8 @@ import checker
 import database
 import product_cleanup
 from data_reader import scrape_prices
+from handlers.add import add_handler
+from handlers.delete import delete_handler
 from handlers.list import list_handler
 from handlers.start import start_handler
 from health_handler import start_health_server
@@ -185,25 +187,6 @@ async def schedule_cleanup() -> None:  # pragma: no cover
 # ============================================================================
 # Command Handlers (Stubs - to be implemented)
 # ============================================================================
-
-
-async def add_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:  # pragma: no cover
-    """Handle /add command."""
-    await update.message.reply_text(
-        "⚠️ Comando /add non ancora implementato.\n"
-        "Utilizzo: /add <url> <prezzo> <giorni|data> [soglia]"
-    )
-
-
-async def delete_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:  # pragma: no cover
-    """Handle /delete command."""
-    await update.message.reply_text(
-        "⚠️ Comando /delete non ancora implementato.\nUtilizzo: /delete <numero>"
-    )
 
 
 async def update_handler(
