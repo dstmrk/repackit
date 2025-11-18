@@ -124,13 +124,20 @@ async def run_cleanup() -> None:
         logger.error(f"Error in cleanup task: {e}", exc_info=True)
 
 
-async def schedule_scraper() -> None:  # pragma: no cover
-    """Schedule daily scraper runs."""
+async def schedule_task(task_name: str, hour: int, task_func) -> None:  # pragma: no cover
+    """
+    Generic scheduler for daily tasks.
+
+    Args:
+        task_name: Human-readable name for logging (e.g., "Scraper", "Checker")
+        hour: Hour of day to run (0-23)
+        task_func: Async function to execute
+    """
     while not shutdown_event.is_set():
-        next_run = calculate_next_run(SCRAPER_HOUR)
+        next_run = calculate_next_run(hour)
         sleep_seconds = (next_run - datetime.now(timezone.utc)).total_seconds()
 
-        logger.info(f"Scraper scheduled for {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info(f"{task_name} scheduled for {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
 
         # Wait for sleep_seconds or until shutdown event is set
         try:
@@ -138,53 +145,26 @@ async def schedule_scraper() -> None:  # pragma: no cover
             # If we got here, shutdown was triggered
             break
         except TimeoutError:
-            # Timeout is normal - time to run the scraper
+            # Timeout is normal - time to run the task
             pass
 
         if not shutdown_event.is_set():
-            await run_scraper()
+            await task_func()
+
+
+async def schedule_scraper() -> None:  # pragma: no cover
+    """Schedule daily scraper runs."""
+    await schedule_task("Scraper", SCRAPER_HOUR, run_scraper)
 
 
 async def schedule_checker() -> None:  # pragma: no cover
     """Schedule daily checker runs."""
-    while not shutdown_event.is_set():
-        next_run = calculate_next_run(CHECKER_HOUR)
-        sleep_seconds = (next_run - datetime.now(timezone.utc)).total_seconds()
-
-        logger.info(f"Checker scheduled for {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
-
-        # Wait for sleep_seconds or until shutdown event is set
-        try:
-            await asyncio.wait_for(shutdown_event.wait(), timeout=sleep_seconds)
-            # If we got here, shutdown was triggered
-            break
-        except TimeoutError:
-            # Timeout is normal - time to run the checker
-            pass
-
-        if not shutdown_event.is_set():
-            await run_checker()
+    await schedule_task("Checker", CHECKER_HOUR, run_checker)
 
 
 async def schedule_cleanup() -> None:  # pragma: no cover
     """Schedule daily cleanup runs."""
-    while not shutdown_event.is_set():
-        next_run = calculate_next_run(CLEANUP_HOUR)
-        sleep_seconds = (next_run - datetime.now(timezone.utc)).total_seconds()
-
-        logger.info(f"Cleanup scheduled for {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
-
-        # Wait for sleep_seconds or until shutdown event is set
-        try:
-            await asyncio.wait_for(shutdown_event.wait(), timeout=sleep_seconds)
-            # If we got here, shutdown was triggered
-            break
-        except TimeoutError:
-            # Timeout is normal - time to run the cleanup
-            pass
-
-        if not shutdown_event.is_set():
-            await run_cleanup()
+    await schedule_task("Cleanup", CLEANUP_HOUR, run_cleanup)
 
 
 # ============================================================================
