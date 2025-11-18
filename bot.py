@@ -22,6 +22,10 @@ load_dotenv()
 
 # Configure logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+
+# Create logs directory if it doesn't exist
+os.makedirs("data/logs", exist_ok=True)
+
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL.upper()),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
