@@ -128,7 +128,7 @@ async def test_delete_handler_number_too_high(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123, asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
     )
 
     update = MagicMock()
@@ -153,10 +153,10 @@ async def test_delete_handler_success(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123, asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
     )
     await database.add_product(
-        user_id=123, asin="ASIN00002", price_paid=75.0, return_deadline=tomorrow
+        user_id=123, asin="ASIN00002", marketplace="it", price_paid=75.0, return_deadline=tomorrow
     )
 
     # Verify 2 products exist
@@ -189,7 +189,7 @@ async def test_delete_handler_database_error(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123, asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
     )
 
     update = MagicMock()

@@ -65,6 +65,7 @@ async def test_list_handler_single_product(test_db):
     await database.add_product(
         user_id=123,
         asin="B08N5WRWNW",
+        marketplace="it",
         price_paid=59.90,
         return_deadline=tomorrow,
         min_savings_threshold=5.0,

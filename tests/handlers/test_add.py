@@ -306,3 +306,41 @@ async def test_add_handler_database_error(test_db):
         call_args = update.message.reply_text.call_args
         message = call_args[0][0]
         assert "Errore" in message
+
+
+@pytest.mark.asyncio
+async def test_add_handler_multiple_marketplaces(test_db):
+    """Test /add handler with products from different Amazon marketplaces."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.effective_user.language_code = "it"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+
+    # Test different marketplace URLs
+    test_cases = [
+        ("https://www.amazon.it/dp/B08N5WRWNW", "it", 59.90),
+        ("https://www.amazon.com/dp/B08N5WRWNX", "com", 69.90),
+        ("https://www.amazon.de/dp/B08N5WRWNY", "de", 79.90),
+        ("https://www.amazon.fr/dp/B08N5WRWNZ", "fr", 89.90),
+        ("https://www.amazon.co.uk/dp/B08N5WRNWA", "uk", 99.90),
+    ]
+
+    for url, expected_marketplace, price in test_cases:
+        context.args = [url, str(price), "30"]
+        await add_handler(update, context)
+
+    # Verify all products were added with correct marketplace
+    products = await database.get_user_products(123)
+    assert len(products) == 5
+
+    # Verify each product has correct marketplace (reverse order due to DESC sort)
+    for i, (_, expected_marketplace, price) in enumerate(reversed(test_cases)):
+        product = products[i]
+        assert product["marketplace"] == expected_marketplace
+        assert product["price_paid"] == price
+
+    # Verify success message includes marketplace
+    last_call_args = update.message.reply_text.call_args
+    last_message = last_call_args[0][0]
+    assert "amazon.uk" in last_message  # Last added was UK
