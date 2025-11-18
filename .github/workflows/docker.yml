@@ -4,9 +4,23 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.gitattributes'
+      - '.github/workflows/**'
+      - '!.github/workflows/docker.yml'  # Still run if docker.yml itself changes
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.gitattributes'
+      - '.github/workflows/**'
+      - '!.github/workflows/docker.yml'  # Still run if docker.yml itself changes
 
 jobs:
   docker-build:
