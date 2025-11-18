@@ -15,6 +15,7 @@ import checker
 import database
 import product_cleanup
 from data_reader import scrape_prices
+from handlers.start import start_handler
 from health_handler import start_health_server
 
 # Load environment variables
@@ -183,21 +184,6 @@ async def schedule_cleanup() -> None:  # pragma: no cover
 # ============================================================================
 # Command Handlers (Stubs - to be implemented)
 # ============================================================================
-
-
-async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /start command."""
-    logger.info(f"User {update.effective_user.id} started the bot")
-    await update.message.reply_text(
-        "👋 Benvenuto su RepackIt!\n\n"
-        "Ti aiuto a risparmiare monitorando i prezzi Amazon durante il periodo di reso.\n\n"
-        "Comandi disponibili:\n"
-        "/add - Aggiungi un prodotto da monitorare\n"
-        "/list - Visualizza i tuoi prodotti\n"
-        "/delete - Rimuovi un prodotto\n"
-        "/update - Modifica un prodotto\n"
-        "/feedback - Invia un feedback"
-    )
 
 
 async def add_handler(
