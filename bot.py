@@ -15,6 +15,7 @@ import checker
 import database
 import product_cleanup
 from data_reader import scrape_prices
+from handlers.list import list_handler
 from handlers.start import start_handler
 from health_handler import start_health_server
 
@@ -194,13 +195,6 @@ async def add_handler(
         "⚠️ Comando /add non ancora implementato.\n"
         "Utilizzo: /add <url> <prezzo> <giorni|data> [soglia]"
     )
-
-
-async def list_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:  # pragma: no cover
-    """Handle /list command."""
-    await update.message.reply_text("⚠️ Comando /list non ancora implementato.")
 
 
 async def delete_handler(
