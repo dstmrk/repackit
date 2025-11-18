@@ -3,8 +3,30 @@ name: Test
 on:
   push:
     branches: [ main, master, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.gitattributes'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.dockerignore'
+      - '.env.example'
+      - '.github/workflows/**'
+      - '!.github/workflows/test.yml'  # Still run if test.yml itself changes
   pull_request:
     branches: [ main, master, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.gitattributes'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.dockerignore'
+      - '.env.example'
+      - '.github/workflows/**'
+      - '!.github/workflows/test.yml'  # Still run if test.yml itself changes
 
 jobs:
   test:

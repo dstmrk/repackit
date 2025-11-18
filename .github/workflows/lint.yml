@@ -3,8 +3,30 @@ name: Lint
 on:
   push:
     branches: [ main, master, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.gitattributes'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.dockerignore'
+      - '.env.example'
+      - '.github/workflows/**'
+      - '!.github/workflows/lint.yml'  # Still run if lint.yml itself changes
   pull_request:
     branches: [ main, master, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.gitattributes'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.dockerignore'
+      - '.env.example'
+      - '.github/workflows/**'
+      - '!.github/workflows/lint.yml'  # Still run if lint.yml itself changes
 
 jobs:
   lint:
