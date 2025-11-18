@@ -13,6 +13,11 @@ logger = logging.getLogger(__name__)
 # Get affiliate tag from environment
 AMAZON_AFFILIATE_TAG = os.getenv("AMAZON_AFFILIATE_TAG", "")
 
+# Retry configuration for scraping
+MAX_RETRIES = 3
+INITIAL_RETRY_DELAY = 2.0  # seconds
+BACKOFF_MULTIPLIER = 2.0
+
 # ASIN pattern: 10 alphanumeric characters
 # Supports: /dp/, /gp/product/, and short links /d/
 ASIN_PATTERN = re.compile(r"/dp/([A-Z0-9]{10})|/gp/product/([A-Z0-9]{10})|/d/([A-Z0-9]{10})")
@@ -107,10 +112,53 @@ async def scrape_price(asin: str, marketplace: str = "it") -> float | None:
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         try:
-            price = await _scrape_single_price(browser, asin, marketplace)
+            price = await _retry_with_backoff(_scrape_single_price, browser, asin, marketplace)
             return price
         finally:
             await browser.close()
+
+
+async def _retry_with_backoff(func, *args, **kwargs):
+    """
+    Retry a function with exponential backoff on failure.
+
+    Args:
+        func: Async function to retry
+        *args: Positional arguments for func
+        **kwargs: Keyword arguments for func
+
+    Returns:
+        Result from func if successful, None if all retries fail
+    """
+    delay = INITIAL_RETRY_DELAY
+
+    for attempt in range(MAX_RETRIES):
+        try:
+            result = await func(*args, **kwargs)
+            if result is not None:  # Success
+                return result
+
+            # Result was None, retry
+            if attempt < MAX_RETRIES - 1:
+                logger.debug(
+                    f"Attempt {attempt + 1}/{MAX_RETRIES} returned None, "
+                    f"retrying in {delay:.1f}s..."
+                )
+                await asyncio.sleep(delay)
+                delay *= BACKOFF_MULTIPLIER
+        except Exception as e:
+            if attempt < MAX_RETRIES - 1:
+                logger.warning(
+                    f"Attempt {attempt + 1}/{MAX_RETRIES} failed: {e}, "
+                    f"retrying in {delay:.1f}s..."
+                )
+                await asyncio.sleep(delay)
+                delay *= BACKOFF_MULTIPLIER
+            else:
+                logger.error(f"All {MAX_RETRIES} attempts failed for scraping")
+                raise
+
+    return None
 
 
 async def _scrape_single_price(browser: Browser, asin: str, marketplace: str) -> float | None:
