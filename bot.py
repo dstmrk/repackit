@@ -19,6 +19,7 @@ from handlers.add import add_handler
 from handlers.delete import delete_handler
 from handlers.list import list_handler
 from handlers.start import start_handler
+from handlers.update import update_handler
 from health_handler import start_health_server
 
 # Load environment variables
@@ -187,15 +188,6 @@ async def schedule_cleanup() -> None:  # pragma: no cover
 # ============================================================================
 # Command Handlers (Stubs - to be implemented)
 # ============================================================================
-
-
-async def update_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:  # pragma: no cover
-    """Handle /update command."""
-    await update.message.reply_text(
-        "⚠️ Comando /update non ancora implementato.\nUtilizzo: /update <numero> <campo> <valore>"
-    )
 
 
 async def feedback_handler(
