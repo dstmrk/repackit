@@ -1,14 +1,12 @@
 """Tests for price checker."""
 
-import os
 from datetime import date, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from telegram.error import TelegramError
 
 import checker
-
 
 # ============================================================================
 # Main check_and_notify tests
@@ -152,9 +150,7 @@ async def test_check_and_notify_success():
         with patch("checker.database.get_all_active_products", return_value=products):
             with patch("checker.scrape_prices", return_value=current_prices):
                 with patch("checker.Bot", return_value=mock_bot):
-                    with patch(
-                        "checker.database.update_last_notified_price"
-                    ) as mock_update_price:
+                    with patch("checker.database.update_last_notified_price") as mock_update_price:
                         with patch("checker.database.update_system_status"):
                             stats = await checker.check_and_notify()
 
