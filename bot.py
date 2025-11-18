@@ -6,6 +6,7 @@ import logging
 import os
 import signal
 from datetime import datetime, timedelta, timezone
+from logging.handlers import TimedRotatingFileHandler
 
 from dotenv import load_dotenv
 from telegram.ext import Application, CommandHandler
@@ -31,12 +32,21 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 # Create logs directory if it doesn't exist
 os.makedirs("data/logs", exist_ok=True)
 
+# Setup rotating file handler (daily rotation, keep 2 backups + today = 3 days total)
+file_handler = TimedRotatingFileHandler(
+    filename="data/logs/bot.log",
+    when="midnight",
+    interval=1,
+    backupCount=2,
+)
+file_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL.upper()),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("data/logs/bot.log"),
+        file_handler,
     ],
 )
 logger = logging.getLogger(__name__)

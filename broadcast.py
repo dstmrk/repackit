@@ -15,6 +15,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
+from logging.handlers import TimedRotatingFileHandler
 
 import httpx
 from dotenv import load_dotenv
@@ -25,12 +26,21 @@ import database
 load_dotenv()
 
 # Configure logging
+# Setup rotating file handler (daily rotation, keep 2 backups + today = 3 days total)
+file_handler = TimedRotatingFileHandler(
+    filename="data/logs/broadcast.log",
+    when="midnight",
+    interval=1,
+    backupCount=2,
+)
+file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("data/logs/broadcast.log"),
+        file_handler,
     ],
 )
 logger = logging.getLogger(__name__)
