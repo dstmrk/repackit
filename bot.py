@@ -8,15 +8,18 @@ import signal
 from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler
 
 import checker
 import database
 import product_cleanup
 from data_reader import scrape_prices
+from handlers.add import add_handler
+from handlers.delete import delete_handler
+from handlers.feedback import feedback_handler
 from handlers.list import list_handler
 from handlers.start import start_handler
+from handlers.update import update_handler
 from health_handler import start_health_server
 
 # Load environment variables
@@ -180,48 +183,6 @@ async def schedule_cleanup() -> None:  # pragma: no cover
 
         if not shutdown_event.is_set():
             await run_cleanup()
-
-
-# ============================================================================
-# Command Handlers (Stubs - to be implemented)
-# ============================================================================
-
-
-async def add_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:  # pragma: no cover
-    """Handle /add command."""
-    await update.message.reply_text(
-        "⚠️ Comando /add non ancora implementato.\n"
-        "Utilizzo: /add <url> <prezzo> <giorni|data> [soglia]"
-    )
-
-
-async def delete_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:  # pragma: no cover
-    """Handle /delete command."""
-    await update.message.reply_text(
-        "⚠️ Comando /delete non ancora implementato.\nUtilizzo: /delete <numero>"
-    )
-
-
-async def update_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:  # pragma: no cover
-    """Handle /update command."""
-    await update.message.reply_text(
-        "⚠️ Comando /update non ancora implementato.\nUtilizzo: /update <numero> <campo> <valore>"
-    )
-
-
-async def feedback_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:  # pragma: no cover
-    """Handle /feedback command."""
-    await update.message.reply_text(
-        "⚠️ Comando /feedback non ancora implementato.\nUtilizzo: /feedback <messaggio>"
-    )
 
 
 # ============================================================================
