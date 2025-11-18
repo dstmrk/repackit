@@ -1,4 +1,4 @@
-# RepackIt Bot 🤖
+# RepackIt Bot 🤖📦
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
 [![Unit Tests](https://github.com/dstmrk/repackit/actions/workflows/test.yml/badge.svg)](https://github.com/dstmrk/repackit/actions/workflows/test.yml)
