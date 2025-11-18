@@ -102,9 +102,9 @@ async def test_get_stats_with_data(test_db):
     future_date = date.today() + timedelta(days=10)
     past_date = date.today() - timedelta(days=1)
 
-    await database.add_product(111, "ACTIVE01", 50.0, future_date)
-    await database.add_product(111, "ACTIVE02", 60.0, future_date)
-    await database.add_product(222, "EXPIRED1", 70.0, past_date)
+    await database.add_product(111, "ACTIVE01", "it", 50.0, future_date)
+    await database.add_product(111, "ACTIVE02", "it", 60.0, future_date)
+    await database.add_product(222, "EXPIRED1", "it", 70.0, past_date)
 
     stats = await database.get_stats()
     assert stats["user_count"] == 2
@@ -184,7 +184,7 @@ async def test_health_status_includes_stats(test_db):
     await database.add_user(222, "en")
 
     future_date = date.today() + timedelta(days=10)
-    await database.add_product(111, "ACTIVE01", 50.0, future_date)
+    await database.add_product(111, "ACTIVE01", "it", 50.0, future_date)
 
     health = await health_handler.get_health_status()
 

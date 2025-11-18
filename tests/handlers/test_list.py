@@ -103,11 +103,16 @@ async def test_list_handler_multiple_products(test_db):
     next_week = date.today() + timedelta(days=7)
 
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=tomorrow,
     )
     await database.add_product(
         user_id=123,
         asin="ASIN00002",
+        marketplace="it",
         price_paid=75.0,
         return_deadline=next_week,
         min_savings_threshold=10.0,
@@ -141,7 +146,11 @@ async def test_list_handler_deadline_today(test_db):
 
     today = date.today()
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=today
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=today,
     )
 
     update = MagicMock()
@@ -163,7 +172,11 @@ async def test_list_handler_deadline_expired(test_db):
 
     yesterday = date.today() - timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=yesterday
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=yesterday,
     )
 
     update = MagicMock()
@@ -187,6 +200,7 @@ async def test_list_handler_no_threshold(test_db):
     await database.add_product(
         user_id=123,
         asin="ASIN00001",
+        marketplace="it",
         price_paid=50.0,
         return_deadline=tomorrow,
         min_savings_threshold=None,

@@ -93,7 +93,8 @@ async def init_db() -> None:
             if "marketplace" not in column_names:
                 logger.info("Migrating database: adding marketplace column")
                 await db.execute(
-                    "ALTER TABLE products ADD COLUMN marketplace TEXT NOT NULL DEFAULT 'it'"
+                    "ALTER TABLE products ADD COLUMN marketplace TEXT NOT NULL "
+                    "DEFAULT 'it'"
                 )
 
         await db.commit()
