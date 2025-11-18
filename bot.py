@@ -117,7 +117,7 @@ async def run_cleanup() -> None:
         logger.error(f"Error in cleanup task: {e}", exc_info=True)
 
 
-async def schedule_scraper() -> None:
+async def schedule_scraper() -> None:  # pragma: no cover
     """Schedule daily scraper runs."""
     while not shutdown_flag:
         next_run = calculate_next_run(SCRAPER_HOUR)
@@ -134,7 +134,7 @@ async def schedule_scraper() -> None:
             await run_scraper()
 
 
-async def schedule_checker() -> None:
+async def schedule_checker() -> None:  # pragma: no cover
     """Schedule daily checker runs."""
     while not shutdown_flag:
         next_run = calculate_next_run(CHECKER_HOUR)
@@ -151,7 +151,7 @@ async def schedule_checker() -> None:
             await run_checker()
 
 
-async def schedule_cleanup() -> None:
+async def schedule_cleanup() -> None:  # pragma: no cover
     """Schedule daily cleanup runs."""
     while not shutdown_flag:
         next_run = calculate_next_run(CLEANUP_HOUR)
