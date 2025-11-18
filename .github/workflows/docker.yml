@@ -75,31 +75,33 @@ jobs:
           # Create data directory
           mkdir -p data/logs
 
-          # Start container (will exit due to invalid Telegram token, but tests basic startup)
-          docker run --rm -d \
+          # Start container without --rm to preserve logs even after exit
+          docker run -d \
             --name repackit-test \
             --env-file .env \
             -v $(pwd)/data:/app/data \
-            repackit:test || true
+            repackit:test || echo "Container exited immediately (expected with fake token)"
 
-          # Wait for container to initialize
-          sleep 10
+          # Wait for container to initialize and potentially exit
+          sleep 5
 
-          # Get container logs
-          docker logs repackit-test 2>&1 | tee /tmp/container.log || true
+          # Get container logs (works even if container has exited)
+          echo "=== Container Logs ==="
+          docker logs repackit-test 2>&1 | tee /tmp/container.log
 
           # Check that bot at least attempted to start (should see initialization logs)
-          if grep -q "INFO" /tmp/container.log || grep -q "ERROR" /tmp/container.log; then
+          if grep -E "INFO|ERROR|WARNING" /tmp/container.log > /dev/null; then
             echo "✓ Container started and bot initialized"
-            echo "Container logs:"
-            cat /tmp/container.log | head -20
+            echo ""
+            echo "First 30 lines of logs:"
+            head -30 /tmp/container.log
           else
             echo "✗ Container failed to initialize - no logs found"
             exit 1
           fi
 
           # Clean up
-          docker stop repackit-test 2>/dev/null || true
+          docker rm -f repackit-test 2>/dev/null || true
 
       - name: Move cache
         run: |
