@@ -182,6 +182,23 @@ async def schedule_cleanup() -> None:  # pragma: no cover
 # ============================================================================
 
 
+def validate_environment() -> list[str]:
+    """
+    Validate all required environment variables are set.
+
+    Returns:
+        List of missing variable names (empty if all are set)
+    """
+    required_vars = {
+        "TELEGRAM_TOKEN": TELEGRAM_TOKEN,
+        "WEBHOOK_URL": WEBHOOK_URL,
+        "WEBHOOK_SECRET": WEBHOOK_SECRET,
+    }
+
+    missing = [name for name, value in required_vars.items() if not value]
+    return missing
+
+
 def setup_signal_handlers() -> None:  # pragma: no cover
     """Setup signal handlers for graceful shutdown."""
 
@@ -198,12 +215,12 @@ async def main() -> None:  # pragma: no cover
     logger.info("Starting RepackIt bot...")
 
     # Validate environment variables
-    if not TELEGRAM_TOKEN:
-        logger.error("TELEGRAM_TOKEN not set")
-        return
-
-    if not WEBHOOK_URL:
-        logger.error("WEBHOOK_URL not set")
+    missing_vars = validate_environment()
+    if missing_vars:
+        logger.error(
+            f"Missing required environment variables: {', '.join(missing_vars)}\n"
+            "Please set them in your .env file or environment."
+        )
         return
 
     # Initialize database
