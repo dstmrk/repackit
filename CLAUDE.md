@@ -141,6 +141,9 @@ CLEANUP_HOUR=2         # Daily cleanup time (removes expired products)
 # Admin
 ADMIN_USER_ID=123456789  # Telegram user ID for broadcast.py script verification
 
+# Amazon Affiliate
+AMAZON_AFFILIATE_TAG=yourtag-21  # Amazon affiliate tag for monetization
+
 # Logging
 LOG_LEVEL=INFO         # DEBUG, INFO, WARNING, ERROR, CRITICAL
 ```
@@ -248,7 +251,14 @@ Risparmio: €13.91
 
 Scadenza reso: 15/12/2024 (tra 12 giorni)
 
-🔗 [Vai al prodotto](https://amazon.it/dp/B08N5WRWNW)
+🔗 [Vai al prodotto](https://amazon.it/dp/B08N5WRWNW?tag=yourtag-21)
+```
+
+**Affiliate URL Construction**:
+All product URLs sent to users include the `AMAZON_AFFILIATE_TAG` for monetization:
+```python
+# Format: https://amazon.it/dp/{ASIN}?tag={AFFILIATE_TAG}
+url = f"https://amazon.it/dp/{asin}?tag={AMAZON_AFFILIATE_TAG}"
 ```
 
 **Can Run Standalone**:
@@ -583,6 +593,29 @@ uv run pytest -v
 
 # Regex: r'/dp/([A-Z0-9]{10})|/gp/product/([A-Z0-9]{10})'
 ```
+
+### Affiliate URL Construction
+When sending product links to users, always construct clean URLs with the affiliate tag:
+```python
+def build_affiliate_url(asin: str, marketplace: str = "it") -> str:
+    """
+    Build Amazon affiliate URL from ASIN.
+
+    Args:
+        asin: Amazon Standard Identification Number (10 chars)
+        marketplace: Country code (it, com, de, fr, etc.)
+
+    Returns:
+        Clean affiliate URL: https://amazon.{marketplace}/dp/{asin}?tag={tag}
+    """
+    return f"https://amazon.{marketplace}/dp/{asin}?tag={AMAZON_AFFILIATE_TAG}"
+```
+
+**Important Notes**:
+- Always use clean `/dp/{ASIN}` format (not `/gp/product/` or complex URLs)
+- Affiliate tag is the **only** query parameter needed
+- Works across all Amazon marketplaces (.it, .com, .de, etc.)
+- URL is short and user-friendly for Telegram messages
 
 ### Price Scraping Selectors
 Amazon's HTML structure (subject to change):
