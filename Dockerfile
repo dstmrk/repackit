@@ -19,12 +19,11 @@ RUN uv venv /opt/venv && \
 # Stage 2: Runtime - Minimal production image
 FROM python:3.11-slim
 
-# Install system dependencies for Playwright
-RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
+# Install system dependencies for Playwright and create non-root user
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     fonts-liberation \
+    gnupg \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
@@ -42,22 +41,23 @@ RUN apt-get update && apt-get install -y \
     libxfixes3 \
     libxkbcommon0 \
     libxrandr2 \
+    wget \
     xdg-utils \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create non-root user
-RUN useradd -m -u 1000 repackit && \
-    mkdir -p /app/data/logs && \
-    chown -R repackit:repackit /app
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -u 1000 repackit \
+    && mkdir -p /app/data/logs \
+    && chown -R repackit:repackit /app
 
 # Set working directory
 WORKDIR /app
 
-# Copy virtual environment from builder
-COPY --from=builder /opt/venv /opt/venv
+# Copy virtual environment from builder (read-only for non-root users)
+COPY --from=builder --chown=root:root --chmod=755 /opt/venv /opt/venv
 
-# Copy application code
-COPY --chown=repackit:repackit . .
+# Copy application code (only necessary files, not recursive context)
+COPY --chown=repackit:repackit pyproject.toml ./
+COPY --chown=repackit:repackit *.py ./
+COPY --chown=repackit:repackit handlers/ ./handlers/
 
 # Switch to non-root user
 USER repackit
