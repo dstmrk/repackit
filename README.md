@@ -1,5 +1,19 @@
 # RepackIt Bot 🤖
 
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
+[![Unit Tests](https://github.com/dstmrk/repackit/actions/workflows/test.yml/badge.svg)](https://github.com/dstmrk/repackit/actions/workflows/test.yml)
+[![Lint](https://github.com/dstmrk/repackit/actions/workflows/lint.yml/badge.svg)](https://github.com/dstmrk/repackit/actions/workflows/lint.yml)
+[![Docker Build](https://github.com/dstmrk/repackit/actions/workflows/docker.yml/badge.svg)](https://github.com/dstmrk/repackit/actions/workflows/docker.yml)
+
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=dstmrk_repackit&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=dstmrk_repackit)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=dstmrk_repackit&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=dstmrk_repackit)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=dstmrk_repackit&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=dstmrk_repackit)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=dstmrk_repackit&metric=bugs)](https://sonarcloud.io/summary/new_code?id=dstmrk_repackit)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=dstmrk_repackit&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=dstmrk_repackit)
+[![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=dstmrk_repackit&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=dstmrk_repackit)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=dstmrk_repackit&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=dstmrk_repackit)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=dstmrk_repackit&metric=coverage)](https://sonarcloud.io/summary/new_code?id=dstmrk_repackit)
+
 Un bot Telegram che ti avvisa se il prezzo dei tuoi acquisti Amazon scende durante il periodo di reso, permettendoti di riacquistarli a meno e fare il reso del primo ordine.
 
 ## Caratteristiche
