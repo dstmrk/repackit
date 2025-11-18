@@ -35,6 +35,7 @@ repackit/
 ├── data_reader.py            # Amazon scraper (Playwright)
 ├── checker.py                # Price comparison & notifications
 ├── product_cleanup.py        # Removes expired products
+├── broadcast.py              # Admin-only manual broadcast script
 ├── health_handler.py         # Health check endpoint
 ├── handlers/                 # Command handlers (one file per command)
 │   ├── __init__.py
@@ -43,13 +44,13 @@ repackit/
 │   ├── list.py
 │   ├── delete.py
 │   ├── update.py
-│   ├── feedback.py
-│   └── broadcast.py
+│   └── feedback.py
 ├── tests/                    # Unit tests mirroring src structure
 │   ├── test_bot.py
 │   ├── test_data_reader.py
 │   ├── test_checker.py
 │   ├── test_product_cleanup.py
+│   ├── test_broadcast.py
 │   └── handlers/
 │       ├── test_start.py
 │       └── ...
@@ -138,7 +139,7 @@ CHECKER_HOUR=10        # Daily price check time
 CLEANUP_HOUR=2         # Daily cleanup time (removes expired products)
 
 # Admin
-ADMIN_USER_ID=123456789  # Telegram user ID for /broadcast command
+ADMIN_USER_ID=123456789  # Telegram user ID for broadcast.py script verification
 
 # Logging
 LOG_LEVEL=INFO         # DEBUG, INFO, WARNING, ERROR, CRITICAL
@@ -271,7 +272,39 @@ uv run python product_cleanup.py  # Manual cleanup
 
 ---
 
-### 5. `handlers/` - Command Handlers
+### 5. `broadcast.py` - Admin Broadcast Script
+
+**Responsibilities**:
+- Send broadcast messages to all registered users
+- Admin-only script (not a bot command for enhanced security)
+- Requires manual execution by admin
+
+**Security Design**:
+Unlike a `/broadcast` bot command, this is a standalone Python script that must be executed manually. This prevents abuse even if an attacker gains access to `ADMIN_USER_ID`.
+
+**Usage**:
+```bash
+uv run python broadcast.py "Messaggio da inviare a tutti gli utenti"
+```
+
+**Implementation Notes**:
+- Validates `ADMIN_USER_ID` from environment
+- Sends message to all users in database
+- Implements rate limiting (avoid Telegram flood limits)
+- Logs all broadcast operations
+- Reports delivery statistics (sent, failed)
+
+**Example Output**:
+```
+[INFO] Starting broadcast to 1,234 users
+[INFO] Progress: 500/1234 (40%)
+[INFO] Progress: 1000/1234 (81%)
+[INFO] Broadcast completed: 1,230 sent, 4 failed
+```
+
+---
+
+### 6. `handlers/` - Command Handlers
 
 Each command in a separate file for maintainability.
 
@@ -322,9 +355,6 @@ Allows updating price_paid, return_deadline, or min_savings_threshold.
 
 #### `/feedback <messaggio>`
 Stores user feedback in database for admin review.
-
-#### `/broadcast <messaggio>` (Admin Only)
-Sends message to all users. Restricted to `ADMIN_USER_ID`.
 
 ---
 
@@ -392,6 +422,9 @@ uv run python bot.py
 uv run python data_reader.py
 uv run python checker.py
 uv run python product_cleanup.py
+
+# Admin-only broadcast (manual execution for security)
+uv run python broadcast.py "Your message here"
 ```
 
 ### Code Quality Checks
@@ -491,6 +524,7 @@ tests/
 ├── test_data_reader.py
 ├── test_checker.py
 ├── test_product_cleanup.py
+├── test_broadcast.py
 └── handlers/
     ├── test_start.py
     ├── test_add.py
