@@ -1,0 +1,252 @@
+"""Price checker and notification sender."""
+
+import asyncio
+import logging
+import os
+from datetime import date, datetime
+
+from telegram import Bot
+from telegram.error import TelegramError
+
+import database
+from data_reader import build_affiliate_url, scrape_prices
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Get bot token from environment
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
+
+
+async def check_and_notify() -> dict:
+    """
+    Check all active products for price drops and send notifications.
+
+    This is the main function that orchestrates the checking process:
+    1. Get all active products from database
+    2. Scrape current prices from Amazon
+    3. Compare with prices paid
+    4. Send notifications for significant drops
+    5. Update last_notified_price
+
+    Returns:
+        Dict with statistics:
+        - total_products: Total products checked
+        - scraped: Successfully scraped prices
+        - notifications_sent: Notifications sent to users
+        - errors: Number of errors encountered
+    """
+    logger.info("Starting price check process")
+
+    # Initialize statistics
+    stats = {
+        "total_products": 0,
+        "scraped": 0,
+        "notifications_sent": 0,
+        "errors": 0,
+    }
+
+    try:
+        # Get all active products (not expired)
+        products = await database.get_all_active_products()
+        stats["total_products"] = len(products)
+
+        if not products:
+            logger.info("No active products to check")
+            return stats
+
+        logger.info(f"Checking {len(products)} active products")
+
+        # Scrape current prices
+        current_prices = await scrape_prices(products)
+        stats["scraped"] = len(current_prices)
+
+        logger.info(f"Successfully scraped {len(current_prices)}/{len(products)} prices")
+
+        # Initialize Telegram bot
+        if not TELEGRAM_TOKEN:
+            logger.error("TELEGRAM_TOKEN not set, cannot send notifications")
+            stats["errors"] += 1
+            return stats
+
+        bot = Bot(token=TELEGRAM_TOKEN)
+
+        # Check each product and send notifications
+        for product in products:
+            product_id = product["id"]
+            user_id = product["user_id"]
+            asin = product["asin"]
+            price_paid = product["price_paid"]
+            return_deadline = date.fromisoformat(product["return_deadline"])
+            min_savings = product["min_savings_threshold"] or 0
+            last_notified = product["last_notified_price"]
+
+            # Get current price
+            current_price = current_prices.get(product_id)
+            if current_price is None:
+                logger.debug(f"No price data for product {product_id} (ASIN: {asin})")
+                continue
+
+            # Check if price dropped
+            if current_price >= price_paid:
+                logger.debug(
+                    f"Product {product_id}: current price (€{current_price}) "
+                    f">= paid (€{price_paid}), no notification"
+                )
+                continue
+
+            # Calculate savings
+            savings = price_paid - current_price
+
+            # Check if savings meets threshold
+            if savings < min_savings:
+                logger.debug(
+                    f"Product {product_id}: savings (€{savings}) "
+                    f"< threshold (€{min_savings}), no notification"
+                )
+                continue
+
+            # Check if we should notify (new price lower than last notified)
+            if last_notified is not None and current_price >= last_notified:
+                logger.debug(
+                    f"Product {product_id}: current price (€{current_price}) "
+                    f">= last notified (€{last_notified}), no notification"
+                )
+                continue
+
+            # Send notification
+            try:
+                marketplace = product.get("marketplace", "it")
+                await send_price_drop_notification(
+                    bot=bot,
+                    user_id=user_id,
+                    asin=asin,
+                    marketplace=marketplace,
+                    current_price=current_price,
+                    price_paid=price_paid,
+                    savings=savings,
+                    return_deadline=return_deadline,
+                )
+
+                # Update last_notified_price
+                await database.update_last_notified_price(product_id, current_price)
+
+                stats["notifications_sent"] += 1
+                logger.info(
+                    f"Notification sent to user {user_id} for product {product_id} "
+                    f"(€{savings:.2f} savings)"
+                )
+
+            except Exception as e:
+                logger.error(
+                    f"Error notifying user {user_id} for product {product_id}: {e}",
+                    exc_info=True,
+                )
+                stats["errors"] += 1
+
+        # Update system status for health check
+        await database.update_system_status("last_checker_run", datetime.now().isoformat())
+
+        logger.info(
+            f"Price check completed: {stats['notifications_sent']} notifications sent, "
+            f"{stats['errors']} errors"
+        )
+
+    except Exception as e:
+        logger.error(f"Error in check_and_notify: {e}", exc_info=True)
+        stats["errors"] += 1
+
+    return stats
+
+
+async def send_price_drop_notification(
+    bot: Bot,
+    user_id: int,
+    asin: str,
+    marketplace: str,
+    current_price: float,
+    price_paid: float,
+    savings: float,
+    return_deadline: date,
+) -> None:
+    """
+    Send price drop notification to user via Telegram.
+
+    Args:
+        bot: Telegram Bot instance
+        user_id: Telegram user ID
+        asin: Amazon product ASIN
+        marketplace: Amazon marketplace (it, com, de, etc.)
+        current_price: Current product price
+        price_paid: Price user paid
+        savings: Amount saved
+        return_deadline: Last day to return product
+
+    Raises:
+        TelegramError: If notification fails to send
+    """
+    # Calculate days remaining
+    today = date.today()
+    days_remaining = (return_deadline - today).days
+
+    # Build affiliate URL
+    product_url = build_affiliate_url(asin, marketplace)
+
+    # Format deadline
+    deadline_str = return_deadline.strftime("%d/%m/%Y")
+
+    # Build message
+    message = (
+        "🎉 *Prezzo in calo su Amazon!*\n\n"
+        f"Il prodotto che stai monitorando è sceso a *€{current_price:.2f}*\n"
+        f"Prezzo pagato: €{price_paid:.2f}\n"
+        f"💰 Risparmio: *€{savings:.2f}*\n\n"
+        f"📅 Scadenza reso: {deadline_str}"
+    )
+
+    # Add days remaining info
+    if days_remaining > 0:
+        message += f" (tra {days_remaining} giorni)"
+    elif days_remaining == 0:
+        message += " (*oggi*)"
+    else:
+        message += " (*scaduto*)"
+
+    message += f"\n\n🔗 [Vai al prodotto]({product_url})"
+
+    # Send message
+    try:
+        await bot.send_message(
+            chat_id=user_id,
+            text=message,
+            parse_mode="Markdown",
+            disable_web_page_preview=False,
+        )
+    except TelegramError as e:
+        logger.error(f"Failed to send message to user {user_id}: {e}")
+        raise
+
+
+if __name__ == "__main__":
+    # Setup logging for manual testing
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+
+    # Load environment variables
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
+    # Initialize database
+    asyncio.run(database.init_db())
+
+    # Run checker
+    print("Running price checker...")
+    stats = asyncio.run(check_and_notify())
+
+    print("\nResults:")
+    print(f"  Total products: {stats['total_products']}")
+    print(f"  Prices scraped: {stats['scraped']}")
+    print(f"  Notifications sent: {stats['notifications_sent']}")
+    print(f"  Errors: {stats['errors']}")
