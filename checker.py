@@ -18,6 +18,58 @@ logger = logging.getLogger(__name__)
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 
 
+def _should_notify(
+    product_id: int,
+    asin: str,
+    current_price: float,
+    price_paid: float,
+    min_savings: float,
+    last_notified: float | None,
+) -> tuple[bool, float]:
+    """
+    Check if a product should trigger a notification.
+
+    Args:
+        product_id: Database product ID
+        asin: Amazon ASIN
+        current_price: Current scraped price
+        price_paid: Price user paid
+        min_savings: Minimum savings threshold
+        last_notified: Last notified price (or None)
+
+    Returns:
+        Tuple of (should_notify: bool, savings: float)
+    """
+    # Check if price dropped
+    if current_price >= price_paid:
+        logger.debug(
+            f"Product {product_id}: current price (€{current_price}) "
+            f">= paid (€{price_paid}), no notification"
+        )
+        return False, 0.0
+
+    # Calculate savings
+    savings = price_paid - current_price
+
+    # Check if savings meets threshold
+    if savings < min_savings:
+        logger.debug(
+            f"Product {product_id}: savings (€{savings}) "
+            f"< threshold (€{min_savings}), no notification"
+        )
+        return False, savings
+
+    # Check if we should notify (new price lower than last notified)
+    if last_notified is not None and current_price >= last_notified:
+        logger.debug(
+            f"Product {product_id}: current price (€{current_price}) "
+            f">= last notified (€{last_notified}), no notification"
+        )
+        return False, savings
+
+    return True, savings
+
+
 async def check_and_notify() -> dict:
     """
     Check all active products for price drops and send notifications.
@@ -87,31 +139,12 @@ async def check_and_notify() -> dict:
                 logger.debug(f"No price data for product {product_id} (ASIN: {asin})")
                 continue
 
-            # Check if price dropped
-            if current_price >= price_paid:
-                logger.debug(
-                    f"Product {product_id}: current price (€{current_price}) "
-                    f">= paid (€{price_paid}), no notification"
-                )
-                continue
+            # Check if we should notify
+            should_notify, savings = _should_notify(
+                product_id, asin, current_price, price_paid, min_savings, last_notified
+            )
 
-            # Calculate savings
-            savings = price_paid - current_price
-
-            # Check if savings meets threshold
-            if savings < min_savings:
-                logger.debug(
-                    f"Product {product_id}: savings (€{savings}) "
-                    f"< threshold (€{min_savings}), no notification"
-                )
-                continue
-
-            # Check if we should notify (new price lower than last notified)
-            if last_notified is not None and current_price >= last_notified:
-                logger.debug(
-                    f"Product {product_id}: current price (€{current_price}) "
-                    f">= last notified (€{last_notified}), no notification"
-                )
+            if not should_notify:
                 continue
 
             # Send notification

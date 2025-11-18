@@ -51,7 +51,8 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format, *args):
         """Override to use custom logger."""
-        logger.info(f"{self.address_string()} - {format % args}")
+        message = format % args
+        logger.info(f"{self.address_string()} - {message}")
 
 
 async def get_health_status() -> dict:
