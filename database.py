@@ -69,6 +69,17 @@ async def init_db() -> None:
             """
         )
 
+        # System status table (for health checks)
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS system_status (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
         # Create indexes for performance
         await db.execute(
             "CREATE INDEX IF NOT EXISTS idx_user_products ON products(user_id)"
@@ -368,3 +379,95 @@ async def get_all_feedback() -> list[dict]:
         ) as cursor:
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
+
+
+# ============================================================================
+# System status operations (for health checks)
+# ============================================================================
+
+
+async def update_system_status(key: str, value: str) -> None:
+    """
+    Update system status key-value pair.
+
+    Args:
+        key: Status key (e.g., "last_scraper_run", "last_checker_run")
+        value: Status value (typically ISO timestamp)
+    """
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO system_status (key, value, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (key, value),
+        )
+        await db.commit()
+        logger.debug(f"System status updated: {key} = {value}")
+
+
+async def get_system_status(key: str) -> Optional[dict]:
+    """
+    Get system status value.
+
+    Args:
+        key: Status key
+
+    Returns:
+        Dict with keys: key, value, updated_at
+        None if key doesn't exist
+    """
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM system_status WHERE key = ?", (key,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+
+async def get_all_system_status() -> dict[str, dict]:
+    """
+    Get all system status entries.
+
+    Returns:
+        Dict mapping keys to their status dicts
+    """
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM system_status") as cursor:
+            rows = await cursor.fetchall()
+            return {row["key"]: dict(row) for row in rows}
+
+
+async def get_stats() -> dict:
+    """
+    Get database statistics for health check.
+
+    Returns:
+        Dict with keys: user_count, product_count, active_product_count
+    """
+    today = date.today().isoformat()
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        # Count users
+        async with db.execute("SELECT COUNT(*) FROM users") as cursor:
+            user_count = (await cursor.fetchone())[0]
+
+        # Count total products
+        async with db.execute("SELECT COUNT(*) FROM products") as cursor:
+            product_count = (await cursor.fetchone())[0]
+
+        # Count active products (not expired)
+        async with db.execute(
+            "SELECT COUNT(*) FROM products WHERE return_deadline >= ?", (today,)
+        ) as cursor:
+            active_product_count = (await cursor.fetchone())[0]
+
+    return {
+        "user_count": user_count,
+        "product_count": product_count,
+        "active_product_count": active_product_count,
+    }

@@ -109,10 +109,20 @@ CREATE TABLE feedback (
 );
 ```
 
+### `system_status` Table
+```sql
+CREATE TABLE system_status (
+    key TEXT PRIMARY KEY,                         -- Status key (e.g., "last_scraper_run")
+    value TEXT NOT NULL,                          -- Status value (ISO timestamp)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
 **Important Notes**:
 - Users never see the database `id`. Commands use 1-based indexing from their personal product list.
 - `last_notified_price` follows OctoTracker pattern: only notify if new price is **lower** than last notification.
 - `return_deadline` is stored as DATE, supporting both "30 giorni" and "2024-12-25" input formats.
+- `system_status` tracks scheduled task execution for health checks (see `health_handler.py`).
 
 ---
 
@@ -314,7 +324,113 @@ uv run python broadcast.py "Messaggio da inviare a tutti gli utenti"
 
 ---
 
-### 6. `handlers/` - Command Handlers
+### 6. `health_handler.py` - Health Check Endpoint
+
+**Responsibilities**:
+- HTTP server for monitoring bot health
+- Runs on separate port (`HEALTH_PORT`, default: 8444)
+- Integration with UptimeRobot and monitoring services
+- Tracks execution of scheduled tasks
+
+**Health Check Logic**:
+Returns `healthy` status only if ALL conditions are met:
+- Scraper ran within last 2 days
+- Checker ran within last 2 days
+- Cleanup ran within last 2 days
+
+Returns `unhealthy` if ANY task is stale (>2 days) or never ran.
+
+**Endpoint**: `GET /health`
+
+**Response Format**:
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-11-18T14:30:00.123456",
+  "stats": {
+    "users": 150,
+    "products_total": 245,
+    "products_active": 180
+  },
+  "tasks": {
+    "scraper": {
+      "status": "ok",
+      "last_run": "2024-11-18T09:00:00",
+      "healthy": true
+    },
+    "checker": {
+      "status": "ok",
+      "last_run": "2024-11-18T10:00:00",
+      "healthy": true
+    },
+    "cleanup": {
+      "status": "ok",
+      "last_run": "2024-11-18T02:00:00",
+      "healthy": true
+    }
+  },
+  "thresholds": {
+    "max_days_since_last_run": 2
+  }
+}
+```
+
+**Task Status Values**:
+- `ok`: Task ran within threshold (≤2 days)
+- `stale`: Task didn't run for >2 days
+- `never_run`: Task has never executed
+- `error`: Invalid timestamp or other error
+
+**System Status Tracking**:
+Each scheduled task updates the database after execution:
+```python
+from datetime import datetime
+import database
+
+# After successful scraper run
+await database.update_system_status("last_scraper_run", datetime.now().isoformat())
+
+# After successful checker run
+await database.update_system_status("last_checker_run", datetime.now().isoformat())
+
+# After successful cleanup run
+await database.update_system_status("last_cleanup_run", datetime.now().isoformat())
+```
+
+**Database Schema** (system_status table):
+```sql
+CREATE TABLE system_status (
+    key TEXT PRIMARY KEY,              -- e.g., "last_scraper_run"
+    value TEXT NOT NULL,               -- ISO timestamp
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Running Standalone**:
+```bash
+# Start health check server only (for testing)
+uv run python health_handler.py
+# Server runs on http://0.0.0.0:8444/health
+```
+
+**UptimeRobot Configuration**:
+- Monitor Type: HTTP(s)
+- URL: `https://your-domain.com:8444/health`
+- Keyword: `"healthy"` (monitor looks for this in response)
+- Interval: 5 minutes
+
+**Integration with Bot**:
+The health check server runs as a background thread in `bot.py`:
+```python
+from health_handler import start_health_server
+
+# Start health server in background
+start_health_server()  # Non-blocking, runs in daemon thread
+```
+
+---
+
+### 7. `handlers/` - Command Handlers
 
 Each command in a separate file for maintainability.
 
