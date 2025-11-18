@@ -2,8 +2,7 @@
 
 import logging
 import os
-from datetime import date, datetime
-from typing import Optional
+from datetime import date
 
 import aiosqlite
 
@@ -81,9 +80,7 @@ async def init_db() -> None:
         )
 
         # Create indexes for performance
-        await db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_user_products ON products(user_id)"
-        )
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_user_products ON products(user_id)")
         await db.execute(
             "CREATE INDEX IF NOT EXISTS idx_return_deadline ON products(return_deadline)"
         )
@@ -97,7 +94,7 @@ async def init_db() -> None:
 # ============================================================================
 
 
-async def add_user(user_id: int, language_code: Optional[str] = None) -> None:
+async def add_user(user_id: int, language_code: str | None = None) -> None:
     """
     Add a new user to the database.
 
@@ -117,7 +114,7 @@ async def add_user(user_id: int, language_code: Optional[str] = None) -> None:
         logger.info(f"User {user_id} added to database")
 
 
-async def get_user(user_id: int) -> Optional[dict]:
+async def get_user(user_id: int) -> dict | None:
     """
     Get user information from database.
 
@@ -130,9 +127,7 @@ async def get_user(user_id: int) -> Optional[dict]:
     """
     async with aiosqlite.connect(DATABASE_PATH) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT * FROM users WHERE user_id = ?", (user_id,)
-        ) as cursor:
+        async with db.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)) as cursor:
             row = await cursor.fetchone()
             return dict(row) if row else None
 
@@ -238,9 +233,9 @@ async def get_all_active_products() -> list[dict]:
 
 async def update_product(
     product_id: int,
-    price_paid: Optional[float] = None,
-    return_deadline: Optional[date] = None,
-    min_savings_threshold: Optional[float] = None,
+    price_paid: float | None = None,
+    return_deadline: date | None = None,
+    min_savings_threshold: float | None = None,
 ) -> bool:
     """
     Update product fields.
@@ -329,9 +324,7 @@ async def delete_expired_products() -> int:
     """
     today = date.today().isoformat()
     async with aiosqlite.connect(DATABASE_PATH) as db:
-        cursor = await db.execute(
-            "DELETE FROM products WHERE return_deadline < ?", (today,)
-        )
+        cursor = await db.execute("DELETE FROM products WHERE return_deadline < ?", (today,))
         await db.commit()
         count = cursor.rowcount
         logger.info(f"Deleted {count} expired products")
@@ -374,9 +367,7 @@ async def get_all_feedback() -> list[dict]:
     """
     async with aiosqlite.connect(DATABASE_PATH) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT * FROM feedback ORDER BY created_at DESC"
-        ) as cursor:
+        async with db.execute("SELECT * FROM feedback ORDER BY created_at DESC") as cursor:
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
 
@@ -409,7 +400,7 @@ async def update_system_status(key: str, value: str) -> None:
         logger.debug(f"System status updated: {key} = {value}")
 
 
-async def get_system_status(key: str) -> Optional[dict]:
+async def get_system_status(key: str) -> dict | None:
     """
     Get system status value.
 
@@ -422,9 +413,7 @@ async def get_system_status(key: str) -> Optional[dict]:
     """
     async with aiosqlite.connect(DATABASE_PATH) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT * FROM system_status WHERE key = ?", (key,)
-        ) as cursor:
+        async with db.execute("SELECT * FROM system_status WHERE key = ?", (key,)) as cursor:
             row = await cursor.fetchone()
             return dict(row) if row else None
 

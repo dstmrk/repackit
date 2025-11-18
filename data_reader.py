@@ -4,9 +4,8 @@ import asyncio
 import logging
 import os
 import re
-from typing import Optional
 
-from playwright.async_api import async_playwright, Browser, Page, TimeoutError
+from playwright.async_api import Browser, TimeoutError, async_playwright
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -88,7 +87,7 @@ def build_affiliate_url(asin: str, marketplace: str = "it") -> str:
         return f"https://amazon.{marketplace}/dp/{asin}"
 
 
-async def scrape_price(asin: str, marketplace: str = "it") -> Optional[float]:
+async def scrape_price(asin: str, marketplace: str = "it") -> float | None:
     """
     Scrape current price from Amazon product page.
 
@@ -113,9 +112,7 @@ async def scrape_price(asin: str, marketplace: str = "it") -> Optional[float]:
             await browser.close()
 
 
-async def _scrape_single_price(
-    browser: Browser, asin: str, marketplace: str
-) -> Optional[float]:
+async def _scrape_single_price(browser: Browser, asin: str, marketplace: str) -> float | None:
     """
     Internal function to scrape price using existing browser instance.
 
@@ -175,7 +172,7 @@ async def _scrape_single_price(
         return None
 
 
-def _parse_price(price_text: str) -> Optional[float]:
+def _parse_price(price_text: str) -> float | None:
     """
     Parse price from text, handling various formats.
 

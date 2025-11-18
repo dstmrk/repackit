@@ -51,7 +51,8 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format, *args):
         """Override to use custom logger."""
-        logger.info("%s - %s" % (self.address_string(), format % args))
+        message = format % args
+        logger.info(f"{self.address_string()} - {message}")
 
 
 async def get_health_status() -> dict:
@@ -104,7 +105,7 @@ async def get_health_status() -> dict:
                 if not is_healthy:
                     all_healthy = False
 
-            except (ValueError, TypeError) as e:
+            except (ValueError, TypeError):
                 logger.warning(f"Invalid timestamp for {key}: {last_run_str}")
                 tasks[task_name] = {
                     "status": "error",
