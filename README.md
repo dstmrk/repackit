@@ -69,13 +69,17 @@ uv run python bot.py
 cp .env.example .env
 vim .env  # Inserisci le tue credenziali
 
-# 2. Build e avvia con docker-compose
+# 2. Crea directory data con permessi corretti
+mkdir -p data/logs
+chown -R 1000:1000 data  # User repackit nel container ha uid 1000
+
+# 3. Build e avvia con docker-compose
 docker-compose up -d
 
-# 3. Verifica i logs
+# 4. Verifica i logs
 docker-compose logs -f
 
-# 4. Controlla health status
+# 5. Controlla health status
 curl http://localhost:8444/health
 ```
 
@@ -101,10 +105,14 @@ docker-compose exec repackit-bot /bin/bash
 ### Build manuale Docker
 
 ```bash
-# Build immagine
+# 1. Build immagine
 docker build -t repackit:latest .
 
-# Run container
+# 2. Crea directory data con permessi corretti
+mkdir -p data/logs
+chown -R 1000:1000 data  # User repackit nel container
+
+# 3. Run container
 docker run -d \
   --name repackit \
   --env-file .env \
@@ -284,6 +292,13 @@ LOG_LEVEL=INFO
 1. Assicurati che solo un'istanza del bot sia in esecuzione
 2. Verifica permessi file: `chmod 644 data/users.db`
 3. Considera WAL mode: `PRAGMA journal_mode=WAL;`
+
+### Permission denied su data/logs
+
+1. Il container usa utente repackit (uid 1000)
+2. La directory data deve essere scrivibile: `chown -R 1000:1000 data/`
+3. Oppure permessi più aperti: `chmod -R 777 data/` (solo per test)
+4. Verifica ownership: `ls -la data/`
 
 ## Contributing
 
