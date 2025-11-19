@@ -34,9 +34,7 @@ async def list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         if not products:
             await update.message.reply_text(
                 "📭 *Nessun prodotto monitorato*\n\n"
-                "Usa /add per aggiungere il tuo primo prodotto!\n\n"
-                "Esempio:\n"
-                "`/add https://amazon.it/dp/B08N5WRWNW 59.90 30`",
+                "Usa /add per aggiungere il tuo primo prodotto!",
                 parse_mode="Markdown",
             )
             return
@@ -47,6 +45,7 @@ async def list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         today = date.today()
 
         for idx, product in enumerate(products, start=1):
+            product_name = product.get("product_name") or "Prodotto senza nome"
             asin = product["asin"]
             price_paid = product["price_paid"]
             return_deadline = date.fromisoformat(product["return_deadline"])
@@ -70,14 +69,13 @@ async def list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
             # Add product info
             product_info = (
-                f"\n*{idx}.* [Prodotto Amazon]({product_url})\n"
-                f"   🌍 amazon.{marketplace}\n"
+                f"\n*{idx}.* [{product_name}]({product_url})\n"
                 f"   💰 Prezzo pagato: €{price_paid:.2f}\n"
                 f"   📅 Scadenza reso: {deadline_info}\n"
             )
 
             if min_savings > 0:
-                product_info += f"   🎯 Soglia risparmio: €{min_savings:.2f}\n"
+                product_info += f"   🎯 Risparmio minimo: €{min_savings:.2f}\n"
 
             message_parts.append(product_info)
 

@@ -54,11 +54,10 @@ async def start_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     # Create inline keyboard with one button per product
     keyboard = []
     for idx, product in enumerate(products, start=1):
-        asin = product["asin"]
+        product_name = product.get("product_name") or f"Prodotto #{idx}"
         price_paid = product["price_paid"]
-        marketplace = product.get("marketplace", "it")
 
-        button_text = f"{idx}. {asin} - €{price_paid:.2f} (amazon.{marketplace})"
+        button_text = f"{idx}. {product_name} - €{price_paid:.2f}"
         callback_data = f"update_product_{product['id']}"
 
         keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
@@ -111,13 +110,17 @@ async def handle_product_selection(update: Update, context: ContextTypes.DEFAULT
 
     # Store product info in context
     context.user_data["update_product_id"] = product_id
+    context.user_data["update_product_name"] = product.get("product_name") or "Prodotto"
     context.user_data["update_product_asin"] = product["asin"]
     context.user_data["update_product_price_paid"] = product["price_paid"]
 
     logger.info(f"User {user_id} selected product_id={product_id} for update")
 
+    product_display = product.get("product_name") or f"ASIN {product['asin']}"
+
     # Create inline keyboard for field selection
     keyboard = [
+        [InlineKeyboardButton("📦 Nome prodotto", callback_data="update_field_nome")],
         [InlineKeyboardButton("💰 Prezzo pagato", callback_data="update_field_prezzo")],
         [InlineKeyboardButton("📅 Scadenza reso", callback_data="update_field_scadenza")],
         [InlineKeyboardButton("🎯 Soglia risparmio", callback_data="update_field_soglia")],
@@ -126,7 +129,7 @@ async def handle_product_selection(update: Update, context: ContextTypes.DEFAULT
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
-        f"📦 *Prodotto selezionato:* `{product['asin']}`\n\n" "Cosa vuoi modificare?",
+        f"📦 *Prodotto selezionato:* {product_display}\n\n" "Cosa vuoi modificare?",
         parse_mode="Markdown",
         reply_markup=reply_markup,
     )
@@ -163,7 +166,16 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
     logger.info(f"User {user_id} selected field={field} for update")
 
     # Show appropriate message based on field
-    if field == "prezzo":
+    if field == "nome":
+        current_name = context.user_data["update_product_name"]
+        message = (
+            "📦 *Aggiorna nome prodotto*\n\n"
+            f"Nome attuale: *{current_name}*\n\n"
+            "Inviami il nuovo nome (tra 3 e 100 caratteri).\n\n"
+            "Esempio: `iPhone 15 Pro` oppure `Cuffie Sony`\n\n"
+            "Oppure scrivi /cancel per annullare."
+        )
+    elif field == "prezzo":
         message = (
             "💰 *Aggiorna prezzo pagato*\n\n"
             "Inviami il nuovo prezzo in euro.\n\n"
@@ -178,7 +190,7 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
             "• Un numero di giorni (da 1 a 365)\n"
             "  Esempio: `30`\n\n"
             "• Una data nel formato gg-mm-aaaa\n"
-            "  Esempio: `25-12-2024`\n\n"
+            "  Esempio: `09-05-2025`\n\n"
             "Oppure scrivi /cancel per annullare."
         )
     elif field == "soglia":
@@ -214,7 +226,9 @@ async def handle_value_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     try:
         # Update based on field
-        if field == "prezzo":
+        if field == "nome":
+            success = await _update_name(product_id, value_str, user_id, update.message)
+        elif field == "prezzo":
             success = await _update_price(product_id, asin, value_str, user_id, update.message)
         elif field == "scadenza":
             success = await _update_deadline(product_id, asin, value_str, user_id, update.message)
@@ -246,6 +260,40 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text(CANCEL_MESSAGE, parse_mode="Markdown")
     context.user_data.clear()
     return ConversationHandler.END
+
+
+async def _update_name(product_id: int, value_str: str, user_id: int, message) -> bool:
+    """Update product name. Returns True if successful."""
+    new_name = value_str.strip()
+
+    # Validate length (between 3 and 100 characters)
+    if len(new_name) < 3:
+        await message.reply_text(
+            "❌ *Nome troppo corto*\n\n"
+            "Il nome del prodotto deve contenere almeno 3 caratteri.\n\n"
+            "Riprova oppure /cancel per annullare.",
+            parse_mode="Markdown",
+        )
+        return False
+
+    if len(new_name) > 100:
+        await message.reply_text(
+            "❌ *Nome troppo lungo*\n\n"
+            "Il nome del prodotto può contenere al massimo 100 caratteri.\n\n"
+            "Riprova oppure /cancel per annullare.",
+            parse_mode="Markdown",
+        )
+        return False
+
+    await database.update_product(product_id, product_name=new_name)
+    await message.reply_text(
+        "✅ *Nome aggiornato con successo!*\n\n" f"📦 Nuovo nome: *{new_name}*",
+        parse_mode="Markdown",
+    )
+    logger.info(
+        f"Product name updated for user {user_id}: product_id={product_id}, new_name={new_name}"
+    )
+    return True
 
 
 async def _update_price(product_id: int, asin: str, value_str: str, user_id: int, message) -> bool:
@@ -282,7 +330,7 @@ async def _update_deadline(
     except ValueError as e:
         await message.reply_text(
             f"❌ Scadenza non valida: {e}\n\n"
-            "Usa giorni (es. 30) o data gg-mm-aaaa (es. 25-12-2024)\n\n"
+            "Usa giorni (es. 30) o data gg-mm-aaaa (es. 09-05-2025)\n\n"
             "Riprova oppure /cancel per annullare."
         )
         return False

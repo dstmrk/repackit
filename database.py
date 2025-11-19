@@ -44,6 +44,7 @@ async def init_db() -> None:
             CREATE TABLE IF NOT EXISTS products (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
+                product_name TEXT,
                 asin TEXT NOT NULL,
                 marketplace TEXT NOT NULL DEFAULT 'it',
                 price_paid REAL NOT NULL,
@@ -100,6 +101,9 @@ async def init_db() -> None:
                 await db.execute(
                     "ALTER TABLE products ADD COLUMN consecutive_failures INTEGER DEFAULT 0"
                 )
+            if "product_name" not in column_names:
+                logger.info("Migrating database: adding product_name column")
+                await db.execute("ALTER TABLE products ADD COLUMN product_name TEXT")
 
         await db.commit()
         logger.info(f"Database initialized at {DATABASE_PATH}")
@@ -169,6 +173,7 @@ async def get_all_users() -> list[dict]:
 
 async def add_product(
     user_id: int,
+    product_name: str | None,
     asin: str,
     marketplace: str,
     price_paid: float,
@@ -180,6 +185,7 @@ async def add_product(
 
     Args:
         user_id: Telegram user ID
+        product_name: User-defined product name for easy identification
         asin: Amazon Standard Identification Number
         marketplace: Amazon marketplace (it, com, de, fr, etc.)
         price_paid: Price user paid for the product (€)
@@ -193,12 +199,14 @@ async def add_product(
         cursor = await db.execute(
             """
             INSERT INTO products (
-                user_id, asin, marketplace, price_paid, return_deadline, min_savings_threshold
+                user_id, product_name, asin, marketplace, price_paid,
+                return_deadline, min_savings_threshold
             )
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
+                product_name,
                 asin,
                 marketplace,
                 price_paid,
@@ -208,8 +216,9 @@ async def add_product(
         )
         await db.commit()
         product_id = cursor.lastrowid
+        product_display = product_name or f"ASIN {asin}"
         logger.info(
-            f"Product {asin} from amazon.{marketplace} added for user {user_id} "
+            f"Product '{product_display}' from amazon.{marketplace} added for user {user_id} "
             f"(ID: {product_id})"
         )
         return product_id
@@ -263,6 +272,7 @@ async def get_all_active_products() -> list[dict]:
 
 async def update_product(
     product_id: int,
+    product_name: str | None = None,
     price_paid: float | None = None,
     return_deadline: date | None = None,
     min_savings_threshold: float | None = None,
@@ -272,6 +282,7 @@ async def update_product(
 
     Args:
         product_id: Database product ID
+        product_name: New product name (optional)
         price_paid: New price paid (optional)
         return_deadline: New return deadline (optional)
         min_savings_threshold: New savings threshold (optional)
@@ -281,6 +292,10 @@ async def update_product(
     """
     updates = []
     params = []
+
+    if product_name is not None:
+        updates.append("product_name = ?")
+        params.append(product_name)
 
     if price_paid is not None:
         updates.append("price_paid = ?")
