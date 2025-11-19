@@ -17,7 +17,7 @@ import product_cleanup
 from data_reader import scrape_prices
 from handlers.add import add_conversation_handler
 from handlers.delete import delete_callback_query_handler, delete_command_handler
-from handlers.feedback import feedback_handler
+from handlers.feedback import feedback_callback_handler, feedback_conversation_handler
 from handlers.help import help_handler
 from handlers.list import list_handler
 from handlers.start import start_handler
@@ -242,7 +242,8 @@ async def main() -> None:  # pragma: no cover
     application.add_handler(delete_command_handler)
     application.add_handler(delete_callback_query_handler)
     application.add_handler(update_conversation_handler)
-    application.add_handler(CommandHandler("feedback", feedback_handler))
+    application.add_handler(feedback_conversation_handler)
+    application.add_handler(feedback_callback_handler)
 
     # Setup webhook
     logger.info(f"Setting up webhook: {WEBHOOK_URL}")
