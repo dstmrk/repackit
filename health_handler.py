@@ -52,6 +52,45 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         logger.info(f"{self.address_string()} - {message}")
 
 
+def _check_task_health(
+    task_name: str, system_status: dict, threshold: datetime
+) -> tuple[dict, bool]:
+    """
+    Check health status of a single task.
+
+    Args:
+        task_name: Name of the task (scraper, checker, cleanup)
+        system_status: Dict of all system status entries
+        threshold: Datetime threshold for considering task stale
+
+    Returns:
+        Tuple of (task_status_dict, is_healthy)
+    """
+    key = f"last_{task_name}_run"
+    task_info = system_status.get(key)
+
+    if task_info is None:
+        return {"status": "never_run", "last_run": None}, False
+
+    last_run_str = task_info["value"]
+    try:
+        last_run = datetime.fromisoformat(last_run_str)
+        # Ensure timezone-aware for comparison (assume UTC if naive)
+        if last_run.tzinfo is None:
+            last_run = last_run.replace(tzinfo=UTC)
+
+        is_healthy = last_run >= threshold
+        status_dict = {
+            "status": "ok" if is_healthy else "stale",
+            "last_run": last_run_str,
+        }
+        return status_dict, is_healthy
+
+    except (ValueError, TypeError):
+        logger.warning(f"Invalid timestamp for {key}: {last_run_str}")
+        return {"status": "error", "last_run": last_run_str}, False
+
+
 async def get_health_status() -> dict:
     """
     Get complete health status.
@@ -66,52 +105,18 @@ async def get_health_status() -> dict:
     now = datetime.now(UTC)
     threshold = now - timedelta(days=MAX_DAYS_SINCE_LAST_RUN)
 
-    # Get database stats
+    # Get database stats and system status
     stats = await database.get_stats()
-
-    # Get system status for all tasks
     system_status = await database.get_all_system_status()
 
-    # Check each task status
+    # Check each task's health status
     tasks = {}
     all_healthy = True
 
     for task_name in ["scraper", "checker", "cleanup"]:
-        key = f"last_{task_name}_run"
-        task_info = system_status.get(key)
-
-        if task_info is None:
-            # Task has never run
-            tasks[task_name] = {
-                "status": "never_run",
-                "last_run": None,
-            }
-            all_healthy = False
-        else:
-            # Parse last run timestamp
-            last_run_str = task_info["value"]
-            try:
-                last_run = datetime.fromisoformat(last_run_str)
-                # Ensure timezone-aware for comparison (assume UTC if naive)
-                if last_run.tzinfo is None:
-                    last_run = last_run.replace(tzinfo=UTC)
-                is_healthy = last_run >= threshold
-
-                tasks[task_name] = {
-                    "status": "ok" if is_healthy else "stale",
-                    "last_run": last_run_str,
-                }
-
-                if not is_healthy:
-                    all_healthy = False
-
-            except (ValueError, TypeError):
-                logger.warning(f"Invalid timestamp for {key}: {last_run_str}")
-                tasks[task_name] = {
-                    "status": "error",
-                    "last_run": last_run_str,
-                }
-                all_healthy = False
+        task_status, is_healthy = _check_task_health(task_name, system_status, threshold)
+        tasks[task_name] = task_status
+        all_healthy = all_healthy and is_healthy
 
     return {
         "status": "healthy" if all_healthy else "unhealthy",
