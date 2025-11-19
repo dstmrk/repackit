@@ -292,8 +292,7 @@ async def _update_name(
 
     await database.update_product(product_id, product_name=new_name)
     await message.reply_text(
-        "✅ *Nome aggiornato con successo!*\n\n"
-        f"📦 Nuovo nome: *{new_name}*",
+        "✅ *Nome aggiornato con successo!*\n\n" f"📦 Nuovo nome: *{new_name}*",
         parse_mode="Markdown",
     )
     logger.info(

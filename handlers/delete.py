@@ -174,9 +174,7 @@ async def delete_callback_handler(update: Update, context: ContextTypes.DEFAULT_
 
             await query.edit_message_text(success_message, parse_mode="Markdown")
 
-            logger.info(
-                f"Product deleted for user {user_id}: id={product_id}, name={product_name}"
-            )
+            logger.info(f"Product deleted for user {user_id}: id={product_id}, name={product_name}")
 
         # Handle cancellation
         elif callback_data.startswith("delete_cancel_"):

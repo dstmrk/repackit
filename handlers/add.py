@@ -470,7 +470,9 @@ def parse_deadline(deadline_input: str) -> date:
 add_conversation_handler = ConversationHandler(
     entry_points=[CommandHandler("add", start_add)],
     states={
-        WAITING_PRODUCT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_product_name)],
+        WAITING_PRODUCT_NAME: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_product_name)
+        ],
         WAITING_URL: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_url)],
         WAITING_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_price)],
         WAITING_DEADLINE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_deadline)],
