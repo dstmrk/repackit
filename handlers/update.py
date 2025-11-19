@@ -1,6 +1,7 @@
 """Handler for /update command with conversational flow."""
 
 import logging
+import warnings
 from datetime import date
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -12,9 +13,14 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+from telegram.warnings import PTBUserWarning
 
 import database
 from handlers.add import parse_deadline
+
+# Suppress PTBUserWarning for per_message=False in ConversationHandler
+# This is intentional - we want per-conversation tracking, not per-message
+warnings.filterwarnings("ignore", category=PTBUserWarning)
 
 logger = logging.getLogger(__name__)
 
