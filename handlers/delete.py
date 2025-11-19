@@ -41,7 +41,6 @@ async def start_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         for idx, product in enumerate(products, start=1):
             product_id = product["id"]
             product_name = product.get("product_name") or f"Prodotto #{idx}"
-            asin = product["asin"]
             price_paid = product["price_paid"]
 
             # Button text shows name and price

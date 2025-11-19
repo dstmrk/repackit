@@ -73,10 +73,10 @@ async def test_start_update_shows_product_list(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
+        user_id=123, product_name="Product 1", asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
     )
     await database.add_product(
-        user_id=123, asin="ASIN00002", marketplace="it", price_paid=75.0, return_deadline=tomorrow
+        user_id=123, product_name="Product 2", asin="ASIN00002", marketplace="it", price_paid=75.0, return_deadline=tomorrow
     )
 
     update = MagicMock()
@@ -132,7 +132,7 @@ async def test_handle_product_selection_shows_fields(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
+        user_id=123, product_name="Test Product", asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
     )
 
     products = await database.get_user_products(123)
@@ -154,7 +154,7 @@ async def test_handle_product_selection_shows_fields(test_db):
     call_args = update.callback_query.edit_message_text.call_args
     message = call_args[0][0]
     assert "Cosa vuoi modificare" in message
-    assert "ASIN00001" in message
+    assert "Test Product" in message
 
     # Verify product data was stored in context
     assert context.user_data["update_product_id"] == product_id
@@ -264,7 +264,7 @@ async def test_handle_value_input_price_success(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
+        user_id=123, product_name="Test Product", asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
     )
 
     products = await database.get_user_products(123)
@@ -304,7 +304,7 @@ async def test_handle_value_input_price_invalid(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
+        user_id=123, product_name="Test Product", asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
     )
 
     products = await database.get_user_products(123)
@@ -343,7 +343,7 @@ async def test_handle_value_input_deadline_success(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
+        user_id=123, product_name="Test Product", asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
     )
 
     products = await database.get_user_products(123)
@@ -383,7 +383,7 @@ async def test_handle_value_input_threshold_success(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
+        user_id=123, product_name="Test Product", asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
     )
 
     products = await database.get_user_products(123)

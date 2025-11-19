@@ -141,6 +141,7 @@ async def test_add_product(test_db):
     deadline = date.today() + timedelta(days=30)
     product_id = await database.add_product(
         user_id=123456,
+        product_name="Test Product",
         asin="B08N5WRWNW",
         marketplace="it",
         price_paid=59.90,
@@ -173,9 +174,9 @@ async def test_get_user_products_multiple(test_db):
 
     deadline = date.today() + timedelta(days=30)
 
-    await database.add_product(123456, "ASIN00001", "it", 50.0, deadline)
-    await database.add_product(123456, "ASIN00002", "it", 60.0, deadline)
-    await database.add_product(123456, "ASIN00003", "it", 70.0, deadline)
+    await database.add_product(123456, "Product 1", "ASIN00001", "it", 50.0, deadline)
+    await database.add_product(123456, "Product 2", "ASIN00002", "it", 60.0, deadline)
+    await database.add_product(123456, "Product 3", "ASIN00003", "it", 70.0, deadline)
 
     products = await database.get_user_products(123456)
     assert len(products) == 3
@@ -189,12 +190,12 @@ async def test_get_all_active_products(test_db):
 
     # Add active products
     future_date = date.today() + timedelta(days=10)
-    await database.add_product(111, "ACTIVE001", "it", 50.0, future_date)
-    await database.add_product(222, "ACTIVE002", "com", 60.0, future_date)
+    await database.add_product(111, "Active Product 1", "ACTIVE001", "it", 50.0, future_date)
+    await database.add_product(222, "Active Product 2", "ACTIVE002", "com", 60.0, future_date)
 
     # Add expired product
     past_date = date.today() - timedelta(days=1)
-    await database.add_product(111, "EXPIRED01", "de", 70.0, past_date)
+    await database.add_product(111, "Expired Product", "EXPIRED01", "de", 70.0, past_date)
 
     active = await database.get_all_active_products()
     assert len(active) == 2
@@ -207,7 +208,7 @@ async def test_update_product(test_db):
     await database.add_user(123456, "it")
 
     deadline = date.today() + timedelta(days=30)
-    product_id = await database.add_product(123456, "B08N5WRWNW", "it", 59.90, deadline)
+    product_id = await database.add_product(123456, "Test Product", "B08N5WRWNW", "it", 59.90, deadline)
 
     # Update price
     success = await database.update_product(product_id, price_paid=55.00)
@@ -242,7 +243,7 @@ async def test_update_last_notified_price(test_db):
     await database.add_user(123456, "it")
 
     deadline = date.today() + timedelta(days=30)
-    product_id = await database.add_product(123456, "B08N5WRWNW", "it", 59.90, deadline)
+    product_id = await database.add_product(123456, "Test Product", "B08N5WRWNW", "it", 59.90, deadline)
 
     # Initially None
     products = await database.get_user_products(123456)
@@ -265,7 +266,7 @@ async def test_delete_product(test_db):
     await database.add_user(123456, "it")
 
     deadline = date.today() + timedelta(days=30)
-    product_id = await database.add_product(123456, "B08N5WRWNW", "it", 59.90, deadline)
+    product_id = await database.add_product(123456, "Test Product", "B08N5WRWNW", "it", 59.90, deadline)
 
     # Delete product
     success = await database.delete_product(product_id)
@@ -290,14 +291,14 @@ async def test_delete_expired_products(test_db):
 
     # Add active products
     future_date = date.today() + timedelta(days=10)
-    await database.add_product(123456, "ACTIVE001", "it", 50.0, future_date)
-    await database.add_product(123456, "ACTIVE002", "com", 60.0, future_date)
+    await database.add_product(123456, "Active 1", "ACTIVE001", "it", 50.0, future_date)
+    await database.add_product(123456, "Active 2", "ACTIVE002", "com", 60.0, future_date)
 
     # Add expired products
     past_date1 = date.today() - timedelta(days=1)
     past_date2 = date.today() - timedelta(days=10)
-    await database.add_product(123456, "EXPIRED01", "de", 70.0, past_date1)
-    await database.add_product(123456, "EXPIRED02", "fr", 80.0, past_date2)
+    await database.add_product(123456, "Expired 1", "EXPIRED01", "de", 70.0, past_date1)
+    await database.add_product(123456, "Expired 2", "EXPIRED02", "fr", 80.0, past_date2)
 
     # Delete expired
     count = await database.delete_expired_products()
@@ -362,6 +363,7 @@ async def test_increment_consecutive_failures(test_db):
     tomorrow = date.today() + timedelta(days=1)
     product_id = await database.add_product(
         user_id=123,
+        product_name="Test Product",
         asin="B08N5WRWNW",
         marketplace="it",
         price_paid=59.90,
@@ -391,6 +393,7 @@ async def test_reset_consecutive_failures(test_db):
     tomorrow = date.today() + timedelta(days=1)
     product_id = await database.add_product(
         user_id=123,
+        product_name="Test Product",
         asin="B08N5WRWNW",
         marketplace="it",
         price_paid=59.90,

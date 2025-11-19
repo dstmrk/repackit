@@ -237,6 +237,7 @@ async def test_send_price_drop_notification_message_format():
         await checker.send_price_drop_notification(
             bot=mock_bot,
             user_id=123,
+            product_name="Test Product",
             asin="TEST12345",
             marketplace="it",
             current_price=45.99,
@@ -272,6 +273,7 @@ async def test_send_price_drop_notification_deadline_today():
         await checker.send_price_drop_notification(
             bot=mock_bot,
             user_id=123,
+            product_name="Test Product",
             asin="TEST",
             marketplace="it",
             current_price=40.00,
@@ -296,6 +298,7 @@ async def test_send_price_drop_notification_deadline_passed():
         await checker.send_price_drop_notification(
             bot=mock_bot,
             user_id=123,
+            product_name="Test Product",
             asin="TEST",
             marketplace="it",
             current_price=40.00,
@@ -319,6 +322,7 @@ async def test_send_price_drop_notification_telegram_error():
             await checker.send_price_drop_notification(
                 bot=mock_bot,
                 user_id=123,
+                product_name="Test Product",
                 asin="TEST",
                 marketplace="it",
                 current_price=40.00,
@@ -420,6 +424,7 @@ async def test_send_unavailable_notification():
         await checker.send_unavailable_notification(
             bot=mock_bot,
             user_id=123,
+            product_name="Test Product",
             asin="TEST",
             marketplace="it",
             return_deadline=future_date,
@@ -447,6 +452,7 @@ async def test_send_unavailable_notification_today():
         await checker.send_unavailable_notification(
             bot=mock_bot,
             user_id=123,
+            product_name="Test Product",
             asin="TEST",
             marketplace="it",
             return_deadline=date.today(),
@@ -466,6 +472,7 @@ async def test_send_unavailable_notification_expired():
         await checker.send_unavailable_notification(
             bot=mock_bot,
             user_id=123,
+            product_name="Test Product",
             asin="TEST",
             marketplace="it",
             return_deadline=past_date,
@@ -486,6 +493,7 @@ async def test_send_unavailable_notification_telegram_error():
             await checker.send_unavailable_notification(
                 bot=mock_bot,
                 user_id=123,
+                product_name="Test Product",
                 asin="TEST",
                 marketplace="it",
                 return_deadline=date.today(),

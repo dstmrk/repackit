@@ -50,6 +50,7 @@ async def test_cleanup_expired_products_with_expired(test_db):
     # Add expired product (yesterday)
     await database.add_product(
         user_id=123,
+        product_name="Expired Product",
         asin="EXPIRED01",
         marketplace="it",
         price_paid=50.0,
@@ -60,6 +61,7 @@ async def test_cleanup_expired_products_with_expired(test_db):
     # Add active product (tomorrow)
     await database.add_product(
         user_id=123,
+        product_name="Active Product",
         asin="ACTIVE001",
         marketplace="it",
         price_paid=60.0,
@@ -95,6 +97,7 @@ async def test_cleanup_expired_products_no_expired(test_db):
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
         user_id=123,
+        product_name="Active Product",
         asin="ACTIVE001",
         marketplace="it",
         price_paid=50.0,
@@ -127,6 +130,7 @@ async def test_cleanup_expired_products_multiple_users(test_db):
 
     await database.add_product(
         user_id=123,
+        product_name="Expired 1",
         asin="EXPIRED01",
         marketplace="it",
         price_paid=50.0,
@@ -134,6 +138,7 @@ async def test_cleanup_expired_products_multiple_users(test_db):
     )
     await database.add_product(
         user_id=123,
+        product_name="Active 1",
         asin="ACTIVE001",
         marketplace="it",
         price_paid=60.0,
@@ -141,6 +146,7 @@ async def test_cleanup_expired_products_multiple_users(test_db):
     )
     await database.add_product(
         user_id=456,
+        product_name="Expired 2",
         asin="EXPIRED02",
         marketplace="it",
         price_paid=70.0,
@@ -148,6 +154,7 @@ async def test_cleanup_expired_products_multiple_users(test_db):
     )
     await database.add_product(
         user_id=456,
+        product_name="Active 2",
         asin="ACTIVE002",
         marketplace="it",
         price_paid=80.0,
@@ -220,6 +227,7 @@ async def test_cleanup_expired_products_boundary_today(test_db):
     today = date.today()
     await database.add_product(
         user_id=123,
+        product_name="Today Product",
         asin="TODAY001",
         marketplace="it",
         price_paid=50.0,

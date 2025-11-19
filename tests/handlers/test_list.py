@@ -64,6 +64,7 @@ async def test_list_handler_single_product(test_db):
     tomorrow = date.today() + timedelta(days=5)
     await database.add_product(
         user_id=123,
+        product_name="Test Product",
         asin="B08N5WRWNW",
         marketplace="it",
         price_paid=59.90,
@@ -104,6 +105,7 @@ async def test_list_handler_multiple_products(test_db):
 
     await database.add_product(
         user_id=123,
+        product_name="Product 1",
         asin="ASIN00001",
         marketplace="it",
         price_paid=50.0,
@@ -111,6 +113,7 @@ async def test_list_handler_multiple_products(test_db):
     )
     await database.add_product(
         user_id=123,
+        product_name="Product 2",
         asin="ASIN00002",
         marketplace="it",
         price_paid=75.0,
@@ -147,6 +150,7 @@ async def test_list_handler_deadline_today(test_db):
     today = date.today()
     await database.add_product(
         user_id=123,
+        product_name="Test Product",
         asin="ASIN00001",
         marketplace="it",
         price_paid=50.0,
@@ -173,6 +177,7 @@ async def test_list_handler_deadline_expired(test_db):
     yesterday = date.today() - timedelta(days=1)
     await database.add_product(
         user_id=123,
+        product_name="Test Product",
         asin="ASIN00001",
         marketplace="it",
         price_paid=50.0,
@@ -199,6 +204,7 @@ async def test_list_handler_no_threshold(test_db):
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
         user_id=123,
+        product_name="Test Product",
         asin="ASIN00001",
         marketplace="it",
         price_paid=50.0,
