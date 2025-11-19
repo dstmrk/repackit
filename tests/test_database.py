@@ -142,6 +142,7 @@ async def test_add_product(test_db):
     product_id = await database.add_product(
         user_id=123456,
         asin="B08N5WRWNW",
+        marketplace="it",
         price_paid=59.90,
         return_deadline=deadline,
         min_savings_threshold=5.0,
@@ -152,6 +153,7 @@ async def test_add_product(test_db):
     products = await database.get_user_products(123456)
     assert len(products) == 1
     assert products[0]["asin"] == "B08N5WRWNW"
+    assert products[0]["marketplace"] == "it"
     assert products[0]["price_paid"] == 59.90
     assert products[0]["min_savings_threshold"] == 5.0
 
@@ -171,9 +173,9 @@ async def test_get_user_products_multiple(test_db):
 
     deadline = date.today() + timedelta(days=30)
 
-    await database.add_product(123456, "ASIN00001", 50.0, deadline)
-    await database.add_product(123456, "ASIN00002", 60.0, deadline)
-    await database.add_product(123456, "ASIN00003", 70.0, deadline)
+    await database.add_product(123456, "ASIN00001", "it", 50.0, deadline)
+    await database.add_product(123456, "ASIN00002", "it", 60.0, deadline)
+    await database.add_product(123456, "ASIN00003", "it", 70.0, deadline)
 
     products = await database.get_user_products(123456)
     assert len(products) == 3
@@ -187,12 +189,12 @@ async def test_get_all_active_products(test_db):
 
     # Add active products
     future_date = date.today() + timedelta(days=10)
-    await database.add_product(111, "ACTIVE001", 50.0, future_date)
-    await database.add_product(222, "ACTIVE002", 60.0, future_date)
+    await database.add_product(111, "ACTIVE001", "it", 50.0, future_date)
+    await database.add_product(222, "ACTIVE002", "com", 60.0, future_date)
 
     # Add expired product
     past_date = date.today() - timedelta(days=1)
-    await database.add_product(111, "EXPIRED01", 70.0, past_date)
+    await database.add_product(111, "EXPIRED01", "de", 70.0, past_date)
 
     active = await database.get_all_active_products()
     assert len(active) == 2
@@ -205,7 +207,7 @@ async def test_update_product(test_db):
     await database.add_user(123456, "it")
 
     deadline = date.today() + timedelta(days=30)
-    product_id = await database.add_product(123456, "B08N5WRWNW", 59.90, deadline)
+    product_id = await database.add_product(123456, "B08N5WRWNW", "it", 59.90, deadline)
 
     # Update price
     success = await database.update_product(product_id, price_paid=55.00)
@@ -240,7 +242,7 @@ async def test_update_last_notified_price(test_db):
     await database.add_user(123456, "it")
 
     deadline = date.today() + timedelta(days=30)
-    product_id = await database.add_product(123456, "B08N5WRWNW", 59.90, deadline)
+    product_id = await database.add_product(123456, "B08N5WRWNW", "it", 59.90, deadline)
 
     # Initially None
     products = await database.get_user_products(123456)
@@ -263,7 +265,7 @@ async def test_delete_product(test_db):
     await database.add_user(123456, "it")
 
     deadline = date.today() + timedelta(days=30)
-    product_id = await database.add_product(123456, "B08N5WRWNW", 59.90, deadline)
+    product_id = await database.add_product(123456, "B08N5WRWNW", "it", 59.90, deadline)
 
     # Delete product
     success = await database.delete_product(product_id)
@@ -288,14 +290,14 @@ async def test_delete_expired_products(test_db):
 
     # Add active products
     future_date = date.today() + timedelta(days=10)
-    await database.add_product(123456, "ACTIVE001", 50.0, future_date)
-    await database.add_product(123456, "ACTIVE002", 60.0, future_date)
+    await database.add_product(123456, "ACTIVE001", "it", 50.0, future_date)
+    await database.add_product(123456, "ACTIVE002", "com", 60.0, future_date)
 
     # Add expired products
     past_date1 = date.today() - timedelta(days=1)
     past_date2 = date.today() - timedelta(days=10)
-    await database.add_product(123456, "EXPIRED01", 70.0, past_date1)
-    await database.add_product(123456, "EXPIRED02", 80.0, past_date2)
+    await database.add_product(123456, "EXPIRED01", "de", 70.0, past_date1)
+    await database.add_product(123456, "EXPIRED02", "fr", 80.0, past_date2)
 
     # Delete expired
     count = await database.delete_expired_products()
@@ -345,3 +347,68 @@ async def test_get_all_feedback_empty(test_db):
     """Test getting feedback when none exists."""
     all_feedback = await database.get_all_feedback()
     assert all_feedback == []
+
+
+# ============================================================================
+# Consecutive failures tracking tests
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_increment_consecutive_failures(test_db):
+    """Test incrementing consecutive failures count."""
+    # Add user and product
+    await database.add_user(123, "it")
+    tomorrow = date.today() + timedelta(days=1)
+    product_id = await database.add_product(
+        user_id=123,
+        asin="B08N5WRWNW",
+        marketplace="it",
+        price_paid=59.90,
+        return_deadline=tomorrow,
+    )
+
+    # Increment failures
+    count1 = await database.increment_consecutive_failures(product_id)
+    assert count1 == 1
+
+    count2 = await database.increment_consecutive_failures(product_id)
+    assert count2 == 2
+
+    count3 = await database.increment_consecutive_failures(product_id)
+    assert count3 == 3
+
+    # Verify in database
+    products = await database.get_user_products(123)
+    assert products[0]["consecutive_failures"] == 3
+
+
+@pytest.mark.asyncio
+async def test_reset_consecutive_failures(test_db):
+    """Test resetting consecutive failures count."""
+    # Add user and product
+    await database.add_user(123, "it")
+    tomorrow = date.today() + timedelta(days=1)
+    product_id = await database.add_product(
+        user_id=123,
+        asin="B08N5WRWNW",
+        marketplace="it",
+        price_paid=59.90,
+        return_deadline=tomorrow,
+    )
+
+    # Increment failures to 3
+    await database.increment_consecutive_failures(product_id)
+    await database.increment_consecutive_failures(product_id)
+    await database.increment_consecutive_failures(product_id)
+
+    # Verify it's at 3
+    products = await database.get_user_products(123)
+    assert products[0]["consecutive_failures"] == 3
+
+    # Reset
+    await database.reset_consecutive_failures(product_id)
+
+    # Verify it's back to 0
+    products = await database.get_user_products(123)
+    assert products[0]["consecutive_failures"] == 0

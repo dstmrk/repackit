@@ -70,6 +70,7 @@ async def list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             # Add product info
             product_info = (
                 f"\n*{idx}.* [Prodotto Amazon]({product_url})\n"
+                f"   🌍 amazon.{marketplace}\n"
                 f"   💰 Prezzo pagato: €{price_paid:.2f}\n"
                 f"   📅 Scadenza reso: {deadline_info}\n"
             )

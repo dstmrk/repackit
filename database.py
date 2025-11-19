@@ -45,6 +45,7 @@ async def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
                 asin TEXT NOT NULL,
+                marketplace TEXT NOT NULL DEFAULT 'it',
                 price_paid REAL NOT NULL,
                 return_deadline DATE NOT NULL,
                 min_savings_threshold REAL DEFAULT 0,
@@ -84,6 +85,21 @@ async def init_db() -> None:
         await db.execute(
             "CREATE INDEX IF NOT EXISTS idx_return_deadline ON products(return_deadline)"
         )
+
+        # Migration: Add marketplace column if it doesn't exist (for existing databases)
+        async with db.execute("PRAGMA table_info(products)") as cursor:
+            columns = await cursor.fetchall()
+            column_names = [col[1] for col in columns]
+            if "marketplace" not in column_names:
+                logger.info("Migrating database: adding marketplace column")
+                await db.execute(
+                    "ALTER TABLE products ADD COLUMN marketplace TEXT NOT NULL DEFAULT 'it'"
+                )
+            if "consecutive_failures" not in column_names:
+                logger.info("Migrating database: adding consecutive_failures column")
+                await db.execute(
+                    "ALTER TABLE products ADD COLUMN consecutive_failures INTEGER DEFAULT 0"
+                )
 
         await db.commit()
         logger.info(f"Database initialized at {DATABASE_PATH}")
@@ -154,6 +170,7 @@ async def get_all_users() -> list[dict]:
 async def add_product(
     user_id: int,
     asin: str,
+    marketplace: str,
     price_paid: float,
     return_deadline: date,
     min_savings_threshold: float = 0,
@@ -164,6 +181,7 @@ async def add_product(
     Args:
         user_id: Telegram user ID
         asin: Amazon Standard Identification Number
+        marketplace: Amazon marketplace (it, com, de, fr, etc.)
         price_paid: Price user paid for the product (€)
         return_deadline: Last day to return the product
         min_savings_threshold: Minimum € savings to notify (optional)
@@ -174,14 +192,26 @@ async def add_product(
     async with aiosqlite.connect(DATABASE_PATH) as db:
         cursor = await db.execute(
             """
-            INSERT INTO products (user_id, asin, price_paid, return_deadline, min_savings_threshold)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO products (
+                user_id, asin, marketplace, price_paid, return_deadline, min_savings_threshold
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (user_id, asin, price_paid, return_deadline.isoformat(), min_savings_threshold),
+            (
+                user_id,
+                asin,
+                marketplace,
+                price_paid,
+                return_deadline.isoformat(),
+                min_savings_threshold,
+            ),
         )
         await db.commit()
         product_id = cursor.lastrowid
-        logger.info(f"Product {asin} added for user {user_id} (ID: {product_id})")
+        logger.info(
+            f"Product {asin} from amazon.{marketplace} added for user {user_id} "
+            f"(ID: {product_id})"
+        )
         return product_id
 
 
@@ -294,6 +324,49 @@ async def update_last_notified_price(product_id: int, price: float) -> None:
         )
         await db.commit()
         logger.debug(f"Product {product_id} last_notified_price updated to {price}")
+
+
+async def increment_consecutive_failures(product_id: int) -> int:
+    """
+    Increment consecutive failures count for a product.
+
+    Args:
+        product_id: Database product ID
+
+    Returns:
+        New consecutive failures count
+    """
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        await db.execute(
+            "UPDATE products SET consecutive_failures = consecutive_failures + 1 WHERE id = ?",
+            (product_id,),
+        )
+        await db.commit()
+
+        # Get the new count
+        async with db.execute(
+            "SELECT consecutive_failures FROM products WHERE id = ?", (product_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            count = row[0] if row else 0
+            logger.debug(f"Product {product_id} consecutive_failures incremented to {count}")
+            return count
+
+
+async def reset_consecutive_failures(product_id: int) -> None:
+    """
+    Reset consecutive failures count to 0 for a product.
+
+    Args:
+        product_id: Database product ID
+    """
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        await db.execute(
+            "UPDATE products SET consecutive_failures = 0 WHERE id = ?",
+            (product_id,),
+        )
+        await db.commit()
+        logger.debug(f"Product {product_id} consecutive_failures reset to 0")
 
 
 async def delete_product(product_id: int) -> bool:

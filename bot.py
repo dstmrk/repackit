@@ -5,7 +5,8 @@ import contextlib
 import logging
 import os
 import signal
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from logging.handlers import TimedRotatingFileHandler
 
 from dotenv import load_dotenv
 from telegram.ext import Application, CommandHandler
@@ -31,12 +32,21 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 # Create logs directory if it doesn't exist
 os.makedirs("data/logs", exist_ok=True)
 
+# Setup rotating file handler (daily rotation, keep 2 backups + today = 3 days total)
+file_handler = TimedRotatingFileHandler(
+    filename="data/logs/bot.log",
+    when="midnight",
+    interval=1,
+    backupCount=2,
+)
+file_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL.upper()),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("data/logs/bot.log"),
+        file_handler,
     ],
 )
 logger = logging.getLogger(__name__)
@@ -66,7 +76,7 @@ def calculate_next_run(hour: int) -> datetime:
     Returns:
         Datetime of next scheduled run
     """
-    now = datetime.now()
+    now = datetime.now(UTC)
     next_run = now.replace(hour=hour, minute=0, second=0, microsecond=0)
 
     # If the time has already passed today, schedule for tomorrow
@@ -93,7 +103,7 @@ async def run_scraper() -> None:
         logger.info(f"Scraper completed: {len(results)}/{len(products)} prices scraped")
 
         # Update system status
-        await database.update_system_status("last_scraper_run", datetime.now().isoformat())
+        await database.update_system_status("last_scraper_run", datetime.now(UTC).isoformat())
 
     except Exception as e:
         logger.error(f"Error in scraper task: {e}", exc_info=True)
@@ -122,13 +132,20 @@ async def run_cleanup() -> None:
         logger.error(f"Error in cleanup task: {e}", exc_info=True)
 
 
-async def schedule_scraper() -> None:  # pragma: no cover
-    """Schedule daily scraper runs."""
-    while not shutdown_event.is_set():
-        next_run = calculate_next_run(SCRAPER_HOUR)
-        sleep_seconds = (next_run - datetime.now()).total_seconds()
+async def schedule_task(task_name: str, hour: int, task_func) -> None:  # pragma: no cover
+    """
+    Generic scheduler for daily tasks.
 
-        logger.info(f"Scraper scheduled for {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+    Args:
+        task_name: Human-readable name for logging (e.g., "Scraper", "Checker")
+        hour: Hour of day to run (0-23)
+        task_func: Async function to execute
+    """
+    while not shutdown_event.is_set():
+        next_run = calculate_next_run(hour)
+        sleep_seconds = (next_run - datetime.now(UTC)).total_seconds()
+
+        logger.info(f"{task_name} scheduled for {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
 
         # Wait for sleep_seconds or until shutdown event is set
         try:
@@ -136,58 +153,48 @@ async def schedule_scraper() -> None:  # pragma: no cover
             # If we got here, shutdown was triggered
             break
         except TimeoutError:
-            # Timeout is normal - time to run the scraper
+            # Timeout is normal - time to run the task
             pass
 
         if not shutdown_event.is_set():
-            await run_scraper()
+            await task_func()
+
+
+async def schedule_scraper() -> None:  # pragma: no cover
+    """Schedule daily scraper runs."""
+    await schedule_task("Scraper", SCRAPER_HOUR, run_scraper)
 
 
 async def schedule_checker() -> None:  # pragma: no cover
     """Schedule daily checker runs."""
-    while not shutdown_event.is_set():
-        next_run = calculate_next_run(CHECKER_HOUR)
-        sleep_seconds = (next_run - datetime.now()).total_seconds()
-
-        logger.info(f"Checker scheduled for {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
-
-        # Wait for sleep_seconds or until shutdown event is set
-        try:
-            await asyncio.wait_for(shutdown_event.wait(), timeout=sleep_seconds)
-            # If we got here, shutdown was triggered
-            break
-        except TimeoutError:
-            # Timeout is normal - time to run the checker
-            pass
-
-        if not shutdown_event.is_set():
-            await run_checker()
+    await schedule_task("Checker", CHECKER_HOUR, run_checker)
 
 
 async def schedule_cleanup() -> None:  # pragma: no cover
     """Schedule daily cleanup runs."""
-    while not shutdown_event.is_set():
-        next_run = calculate_next_run(CLEANUP_HOUR)
-        sleep_seconds = (next_run - datetime.now()).total_seconds()
-
-        logger.info(f"Cleanup scheduled for {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
-
-        # Wait for sleep_seconds or until shutdown event is set
-        try:
-            await asyncio.wait_for(shutdown_event.wait(), timeout=sleep_seconds)
-            # If we got here, shutdown was triggered
-            break
-        except TimeoutError:
-            # Timeout is normal - time to run the cleanup
-            pass
-
-        if not shutdown_event.is_set():
-            await run_cleanup()
+    await schedule_task("Cleanup", CLEANUP_HOUR, run_cleanup)
 
 
 # ============================================================================
 # Main Application
 # ============================================================================
+
+
+def validate_environment() -> list[str]:
+    """
+    Validate all required environment variables are set.
+
+    Returns:
+        List of missing variable names (empty if all are set)
+    """
+    required_vars = {
+        "TELEGRAM_TOKEN": TELEGRAM_TOKEN,
+        "WEBHOOK_URL": WEBHOOK_URL,
+        "WEBHOOK_SECRET": WEBHOOK_SECRET,
+    }
+
+    missing = [name for name, value in required_vars.items() if not value]
+    return missing
 
 
 def setup_signal_handlers() -> None:  # pragma: no cover
@@ -206,12 +213,12 @@ async def main() -> None:  # pragma: no cover
     logger.info("Starting RepackIt bot...")
 
     # Validate environment variables
-    if not TELEGRAM_TOKEN:
-        logger.error("TELEGRAM_TOKEN not set")
-        return
-
-    if not WEBHOOK_URL:
-        logger.error("WEBHOOK_URL not set")
+    missing_vars = validate_environment()
+    if missing_vars:
+        logger.error(
+            f"Missing required environment variables: {', '.join(missing_vars)}\n"
+            "Please set them in your .env file or environment."
+        )
         return
 
     # Initialize database

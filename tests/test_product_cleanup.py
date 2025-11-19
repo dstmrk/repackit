@@ -51,6 +51,7 @@ async def test_cleanup_expired_products_with_expired(test_db):
     await database.add_product(
         user_id=123,
         asin="EXPIRED01",
+        marketplace="it",
         price_paid=50.0,
         return_deadline=yesterday,
         min_savings_threshold=0,
@@ -60,6 +61,7 @@ async def test_cleanup_expired_products_with_expired(test_db):
     await database.add_product(
         user_id=123,
         asin="ACTIVE001",
+        marketplace="it",
         price_paid=60.0,
         return_deadline=tomorrow,
         min_savings_threshold=0,
@@ -94,6 +96,7 @@ async def test_cleanup_expired_products_no_expired(test_db):
     await database.add_product(
         user_id=123,
         asin="ACTIVE001",
+        marketplace="it",
         price_paid=50.0,
         return_deadline=tomorrow,
         min_savings_threshold=0,
@@ -123,16 +126,32 @@ async def test_cleanup_expired_products_multiple_users(test_db):
     tomorrow = date.today() + timedelta(days=1)
 
     await database.add_product(
-        user_id=123, asin="EXPIRED01", price_paid=50.0, return_deadline=yesterday
+        user_id=123,
+        asin="EXPIRED01",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=yesterday,
     )
     await database.add_product(
-        user_id=123, asin="ACTIVE001", price_paid=60.0, return_deadline=tomorrow
+        user_id=123,
+        asin="ACTIVE001",
+        marketplace="it",
+        price_paid=60.0,
+        return_deadline=tomorrow,
     )
     await database.add_product(
-        user_id=456, asin="EXPIRED02", price_paid=70.0, return_deadline=yesterday
+        user_id=456,
+        asin="EXPIRED02",
+        marketplace="it",
+        price_paid=70.0,
+        return_deadline=yesterday,
     )
     await database.add_product(
-        user_id=456, asin="ACTIVE002", price_paid=80.0, return_deadline=tomorrow
+        user_id=456,
+        asin="ACTIVE002",
+        marketplace="it",
+        price_paid=80.0,
+        return_deadline=tomorrow,
     )
 
     # Run cleanup
@@ -202,6 +221,7 @@ async def test_cleanup_expired_products_boundary_today(test_db):
     await database.add_product(
         user_id=123,
         asin="TODAY001",
+        marketplace="it",
         price_paid=50.0,
         return_deadline=today,
         min_savings_threshold=0,

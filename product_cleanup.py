@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 import database
 
@@ -29,7 +29,7 @@ async def cleanup_expired_products() -> dict:
         deleted_count = await database.delete_expired_products()
 
         # Update system status for health check
-        timestamp = datetime.now().isoformat()
+        timestamp = datetime.now(UTC).isoformat()
         await database.update_system_status("last_cleanup_run", timestamp)
 
         logger.info(f"Cleanup completed: {deleted_count} expired products removed")

@@ -14,7 +14,8 @@ import asyncio
 import logging
 import os
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
+from logging.handlers import TimedRotatingFileHandler
 
 import httpx
 from dotenv import load_dotenv
@@ -25,12 +26,21 @@ import database
 load_dotenv()
 
 # Configure logging
+# Setup rotating file handler (daily rotation, keep 2 backups + today = 3 days total)
+file_handler = TimedRotatingFileHandler(
+    filename="data/logs/broadcast.log",
+    when="midnight",
+    interval=1,
+    backupCount=2,
+)
+file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("data/logs/broadcast.log"),
+        file_handler,
     ],
 )
 logger = logging.getLogger(__name__)
@@ -159,7 +169,7 @@ async def main():  # pragma: no cover
 
     # Log broadcast initiation
     logger.info("=" * 80)
-    logger.info(f"Broadcast initiated at {datetime.now().isoformat()}")
+    logger.info(f"Broadcast initiated at {datetime.now(UTC).isoformat()}")
     logger.info(f"Admin user ID: {ADMIN_USER_ID}")
     logger.info("=" * 80)
 

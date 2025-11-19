@@ -1,7 +1,7 @@
 """Tests for bot.py."""
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -11,7 +11,7 @@ import bot
 
 def test_calculate_next_run_future():
     """Test calculate_next_run when scheduled hour is in the future today."""
-    now = datetime.now()
+    now = datetime.now(UTC)
     future_hour = (now.hour + 2) % 24
 
     # If future_hour wrapped around, we need to handle it
@@ -32,7 +32,7 @@ def test_calculate_next_run_future():
 
 def test_calculate_next_run_past():
     """Test calculate_next_run when scheduled hour has already passed today."""
-    now = datetime.now()
+    now = datetime.now(UTC)
     past_hour = (now.hour - 1) % 24
 
     if past_hour > now.hour:
@@ -213,3 +213,56 @@ async def test_schedule_cleanup_shutdown():
 
     assert task.done() or task.cancelled()
     bot.shutdown_event.clear()
+
+
+def test_validate_environment_all_set():
+    """Test validate_environment when all required variables are set."""
+    # Save original values
+    original_token = bot.TELEGRAM_TOKEN
+    original_url = bot.WEBHOOK_URL
+    original_secret = bot.WEBHOOK_SECRET
+
+    # Set all variables
+    bot.TELEGRAM_TOKEN = "test_token"
+    bot.WEBHOOK_URL = "https://test.com"
+    bot.WEBHOOK_SECRET = "test_secret"
+
+    missing = bot.validate_environment()
+    assert missing == []
+
+    # Restore original values
+    bot.TELEGRAM_TOKEN = original_token
+    bot.WEBHOOK_URL = original_url
+    bot.WEBHOOK_SECRET = original_secret
+
+
+def test_validate_environment_missing_variables():
+    """Test validate_environment when some variables are missing."""
+    # Save original values
+    original_token = bot.TELEGRAM_TOKEN
+    original_url = bot.WEBHOOK_URL
+    original_secret = bot.WEBHOOK_SECRET
+
+    # Test with all missing
+    bot.TELEGRAM_TOKEN = None
+    bot.WEBHOOK_URL = None
+    bot.WEBHOOK_SECRET = None
+
+    missing = bot.validate_environment()
+    assert len(missing) == 3
+    assert "TELEGRAM_TOKEN" in missing
+    assert "WEBHOOK_URL" in missing
+    assert "WEBHOOK_SECRET" in missing
+
+    # Test with only token missing
+    bot.TELEGRAM_TOKEN = None
+    bot.WEBHOOK_URL = "https://test.com"
+    bot.WEBHOOK_SECRET = "test_secret"
+
+    missing = bot.validate_environment()
+    assert missing == ["TELEGRAM_TOKEN"]
+
+    # Restore original values
+    bot.TELEGRAM_TOKEN = original_token
+    bot.WEBHOOK_URL = original_url
+    bot.WEBHOOK_SECRET = original_secret

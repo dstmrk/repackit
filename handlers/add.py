@@ -14,16 +14,16 @@ logger = logging.getLogger(__name__)
 
 async def _validate_inputs(
     url: str, price_str: str, deadline_str: str, threshold_str: str, message
-) -> tuple[str, float, date, float] | None:
+) -> tuple[str, str, float, date, float] | None:
     """
     Validate and parse all input parameters for /add command.
 
     Returns:
-        Tuple of (asin, price_paid, return_deadline, min_savings_threshold) or None if validation fails
+        Tuple of (asin, marketplace, price_paid, return_deadline, min_savings_threshold) or None if validation fails
     """
-    # Extract ASIN from URL
+    # Extract ASIN and marketplace from URL
     try:
-        asin, _ = extract_asin(url)
+        asin, marketplace = extract_asin(url)
     except ValueError as e:
         await message.reply_text(
             f"❌ URL Amazon non valido: {e}\n\nAssicurati di usare un link Amazon corretto."
@@ -75,7 +75,7 @@ async def _validate_inputs(
             )
             return None
 
-    return asin, price_paid, return_deadline, min_savings_threshold
+    return asin, marketplace, price_paid, return_deadline, min_savings_threshold
 
 
 def parse_deadline(deadline_input: str, purchase_date: date = None) -> date:
@@ -163,15 +163,28 @@ async def add_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         result = await _validate_inputs(url, price_str, deadline_str, threshold_str, update.message)
         if result is None:
             return
-        asin, price_paid, return_deadline, min_savings_threshold = result
+        asin, marketplace, price_paid, return_deadline, min_savings_threshold = result
 
         # Register user if not exists
         await database.add_user(user_id=user_id, language_code=update.effective_user.language_code)
+
+        # Check product limit (max 10 products per user)
+        user_products = await database.get_user_products(user_id)
+        if len(user_products) >= 10:
+            await update.message.reply_text(
+                "❌ *Limite prodotti raggiunto!*\n\n"
+                "Puoi monitorare al massimo *10 prodotti* contemporaneamente.\n\n"
+                "Usa `/delete <numero>` per rimuovere un prodotto e fare spazio.",
+                parse_mode="Markdown",
+            )
+            logger.info(f"User {user_id} reached product limit (10 products)")
+            return
 
         # Add product to database
         await database.add_product(
             user_id=user_id,
             asin=asin,
+            marketplace=marketplace,
             price_paid=price_paid,
             return_deadline=return_deadline,
             min_savings_threshold=min_savings_threshold,
@@ -182,6 +195,7 @@ async def add_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         message = (
             "✅ *Prodotto aggiunto con successo!*\n\n"
             f"📦 ASIN: `{asin}`\n"
+            f"🌍 Marketplace: amazon.{marketplace}\n"
             f"💰 Prezzo pagato: €{price_paid:.2f}\n"
             f"📅 Scadenza reso: {return_deadline.strftime('%d/%m/%Y')} (tra {days_remaining} giorni)\n"
         )

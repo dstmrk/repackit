@@ -90,7 +90,11 @@ async def test_update_handler_invalid_field(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=tomorrow,
     )
 
     update = MagicMock()
@@ -132,7 +136,11 @@ async def test_update_handler_number_too_high(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=tomorrow,
     )
 
     update = MagicMock()
@@ -155,7 +163,11 @@ async def test_update_handler_price_success(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=tomorrow,
     )
 
     update = MagicMock()
@@ -183,7 +195,11 @@ async def test_update_handler_price_invalid(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=tomorrow,
     )
 
     update = MagicMock()
@@ -206,7 +222,11 @@ async def test_update_handler_price_negative(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=tomorrow,
     )
 
     update = MagicMock()
@@ -229,7 +249,11 @@ async def test_update_handler_price_comma_separator(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=tomorrow,
     )
 
     update = MagicMock()
@@ -251,7 +275,11 @@ async def test_update_handler_deadline_success_days(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=tomorrow,
     )
 
     update = MagicMock()
@@ -280,7 +308,11 @@ async def test_update_handler_deadline_success_iso(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=tomorrow,
     )
 
     update = MagicMock()
@@ -304,7 +336,11 @@ async def test_update_handler_deadline_invalid(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=tomorrow,
     )
 
     update = MagicMock()
@@ -327,7 +363,11 @@ async def test_update_handler_deadline_past(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=tomorrow,
     )
 
     update = MagicMock()
@@ -351,7 +391,11 @@ async def test_update_handler_threshold_success(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=tomorrow,
     )
 
     update = MagicMock()
@@ -379,7 +423,11 @@ async def test_update_handler_threshold_invalid(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=tomorrow,
     )
 
     update = MagicMock()
@@ -402,7 +450,11 @@ async def test_update_handler_threshold_negative(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=tomorrow,
     )
 
     update = MagicMock()
@@ -425,7 +477,11 @@ async def test_update_handler_threshold_exceeds_price(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=tomorrow,
     )
 
     update = MagicMock()
@@ -448,7 +504,11 @@ async def test_update_handler_threshold_comma_separator(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=tomorrow,
     )
 
     update = MagicMock()
@@ -470,7 +530,11 @@ async def test_update_handler_database_error(test_db):
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123, asin="ASIN00001", price_paid=50.0, return_deadline=tomorrow
+        user_id=123,
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=tomorrow,
     )
 
     update = MagicMock()
