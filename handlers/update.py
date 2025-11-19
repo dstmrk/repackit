@@ -227,10 +227,7 @@ async def handle_value_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     try:
         # Update based on field
         if field == "nome":
-            product_name = context.user_data["update_product_name"]
-            success = await _update_name(
-                product_id, product_name, value_str, user_id, update.message
-            )
+            success = await _update_name(product_id, value_str, user_id, update.message)
         elif field == "prezzo":
             success = await _update_price(product_id, asin, value_str, user_id, update.message)
         elif field == "scadenza":
@@ -265,9 +262,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 
-async def _update_name(
-    product_id: int, old_name: str, value_str: str, user_id: int, message
-) -> bool:
+async def _update_name(product_id: int, value_str: str, user_id: int, message) -> bool:
     """Update product name. Returns True if successful."""
     new_name = value_str.strip()
 
