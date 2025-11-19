@@ -21,7 +21,7 @@ from handlers.help import help_handler
 from handlers.list import list_handler
 from handlers.start import start_handler
 from handlers.update import update_conversation_handler
-from health_handler import start_health_server
+from health_handler import HEALTH_PORT, start_health_server
 
 # Load environment variables
 load_dotenv()
@@ -278,7 +278,7 @@ def main() -> None:  # pragma: no cover
     logger.info(f"🌐 Webhook URL: {WEBHOOK_URL}")
     logger.info(f"🔌 Webhook port: {BOT_PORT}")
     logger.info(f"🏥 Health check port: {HEALTH_PORT}")
-    logger.info(f"🚀 Starting webhook server...")
+    logger.info("🚀 Starting webhook server...")
 
     # Start webhook server (synchronous call, manages its own event loop)
     application.run_webhook(
