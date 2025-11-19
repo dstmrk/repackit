@@ -15,7 +15,7 @@ import checker
 import database
 import product_cleanup
 from data_reader import scrape_prices
-from handlers.add import add_handler
+from handlers.add import add_conversation_handler
 from handlers.delete import delete_handler
 from handlers.feedback import feedback_handler
 from handlers.list import list_handler
@@ -235,7 +235,7 @@ async def main() -> None:  # pragma: no cover
 
     # Register command handlers
     application.add_handler(CommandHandler("start", start_handler))
-    application.add_handler(CommandHandler("add", add_handler))
+    application.add_handler(add_conversation_handler)
     application.add_handler(CommandHandler("list", list_handler))
     application.add_handler(CommandHandler("delete", delete_handler))
     application.add_handler(CommandHandler("update", update_handler))

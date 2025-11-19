@@ -7,9 +7,20 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from telegram.ext import ConversationHandler
 
 import database
-from handlers.add import add_handler, parse_deadline
+from handlers.add import (
+    WAITING_DEADLINE,
+    WAITING_PRICE,
+    WAITING_URL,
+    cancel,
+    handle_deadline,
+    handle_price,
+    handle_url,
+    parse_deadline,
+    start_add,
+)
 
 
 @pytest.fixture
@@ -39,144 +50,363 @@ async def test_db():
 def test_parse_deadline_days():
     """Test parse_deadline with days format."""
     today = date.today()
-    result = parse_deadline("30", today)
+    result = parse_deadline("30")
     expected = today + timedelta(days=30)
     assert result == expected
 
 
-def test_parse_deadline_iso_date():
-    """Test parse_deadline with ISO date format."""
-    result = parse_deadline("2024-12-25")
-    assert result == date(2024, 12, 25)
+def test_parse_deadline_days_min_boundary():
+    """Test parse_deadline with minimum days (1)."""
+    today = date.today()
+    result = parse_deadline("1")
+    expected = today + timedelta(days=1)
+    assert result == expected
 
 
-def test_parse_deadline_invalid_days():
-    """Test parse_deadline with invalid days (zero)."""
-    with pytest.raises(ValueError, match="Days must be positive"):
+def test_parse_deadline_days_max_boundary():
+    """Test parse_deadline with maximum days (365)."""
+    today = date.today()
+    result = parse_deadline("365")
+    expected = today + timedelta(days=365)
+    assert result == expected
+
+
+def test_parse_deadline_days_below_range():
+    """Test parse_deadline with days below valid range (0)."""
+    with pytest.raises(ValueError, match="giorni deve essere tra 1 e 365"):
         parse_deadline("0")
 
 
-def test_parse_deadline_negative_days():
-    """Test parse_deadline with negative days."""
-    with pytest.raises(ValueError, match="Days must be positive"):
-        parse_deadline("-5")
+def test_parse_deadline_days_above_range():
+    """Test parse_deadline with days above valid range (366)."""
+    with pytest.raises(ValueError, match="giorni deve essere tra 1 e 365"):
+        parse_deadline("366")
+
+
+def test_parse_deadline_gg_mm_aaaa_format():
+    """Test parse_deadline with gg-mm-aaaa date format."""
+    result = parse_deadline("25-12-2024")
+    assert result == date(2024, 12, 25)
+
+
+def test_parse_deadline_gg_mm_aaaa_format_leap_year():
+    """Test parse_deadline with leap year date."""
+    result = parse_deadline("29-02-2024")
+    assert result == date(2024, 2, 29)
 
 
 def test_parse_deadline_invalid_format():
     """Test parse_deadline with invalid format."""
-    with pytest.raises(ValueError, match="Invalid deadline format"):
+    with pytest.raises(ValueError, match="Formato non valido"):
         parse_deadline("invalid")
 
 
+def test_parse_deadline_iso_format():
+    """Test parse_deadline with ISO format (yyyy-mm-dd) for /update compatibility."""
+    result = parse_deadline("2024-12-25")
+    assert result == date(2024, 12, 25)
+
+
+def test_parse_deadline_invalid_date():
+    """Test parse_deadline with invalid date (e.g., 32nd day)."""
+    with pytest.raises(ValueError, match="Formato non valido"):
+        parse_deadline("32-13-2024")
+
+
 # ============================================================================
-# add_handler tests
+# Conversational flow tests
 # ============================================================================
 
 
 @pytest.mark.asyncio
-async def test_add_handler_no_args(test_db):
-    """Test /add handler with no arguments."""
+async def test_start_add():
+    """Test /add command initiates conversation."""
     update = MagicMock()
-    update.effective_user.id = 123
     update.message.reply_text = AsyncMock()
     context = MagicMock()
-    context.args = []
 
-    await add_handler(update, context)
+    result = await start_add(update, context)
 
-    # Verify usage message was sent
+    # Verify it asks for URL
     update.message.reply_text.assert_called_once()
     call_args = update.message.reply_text.call_args
     message = call_args[0][0]
-    assert "Utilizzo" in message
-    assert "/add" in message
+    assert "link del prodotto Amazon.it" in message
+    assert "Esempio" in message
+
+    # Verify it returns the correct state
+    assert result == WAITING_URL
 
 
 @pytest.mark.asyncio
-async def test_add_handler_success_with_days(test_db):
-    """Test /add handler with valid input (days format)."""
+async def test_handle_url_valid():
+    """Test handling valid Amazon.it URL."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.message.text = "https://amazon.it/dp/B08N5WRWNW"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {}
+
+    result = await handle_url(update, context)
+
+    # Verify ASIN was stored
+    assert context.user_data["product_asin"] == "B08N5WRWNW"
+    assert context.user_data["product_marketplace"] == "it"
+
+    # Verify it asks for price
+    update.message.reply_text.assert_called_once()
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "prezzo che hai pagato" in message
+    assert "B08N5WRWNW" in message
+
+    # Verify it returns the correct state
+    assert result == WAITING_PRICE
+
+
+@pytest.mark.asyncio
+async def test_handle_url_invalid_marketplace():
+    """Test handling URL from non-.it marketplace."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.message.text = "https://amazon.com/dp/B08N5WRWNW"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {}
+
+    result = await handle_url(update, context)
+
+    # Verify error message
+    update.message.reply_text.assert_called_once()
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "URL non valido" in message or "Marketplace non supportato" in message
+    assert "Amazon.it" in message
+
+    # Verify it stays in same state
+    assert result == WAITING_URL
+
+
+@pytest.mark.asyncio
+async def test_handle_url_invalid():
+    """Test handling invalid URL."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.message.text = "https://google.com"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {}
+
+    result = await handle_url(update, context)
+
+    # Verify error message
+    update.message.reply_text.assert_called_once()
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "URL non valido" in message
+
+    # Verify it stays in same state
+    assert result == WAITING_URL
+
+
+@pytest.mark.asyncio
+async def test_handle_price_valid():
+    """Test handling valid price."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.message.text = "59.90"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {}
+
+    result = await handle_price(update, context)
+
+    # Verify price was stored
+    assert context.user_data["product_price"] == 59.90
+
+    # Verify it asks for deadline
+    update.message.reply_text.assert_called_once()
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "scadenza del reso" in message
+    assert "59.90" in message
+
+    # Verify it returns the correct state
+    assert result == WAITING_DEADLINE
+
+
+@pytest.mark.asyncio
+async def test_handle_price_comma_separator():
+    """Test handling price with comma as decimal separator."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.message.text = "59,90"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {}
+
+    result = await handle_price(update, context)
+
+    # Verify price was stored correctly
+    assert context.user_data["product_price"] == 59.90
+    assert result == WAITING_DEADLINE
+
+
+@pytest.mark.asyncio
+async def test_handle_price_invalid():
+    """Test handling invalid price."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.message.text = "invalid"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {}
+
+    result = await handle_price(update, context)
+
+    # Verify error message
+    update.message.reply_text.assert_called_once()
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "Prezzo non valido" in message
+
+    # Verify it stays in same state
+    assert result == WAITING_PRICE
+
+
+@pytest.mark.asyncio
+async def test_handle_price_negative():
+    """Test handling negative price."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.message.text = "-10"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {}
+
+    result = await handle_price(update, context)
+
+    # Verify error message
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "Prezzo non valido" in message
+
+    # Verify it stays in same state
+    assert result == WAITING_PRICE
+
+
+@pytest.mark.asyncio
+async def test_handle_price_too_many_digits():
+    """Test handling price with more than 16 digits."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.message.text = "12345678901234567.99"  # 19 digits total
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {}
+
+    result = await handle_price(update, context)
+
+    # Verify error message
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "Prezzo troppo lungo" in message or "16 cifre" in message
+
+    # Verify it stays in same state
+    assert result == WAITING_PRICE
+
+
+@pytest.mark.asyncio
+async def test_handle_deadline_days(test_db):
+    """Test handling deadline as number of days."""
     update = MagicMock()
     update.effective_user.id = 123
     update.effective_user.language_code = "it"
+    update.message.text = "30"
     update.message.reply_text = AsyncMock()
     context = MagicMock()
-    context.args = ["https://amazon.it/dp/B08N5WRWNW", "59.90", "30"]
+    context.user_data = {
+        "product_asin": "B08N5WRWNW",
+        "product_marketplace": "it",
+        "product_price": 59.90,
+    }
 
-    await add_handler(update, context)
+    result = await handle_deadline(update, context)
 
-    # Verify product was added to database
+    # Verify product was added
     products = await database.get_user_products(123)
     assert len(products) == 1
     assert products[0]["asin"] == "B08N5WRWNW"
     assert products[0]["price_paid"] == 59.90
 
-    # Verify success message was sent
-    update.message.reply_text.assert_called_once()
+    # Calculate expected deadline
+    expected_deadline = date.today() + timedelta(days=30)
+    assert products[0]["return_deadline"] == expected_deadline.isoformat()
+
+    # Verify success message
     call_args = update.message.reply_text.call_args
     message = call_args[0][0]
     assert "aggiunto con successo" in message
-    assert "B08N5WRWNW" in message
-    assert "€59.90" in message
+
+    # Verify conversation ended
+    assert result == ConversationHandler.END
+
+    # Verify user_data was cleared
+    assert context.user_data == {}
 
 
 @pytest.mark.asyncio
-async def test_add_handler_success_with_iso_date(test_db):
-    """Test /add handler with valid input (ISO date format)."""
+async def test_handle_deadline_date_format(test_db):
+    """Test handling deadline as gg-mm-aaaa date."""
     update = MagicMock()
     update.effective_user.id = 123
     update.effective_user.language_code = "it"
+    # Use a future date
+    future_date = date.today() + timedelta(days=60)
+    update.message.text = future_date.strftime("%d-%m-%Y")
     update.message.reply_text = AsyncMock()
     context = MagicMock()
-    future_date = (date.today() + timedelta(days=30)).isoformat()
-    context.args = ["https://amazon.it/dp/B08N5WRWNW", "59.90", future_date]
+    context.user_data = {
+        "product_asin": "B08N5WRWNW",
+        "product_marketplace": "it",
+        "product_price": 59.90,
+    }
 
-    await add_handler(update, context)
+    result = await handle_deadline(update, context)
 
-    # Verify product was added
+    # Verify product was added with correct deadline
     products = await database.get_user_products(123)
     assert len(products) == 1
-    assert products[0]["return_deadline"] == future_date
+    assert products[0]["return_deadline"] == future_date.isoformat()
+
+    # Verify conversation ended
+    assert result == ConversationHandler.END
 
 
 @pytest.mark.asyncio
-async def test_add_handler_with_threshold(test_db):
-    """Test /add handler with threshold parameter."""
+async def test_handle_deadline_invalid(test_db):
+    """Test handling invalid deadline."""
     update = MagicMock()
     update.effective_user.id = 123
-    update.effective_user.language_code = "it"
+    update.message.text = "invalid"
     update.message.reply_text = AsyncMock()
     context = MagicMock()
-    context.args = ["https://amazon.it/dp/B08N5WRWNW", "59.90", "30", "5.00"]
+    context.user_data = {
+        "product_asin": "B08N5WRWNW",
+        "product_marketplace": "it",
+        "product_price": 59.90,
+    }
 
-    await add_handler(update, context)
+    result = await handle_deadline(update, context)
 
-    # Verify threshold was saved
-    products = await database.get_user_products(123)
-    assert len(products) == 1
-    assert products[0]["min_savings_threshold"] == 5.00
-
-    # Verify threshold is in message
+    # Verify error message
     call_args = update.message.reply_text.call_args
     message = call_args[0][0]
-    assert "€5.00" in message
+    assert "Scadenza non valida" in message
 
-
-@pytest.mark.asyncio
-async def test_add_handler_invalid_url(test_db):
-    """Test /add handler with invalid Amazon URL."""
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["https://google.com", "59.90", "30"]
-
-    await add_handler(update, context)
-
-    # Verify error message was sent
-    update.message.reply_text.assert_called_once()
-    call_args = update.message.reply_text.call_args
-    message = call_args[0][0]
-    assert "URL Amazon non valido" in message
+    # Verify it stays in same state
+    assert result == WAITING_DEADLINE
 
     # Verify no product was added
     products = await database.get_user_products(123)
@@ -184,180 +414,34 @@ async def test_add_handler_invalid_url(test_db):
 
 
 @pytest.mark.asyncio
-async def test_add_handler_invalid_price(test_db):
-    """Test /add handler with invalid price."""
+async def test_handle_deadline_past_date(test_db):
+    """Test handling deadline in the past."""
     update = MagicMock()
     update.effective_user.id = 123
+    yesterday = date.today() - timedelta(days=1)
+    update.message.text = yesterday.strftime("%d-%m-%Y")
     update.message.reply_text = AsyncMock()
     context = MagicMock()
-    context.args = ["https://amazon.it/dp/B08N5WRWNW", "invalid", "30"]
+    context.user_data = {
+        "product_asin": "B08N5WRWNW",
+        "product_marketplace": "it",
+        "product_price": 59.90,
+    }
 
-    await add_handler(update, context)
-
-    # Verify error message
-    call_args = update.message.reply_text.call_args
-    message = call_args[0][0]
-    assert "Prezzo non valido" in message
-
-
-@pytest.mark.asyncio
-async def test_add_handler_negative_price(test_db):
-    """Test /add handler with negative price."""
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["https://amazon.it/dp/B08N5WRWNW", "-10", "30"]
-
-    await add_handler(update, context)
-
-    # Verify error message
-    call_args = update.message.reply_text.call_args
-    message = call_args[0][0]
-    assert "Prezzo non valido" in message
-
-
-@pytest.mark.asyncio
-async def test_add_handler_invalid_deadline(test_db):
-    """Test /add handler with invalid deadline."""
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["https://amazon.it/dp/B08N5WRWNW", "59.90", "invalid"]
-
-    await add_handler(update, context)
-
-    # Verify error message
-    call_args = update.message.reply_text.call_args
-    message = call_args[0][0]
-    assert "Scadenza non valida" in message
-
-
-@pytest.mark.asyncio
-async def test_add_handler_past_deadline(test_db):
-    """Test /add handler with deadline in the past."""
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    yesterday = (date.today() - timedelta(days=1)).isoformat()
-    context.args = ["https://amazon.it/dp/B08N5WRWNW", "59.90", yesterday]
-
-    await add_handler(update, context)
+    result = await handle_deadline(update, context)
 
     # Verify error message
     call_args = update.message.reply_text.call_args
     message = call_args[0][0]
     assert "deve essere nel futuro" in message
 
-
-@pytest.mark.asyncio
-async def test_add_handler_threshold_exceeds_price(test_db):
-    """Test /add handler with threshold greater than price."""
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["https://amazon.it/dp/B08N5WRWNW", "50.00", "30", "60.00"]
-
-    await add_handler(update, context)
-
-    # Verify error message
-    call_args = update.message.reply_text.call_args
-    message = call_args[0][0]
-    assert "Soglia non valida" in message
+    # Verify it stays in same state
+    assert result == WAITING_DEADLINE
 
 
 @pytest.mark.asyncio
-async def test_add_handler_comma_decimal_separator(test_db):
-    """Test /add handler with comma as decimal separator."""
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.effective_user.language_code = "it"
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["https://amazon.it/dp/B08N5WRWNW", "59,90", "30", "5,50"]
-
-    await add_handler(update, context)
-
-    # Verify product was added with correct values
-    products = await database.get_user_products(123)
-    assert len(products) == 1
-    assert products[0]["price_paid"] == 59.90
-    assert products[0]["min_savings_threshold"] == 5.50
-
-
-@pytest.mark.asyncio
-async def test_add_handler_database_error(test_db):
-    """Test /add handler handles database errors gracefully."""
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.effective_user.language_code = "it"
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["https://amazon.it/dp/B08N5WRWNW", "59.90", "30"]
-
-    # Mock database.add_product to raise an exception
-    with patch("handlers.add.database.add_product", side_effect=Exception("DB Error")):
-        await add_handler(update, context)
-
-        # Verify error message was sent
-        call_args = update.message.reply_text.call_args
-        message = call_args[0][0]
-        assert "Errore" in message
-
-
-@pytest.mark.asyncio
-async def test_add_handler_multiple_marketplaces(test_db):
-    """Test /add handler with products from different Amazon marketplaces."""
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.effective_user.language_code = "it"
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-
-    # Test different marketplace URLs
-    test_cases = [
-        ("https://www.amazon.it/dp/B08N5WRWNW", "it", 59.90),
-        ("https://www.amazon.com/dp/B08N5WRWNX", "com", 69.90),
-        ("https://www.amazon.de/dp/B08N5WRWNY", "de", 79.90),
-        ("https://www.amazon.fr/dp/B08N5WRWNZ", "fr", 89.90),
-        ("https://www.amazon.co.uk/dp/B08N5WRNWA", "uk", 99.90),
-    ]
-
-    for url, _expected_marketplace, price in test_cases:
-        context.args = [url, str(price), "30"]
-        await add_handler(update, context)
-
-    # Verify all products were added with correct marketplace
-    products = await database.get_user_products(123)
-    assert len(products) == 5
-
-    # Create a mapping of ASIN to expected marketplace for verification
-    asin_to_marketplace = {
-        "B08N5WRWNW": "it",
-        "B08N5WRWNX": "com",
-        "B08N5WRWNY": "de",
-        "B08N5WRWNZ": "fr",
-        "B08N5WRNWA": "uk",
-    }
-
-    # Verify each product has correct marketplace (order-independent check)
-    for product in products:
-        asin = product["asin"]
-        expected_marketplace = asin_to_marketplace[asin]
-        assert product["marketplace"] == expected_marketplace
-
-    # Verify success message includes marketplace
-    last_call_args = update.message.reply_text.call_args
-    last_message = last_call_args[0][0]
-    assert "amazon.uk" in last_message  # Last added was UK
-
-
-@pytest.mark.asyncio
-async def test_add_handler_product_limit(test_db):
-    """Test /add with product limit (max 10 products per user)."""
+async def test_handle_deadline_product_limit(test_db):
+    """Test adding product when limit is reached."""
     user_id = 123
     tomorrow = date.today() + timedelta(days=1)
 
@@ -371,33 +455,84 @@ async def test_add_handler_product_limit(test_db):
             return_deadline=tomorrow,
         )
 
-    # Verify we have 10 products
-    products = await database.get_user_products(user_id)
-    assert len(products) == 10
-
-    # Mock update and context
     update = MagicMock()
     update.effective_user.id = user_id
     update.effective_user.language_code = "it"
-    update.message = AsyncMock()
-
+    update.message.text = "30"
+    update.message.reply_text = AsyncMock()
     context = MagicMock()
-    context.args = [
-        "https://www.amazon.it/dp/B08N5WRWNW",
-        "59.90",
-        "30",
-    ]
+    context.user_data = {
+        "product_asin": "B08N5WRWNW",
+        "product_marketplace": "it",
+        "product_price": 59.90,
+    }
 
-    # Try to add an 11th product
-    await add_handler(update, context)
+    result = await handle_deadline(update, context)
 
-    # Verify error message was sent
-    assert update.message.reply_text.called
+    # Verify error message
     call_args = update.message.reply_text.call_args
     message = call_args[0][0]
     assert "Limite prodotti raggiunto" in message
     assert "10 prodotti" in message
 
-    # Verify no product was added
+    # Verify conversation ended
+    assert result == ConversationHandler.END
+
+    # Verify no 11th product was added
     products = await database.get_user_products(user_id)
-    assert len(products) == 10  # Still 10, not 11
+    assert len(products) == 10
+
+
+@pytest.mark.asyncio
+async def test_cancel():
+    """Test /cancel command."""
+    update = MagicMock()
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {
+        "product_asin": "B08N5WRWNW",
+        "product_marketplace": "it",
+        "product_price": 59.90,
+    }
+
+    result = await cancel(update, context)
+
+    # Verify cancel message
+    update.message.reply_text.assert_called_once()
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "annullata" in message
+
+    # Verify conversation ended
+    assert result == ConversationHandler.END
+
+    # Verify user_data was cleared
+    assert context.user_data == {}
+
+
+@pytest.mark.asyncio
+async def test_handle_deadline_database_error(test_db):
+    """Test handling database error gracefully."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.effective_user.language_code = "it"
+    update.message.text = "30"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {
+        "product_asin": "B08N5WRWNW",
+        "product_marketplace": "it",
+        "product_price": 59.90,
+    }
+
+    # Mock database.add_product to raise an exception
+    with patch("handlers.add.database.add_product", side_effect=Exception("DB Error")):
+        result = await handle_deadline(update, context)
+
+        # Verify error message was sent
+        call_args = update.message.reply_text.call_args
+        message = call_args[0][0]
+        assert "Errore" in message
+
+        # Verify conversation ended
+        assert result == ConversationHandler.END
