@@ -294,9 +294,7 @@ async def check_and_notify() -> dict:
                 await asyncio.sleep(DELAY_BETWEEN_BATCHES)
 
         # Update system status for health check
-        await database.update_system_status(
-            "last_checker_run", datetime.now(UTC).isoformat()
-        )
+        await database.update_system_status("last_checker_run", datetime.now(UTC).isoformat())
 
         logger.info(
             f"Price check completed: {stats['notifications_sent']} notifications sent, "

@@ -103,9 +103,7 @@ async def run_scraper() -> None:
         logger.info(f"Scraper completed: {len(results)}/{len(products)} prices scraped")
 
         # Update system status
-        await database.update_system_status(
-            "last_scraper_run", datetime.now(UTC).isoformat()
-        )
+        await database.update_system_status("last_scraper_run", datetime.now(UTC).isoformat())
 
     except Exception as e:
         logger.error(f"Error in scraper task: {e}", exc_info=True)

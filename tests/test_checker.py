@@ -355,11 +355,11 @@ async def test_check_and_notify_with_unavailable_products():
             with patch("checker.database.increment_consecutive_failures", return_value=3):
                 with patch("checker.database.update_system_status"):
                     with patch("checker.TELEGRAM_TOKEN", "test_token"):
-                        with patch("checker.Bot") as MockBot:
+                        with patch("checker.Bot") as mock_bot:
                             mock_bot_instance = AsyncMock()
-                            MockBot.return_value = mock_bot_instance
+                            mock_bot.return_value = mock_bot_instance
 
-                            stats = await checker.check_and_notify()
+                            await checker.check_and_notify()
 
                             # Verify unavailable notification was sent
                             assert mock_bot_instance.send_message.called
