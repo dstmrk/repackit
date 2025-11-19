@@ -21,6 +21,7 @@ from handlers.add import (
     handle_deadline,
     handle_min_savings,
     handle_price,
+    handle_product_name,
     handle_url,
     parse_deadline,
     start_add,
@@ -139,6 +140,79 @@ async def test_start_add():
     assert "Esempio" in message
 
     # Verify it returns the correct state
+    assert result == WAITING_PRODUCT_NAME
+
+
+@pytest.mark.asyncio
+async def test_handle_product_name_valid():
+    """Test handling valid product name."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.message.text = "iPhone 15 Pro"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {}
+
+    result = await handle_product_name(update, context)
+
+    # Verify product name was stored
+    assert context.user_data["product_name"] == "iPhone 15 Pro"
+
+    # Verify it asks for URL
+    update.message.reply_text.assert_called_once()
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "Nome salvato" in message
+    assert "iPhone 15 Pro" in message
+    assert "link del prodotto Amazon.it" in message
+
+    # Verify it returns the correct state
+    assert result == WAITING_URL
+
+
+@pytest.mark.asyncio
+async def test_handle_product_name_too_short():
+    """Test handling product name that's too short."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.message.text = "ab"  # Only 2 characters
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {}
+
+    result = await handle_product_name(update, context)
+
+    # Verify error message
+    update.message.reply_text.assert_called_once()
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "Nome troppo corto" in message
+    assert "almeno 3 caratteri" in message
+
+    # Verify it stays in same state
+    assert result == WAITING_PRODUCT_NAME
+
+
+@pytest.mark.asyncio
+async def test_handle_product_name_too_long():
+    """Test handling product name that's too long."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.message.text = "a" * 101  # 101 characters
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {}
+
+    result = await handle_product_name(update, context)
+
+    # Verify error message
+    update.message.reply_text.assert_called_once()
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "Nome troppo lungo" in message
+    assert "massimo 100 caratteri" in message
+
+    # Verify it stays in same state
     assert result == WAITING_PRODUCT_NAME
 
 
@@ -435,6 +509,200 @@ async def test_handle_deadline_past_date(test_db):
 
     # Verify it stays in same state
     assert result == WAITING_DEADLINE
+
+
+@pytest.mark.asyncio
+async def test_handle_min_savings_valid(test_db):
+    """Test handling valid min savings threshold."""
+    user_id = 123
+    tomorrow = date.today() + timedelta(days=1)
+
+    # Setup user and context with stored data
+    await database.add_user(user_id=user_id, language_code="it")
+
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.effective_user.language_code = "it"  # Set to string, not MagicMock
+    update.message.text = "5.00"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {
+        "product_name": "Test Product",
+        "product_asin": "B08N5WRWNW",
+        "product_marketplace": "it",
+        "product_price": 59.90,
+        "product_deadline": tomorrow,
+    }
+
+    result = await handle_min_savings(update, context)
+
+    # Verify product was added
+    products = await database.get_user_products(user_id)
+    assert len(products) == 1
+    assert products[0]["min_savings_threshold"] == 5.00
+
+    # Verify success message
+    update.message.reply_text.assert_called_once()
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "Prodotto aggiunto con successo" in message
+    assert "Test Product" in message
+    assert "€5.00" in message
+
+    # Verify conversation ended
+    assert result == ConversationHandler.END
+
+
+@pytest.mark.asyncio
+async def test_handle_min_savings_zero(test_db):
+    """Test handling min savings of 0 (any price drop)."""
+    user_id = 123
+    tomorrow = date.today() + timedelta(days=1)
+
+    # Setup user and context with stored data
+    await database.add_user(user_id=user_id, language_code="it")
+
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.effective_user.language_code = "it"  # Set to string, not MagicMock
+    update.message.text = "0"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {
+        "product_name": "Test Product",
+        "product_asin": "B08N5WRWNW",
+        "product_marketplace": "it",
+        "product_price": 59.90,
+        "product_deadline": tomorrow,
+    }
+
+    result = await handle_min_savings(update, context)
+
+    # Verify product was added with 0 threshold
+    products = await database.get_user_products(user_id)
+    assert len(products) == 1
+    assert products[0]["min_savings_threshold"] == 0.0
+
+    # Verify success message mentions "qualsiasi risparmio"
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "qualsiasi risparmio" in message
+
+    assert result == ConversationHandler.END
+
+
+@pytest.mark.asyncio
+async def test_handle_min_savings_negative(test_db):
+    """Test handling negative min savings (invalid)."""
+    user_id = 123
+    tomorrow = date.today() + timedelta(days=1)
+
+    await database.add_user(user_id=user_id, language_code="it")
+
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.effective_user.language_code = "it"  # Set to string, not MagicMock
+    update.message.text = "-5"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {
+        "product_name": "Test Product",
+        "product_asin": "B08N5WRWNW",
+        "product_marketplace": "it",
+        "product_price": 59.90,
+        "product_deadline": tomorrow,
+    }
+
+    result = await handle_min_savings(update, context)
+
+    # Verify error message
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "Valore non valido" in message
+    assert "non negativo" in message
+
+    # Verify product was NOT added
+    products = await database.get_user_products(user_id)
+    assert len(products) == 0
+
+    # Verify it stays in same state
+    assert result == WAITING_MIN_SAVINGS
+
+
+@pytest.mark.asyncio
+async def test_handle_min_savings_too_high(test_db):
+    """Test handling min savings >= price paid (invalid)."""
+    user_id = 123
+    tomorrow = date.today() + timedelta(days=1)
+
+    await database.add_user(user_id=user_id, language_code="it")
+
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.effective_user.language_code = "it"  # Set to string, not MagicMock
+    update.message.text = "60"  # Higher than price paid
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {
+        "product_name": "Test Product",
+        "product_asin": "B08N5WRWNW",
+        "product_marketplace": "it",
+        "product_price": 59.90,
+        "product_deadline": tomorrow,
+    }
+
+    result = await handle_min_savings(update, context)
+
+    # Verify error message
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "Valore troppo alto" in message
+    assert "inferiore al prezzo pagato" in message
+
+    # Verify product was NOT added
+    products = await database.get_user_products(user_id)
+    assert len(products) == 0
+
+    # Verify it stays in same state
+    assert result == WAITING_MIN_SAVINGS
+
+
+@pytest.mark.asyncio
+async def test_handle_min_savings_invalid_format(test_db):
+    """Test handling invalid min savings format."""
+    user_id = 123
+    tomorrow = date.today() + timedelta(days=1)
+
+    await database.add_user(user_id=user_id, language_code="it")
+
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.effective_user.language_code = "it"  # Set to string, not MagicMock
+    update.message.text = "abc"  # Not a number
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {
+        "product_name": "Test Product",
+        "product_asin": "B08N5WRWNW",
+        "product_marketplace": "it",
+        "product_price": 59.90,
+        "product_deadline": tomorrow,
+    }
+
+    result = await handle_min_savings(update, context)
+
+    # Verify error message
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "Valore non valido" in message
+    assert "abc" in message
+
+    # Verify product was NOT added
+    products = await database.get_user_products(user_id)
+    assert len(products) == 0
+
+    # Verify it stays in same state
+    assert result == WAITING_MIN_SAVINGS
 
 
 @pytest.mark.asyncio
