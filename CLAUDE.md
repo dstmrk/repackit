@@ -607,8 +607,53 @@ The `/update` command now uses a conversational flow that guides users through u
 - Step-by-step validation with helpful examples
 - No need to remember command syntax
 
-#### `/feedback <messaggio>`
-Stores user feedback in database for admin review.
+#### `/feedback`
+**Conversational flow with validation and confirmation**:
+
+The `/feedback` command uses a conversational flow to collect user feedback with validation and preview confirmation.
+
+**Flow**:
+1. User sends: `/feedback`
+2. Bot asks: "Scrivi il tuo feedback, suggerimento o segnalazione di bug"
+3. User writes feedback message
+4. Bot validates length:
+   - Minimum: 10 characters (prevents spam like "ok", "test")
+   - Maximum: 1000 characters (keeps feedback manageable)
+5. Bot shows preview with confirmation buttons:
+   ```
+   📝 Anteprima del tuo feedback:
+
+   [Feedback text or truncated preview...]
+
+   Lunghezza: 45 caratteri
+
+   Vuoi inviare questo feedback?
+
+   [✅ Sì, invia] [❌ No, annulla]
+   ```
+6. User clicks confirm → feedback saved to database
+7. Bot shows thank you message
+
+**Validation Rules**:
+- **Min length**: 10 characters (prevents trivial feedback)
+- **Max length**: 1000 characters (prevents abuse)
+- **Whitespace**: Leading/trailing spaces automatically stripped
+- **Characters**: Supports emojis and special characters
+
+**Preview Features**:
+- Shows first 200 characters for long feedback
+- Displays total character count
+- Inline keyboard for easy confirmation/cancellation
+
+**Canceling**:
+- Users can click "Annulla" button
+- Users can type `/cancel` when writing feedback
+
+**Benefits**:
+- Prevents accidental submissions with confirmation step
+- Clear validation with helpful error messages
+- Visual preview ensures users see what they're sending
+- Better quality feedback with length requirements
 
 ---
 
