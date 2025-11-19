@@ -529,15 +529,72 @@ The `/delete` command now uses inline keyboard buttons for confirmation to preve
 
 **Note**: Numbers 1, 2, 3... are **not** database IDs, but list indices from `/list`.
 
-#### `/update <numero> <campo> <valore>`
-Allows updating price_paid, return_deadline, or min_savings_threshold.
+#### `/update`
+**Conversational flow with inline buttons**:
 
-**Example**:
-```
-/update 1 prezzo 55.00
-/update 1 scadenza 2024-12-30
-/update 1 soglia 10
-```
+The `/update` command now uses a conversational flow that guides users through updating product information with interactive buttons.
+
+**Flow**:
+1. User sends: `/update`
+2. Bot shows list of products with inline buttons (similar to `/list` but with click actions):
+   ```
+   🔄 Aggiorna un prodotto
+
+   Seleziona il prodotto che vuoi modificare:
+
+   [1. B08N5WRWNW - €59.90 (amazon.it)]
+   [2. B08N5WRWNY - €45.00 (amazon.it)]
+   [❌ Annulla]
+   ```
+3. User clicks a product button
+4. Bot shows field options with inline buttons:
+   ```
+   📦 Prodotto selezionato: B08N5WRWNW
+
+   Cosa vuoi modificare?
+
+   [💰 Prezzo pagato]
+   [📅 Scadenza reso]
+   [🎯 Soglia risparmio]
+   [❌ Annulla]
+   ```
+5. User clicks a field button (e.g., "Prezzo pagato")
+6. Bot asks for new value with validation instructions:
+   ```
+   💰 Aggiorna prezzo pagato
+
+   Inviami il nuovo prezzo in euro.
+
+   Esempio: 59.90 oppure 59,90
+
+   Oppure scrivi /cancel per annullare.
+   ```
+7. User sends new value (e.g., `55.00`)
+8. Bot validates and updates, then shows confirmation:
+   ```
+   ✅ Prezzo aggiornato con successo!
+
+   📦 ASIN: B08N5WRWNW
+   💰 Nuovo prezzo: €55.00
+   ```
+
+**Validation Rules**:
+- **Prezzo**: Must be a positive number (supports both `.` and `,` as decimal separator)
+- **Scadenza**: Accepts either:
+  - Number of days (1-365): `30` → 30 days from today
+  - Date in format gg-mm-aaaa: `25-12-2024` → specific date
+  - Must be in the future
+- **Soglia**: Must be a non-negative number less than the price paid
+
+**Canceling**:
+- Users can click "Annulla" button at any step
+- Users can type `/cancel` when entering new value
+
+**Benefits**:
+- Intuitive product selection with visual list
+- Clear field options with emoji icons
+- Step-by-step validation with helpful examples
+- No need to remember command syntax
 
 #### `/feedback <messaggio>`
 Stores user feedback in database for admin review.

@@ -1,15 +1,244 @@
-"""Handler for /update command."""
+"""Handler for /update command with conversational flow."""
 
 import logging
 from datetime import date
 
-from telegram import Update
-from telegram.ext import ContextTypes
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import (
+    CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes,
+    ConversationHandler,
+    MessageHandler,
+    filters,
+)
 
 import database
 from handlers.add import parse_deadline
 
 logger = logging.getLogger(__name__)
+
+# Conversation states
+WAITING_PRODUCT_SELECTION, WAITING_FIELD_SELECTION, WAITING_VALUE_INPUT = range(3)
+
+
+async def start_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Start the /update conversation flow.
+
+    Step 1: Show list of products with inline buttons.
+    """
+    user_id = update.effective_user.id
+
+    logger.info(f"User {user_id} started /update flow")
+
+    # Get user's products
+    products = await database.get_user_products(user_id)
+
+    if not products:
+        await update.message.reply_text(
+            "📭 *Non hai prodotti da aggiornare*\n\nUsa /add per aggiungere un prodotto!",
+            parse_mode="Markdown",
+        )
+        return ConversationHandler.END
+
+    # Create inline keyboard with one button per product
+    keyboard = []
+    for idx, product in enumerate(products, start=1):
+        asin = product["asin"]
+        price_paid = product["price_paid"]
+        marketplace = product.get("marketplace", "it")
+
+        button_text = f"{idx}. {asin} - €{price_paid:.2f} (amazon.{marketplace})"
+        callback_data = f"update_product_{product['id']}"
+
+        keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+
+    # Add cancel button
+    keyboard.append([InlineKeyboardButton("❌ Annulla", callback_data="update_cancel")])
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "🔄 *Aggiorna un prodotto*\n\n" "Seleziona il prodotto che vuoi modificare:",
+        parse_mode="Markdown",
+        reply_markup=reply_markup,
+    )
+
+    return WAITING_PRODUCT_SELECTION
+
+
+async def handle_product_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Handle product selection.
+
+    Step 2: Show fields that can be updated with inline buttons.
+    """
+    query = update.callback_query
+    user_id = update.effective_user.id
+
+    await query.answer()
+
+    callback_data = query.data
+
+    # Handle cancel
+    if callback_data == "update_cancel":
+        await query.edit_message_text(
+            "❌ *Operazione annullata*\n\nNessuna modifica è stata effettuata.",
+            parse_mode="Markdown",
+        )
+        return ConversationHandler.END
+
+    # Extract product_id
+    product_id = int(callback_data.replace("update_product_", ""))
+
+    # Get product details
+    products = await database.get_user_products(user_id)
+    product = next((p for p in products if p["id"] == product_id), None)
+
+    if product is None:
+        await query.edit_message_text("❌ Prodotto non trovato. Potrebbe essere stato eliminato.")
+        return ConversationHandler.END
+
+    # Store product info in context
+    context.user_data["update_product_id"] = product_id
+    context.user_data["update_product_asin"] = product["asin"]
+    context.user_data["update_product_price_paid"] = product["price_paid"]
+
+    logger.info(f"User {user_id} selected product_id={product_id} for update")
+
+    # Create inline keyboard for field selection
+    keyboard = [
+        [InlineKeyboardButton("💰 Prezzo pagato", callback_data="update_field_prezzo")],
+        [InlineKeyboardButton("📅 Scadenza reso", callback_data="update_field_scadenza")],
+        [InlineKeyboardButton("🎯 Soglia risparmio", callback_data="update_field_soglia")],
+        [InlineKeyboardButton("❌ Annulla", callback_data="update_cancel")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(
+        f"📦 *Prodotto selezionato:* `{product['asin']}`\n\n" "Cosa vuoi modificare?",
+        parse_mode="Markdown",
+        reply_markup=reply_markup,
+    )
+
+    return WAITING_FIELD_SELECTION
+
+
+async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Handle field selection.
+
+    Step 3: Ask for new value based on selected field.
+    """
+    query = update.callback_query
+    user_id = update.effective_user.id
+
+    await query.answer()
+
+    callback_data = query.data
+
+    # Handle cancel
+    if callback_data == "update_cancel":
+        await query.edit_message_text(
+            "❌ *Operazione annullata*\n\nNessuna modifica è stata effettuata.",
+            parse_mode="Markdown",
+        )
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    # Extract field name
+    field = callback_data.replace("update_field_", "")
+    context.user_data["update_field"] = field
+
+    logger.info(f"User {user_id} selected field={field} for update")
+
+    # Show appropriate message based on field
+    if field == "prezzo":
+        message = (
+            "💰 *Aggiorna prezzo pagato*\n\n"
+            "Inviami il nuovo prezzo in euro.\n\n"
+            "Esempio: `59.90` oppure `59,90`\n\n"
+            "Oppure scrivi /cancel per annullare."
+        )
+    elif field == "scadenza":
+        message = (
+            "📅 *Aggiorna scadenza reso*\n\n"
+            "Inviami la nuova scadenza.\n\n"
+            "Puoi inviarmi:\n"
+            "• Un numero di giorni (da 1 a 365)\n"
+            "  Esempio: `30`\n\n"
+            "• Una data nel formato gg-mm-aaaa\n"
+            "  Esempio: `25-12-2024`\n\n"
+            "Oppure scrivi /cancel per annullare."
+        )
+    elif field == "soglia":
+        current_price = context.user_data["update_product_price_paid"]
+        message = (
+            "🎯 *Aggiorna soglia risparmio*\n\n"
+            "Inviami la nuova soglia minima di risparmio in euro.\n\n"
+            f"Deve essere minore del prezzo pagato (€{current_price:.2f})\n\n"
+            "Esempio: `5.00` oppure `5,00`\n\n"
+            "Oppure scrivi /cancel per annullare."
+        )
+
+    await query.edit_message_text(message, parse_mode="Markdown")
+
+    return WAITING_VALUE_INPUT
+
+
+async def handle_value_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Handle value input and update the product.
+
+    Step 4: Validate and save the new value.
+    """
+    user_id = update.effective_user.id
+    value_str = update.message.text.strip()
+
+    # Get stored data
+    product_id = context.user_data["update_product_id"]
+    asin = context.user_data["update_product_asin"]
+    field = context.user_data["update_field"]
+
+    logger.info(f"User {user_id} provided value for {field}: {value_str}")
+
+    try:
+        # Update based on field
+        if field == "prezzo":
+            success = await _update_price(product_id, asin, value_str, user_id, update.message)
+        elif field == "scadenza":
+            success = await _update_deadline(product_id, asin, value_str, user_id, update.message)
+        elif field == "soglia":
+            current_price = context.user_data["update_product_price_paid"]
+            success = await _update_threshold(
+                product_id, asin, value_str, current_price, user_id, update.message
+            )
+        else:
+            success = False
+
+        if success:
+            # Clear user_data and end conversation
+            context.user_data.clear()
+            return ConversationHandler.END
+        else:
+            # Keep in same state to retry
+            return WAITING_VALUE_INPUT
+
+    except Exception as e:
+        logger.error(f"Error in handle_value_input for user {user_id}: {e}", exc_info=True)
+        await update.message.reply_text("❌ Errore nell'aggiornare il prodotto. Riprova più tardi.")
+        context.user_data.clear()
+        return ConversationHandler.END
+
+
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Cancel the conversation."""
+    await update.message.reply_text(
+        "❌ *Operazione annullata*\n\nNessuna modifica è stata effettuata.", parse_mode="Markdown"
+    )
+    context.user_data.clear()
+    return ConversationHandler.END
 
 
 async def _update_price(product_id: int, asin: str, value_str: str, user_id: int, message) -> bool:
@@ -20,7 +249,8 @@ async def _update_price(product_id: int, asin: str, value_str: str, user_id: int
             raise ValueError("Price must be positive")
     except ValueError:
         await message.reply_text(
-            f"❌ Prezzo non valido: `{value_str}`\n\nUsa un numero positivo (es. 59.90 o 59,90)",
+            f"❌ Prezzo non valido: `{value_str}`\n\nUsa un numero positivo (es. 59.90 o 59,90)\n\n"
+            "Riprova oppure /cancel per annullare.",
             parse_mode="Markdown",
         )
         return False
@@ -44,14 +274,17 @@ async def _update_deadline(
         new_deadline = parse_deadline(value_str)
     except ValueError as e:
         await message.reply_text(
-            f"❌ Scadenza non valida: {e}\n\nUsa giorni (es. 30) o data ISO (es. 2024-12-25)"
+            f"❌ Scadenza non valida: {e}\n\n"
+            "Usa giorni (es. 30) o data gg-mm-aaaa (es. 25-12-2024)\n\n"
+            "Riprova oppure /cancel per annullare."
         )
         return False
 
     if new_deadline < date.today():
         await message.reply_text(
             "❌ La scadenza deve essere nel futuro!\n\n"
-            f"Data specificata: {new_deadline.strftime('%d/%m/%Y')}"
+            f"Data specificata: {new_deadline.strftime('%d/%m/%Y')}\n\n"
+            "Riprova oppure /cancel per annullare."
         )
         return False
 
@@ -83,7 +316,8 @@ async def _update_threshold(
     except ValueError as e:
         await message.reply_text(
             f"❌ Soglia non valida: {e}\n\n"
-            "La soglia deve essere un numero positivo minore del prezzo pagato."
+            "La soglia deve essere un numero positivo minore del prezzo pagato.\n\n"
+            "Riprova oppure /cancel per annullare."
         )
         return False
 
@@ -100,104 +334,17 @@ async def _update_threshold(
     return True
 
 
-async def update_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Handle /update command.
-
-    Format: /update <numero> <campo> <valore>
-    Examples:
-    - /update 1 prezzo 55.00
-    - /update 1 scadenza 2024-12-30
-    - /update 1 soglia 10
-
-    Args:
-        update: Telegram update object
-        context: Telegram context object
-    """
-    user_id = update.effective_user.id
-
-    # Check arguments
-    if not context.args or len(context.args) != 3:
-        await update.message.reply_text(
-            "❌ *Utilizzo:* `/update <numero> <campo> <valore>`\n\n"
-            "*Esempi:*\n"
-            "`/update 1 prezzo 55.00`\n"
-            "`/update 1 scadenza 2024-12-30`\n"
-            "`/update 1 soglia 10`\n\n"
-            "*Campi disponibili:*\n"
-            "• `prezzo` - Prezzo pagato in euro\n"
-            "• `scadenza` - Data scadenza reso (giorni o data ISO)\n"
-            "• `soglia` - Soglia minima di risparmio in euro",
-            parse_mode="Markdown",
-        )
-        return
-
-    product_number_str = context.args[0]
-    field = context.args[1].lower()
-    value_str = context.args[2]
-
-    logger.info(f"User {user_id} updating product #{product_number_str}: {field}={value_str}")
-
-    try:
-        # Parse product number
-        try:
-            product_number = int(product_number_str)
-            if product_number < 1:
-                raise ValueError("Product number must be positive")
-        except ValueError:
-            await update.message.reply_text(
-                f"❌ Numero prodotto non valido: `{product_number_str}`\n\n"
-                "Usa un numero intero positivo (es. 1, 2, 3...).\n"
-                "Vedi /list per i numeri dei tuoi prodotti.",
-                parse_mode="Markdown",
-            )
-            return
-
-        # Validate field name
-        valid_fields = ["prezzo", "scadenza", "soglia"]
-        if field not in valid_fields:
-            await update.message.reply_text(
-                f"❌ Campo non valido: `{field}`\n\n"
-                "Campi disponibili: `prezzo`, `scadenza`, `soglia`",
-                parse_mode="Markdown",
-            )
-            return
-
-        # Get user's products
-        products = await database.get_user_products(user_id)
-
-        if not products:
-            await update.message.reply_text(
-                "📭 *Non hai prodotti da aggiornare*\n\nUsa /add per aggiungere un prodotto!",
-                parse_mode="Markdown",
-            )
-            return
-
-        # Validate product number is in range
-        if product_number > len(products):
-            await update.message.reply_text(
-                f"❌ Numero prodotto non valido: {product_number}\n\n"
-                f"Hai solo {len(products)} prodotto/i monitorato/i.\n"
-                "Usa /list per vedere la tua lista."
-            )
-            return
-
-        # Get product to update (convert 1-based to 0-based index)
-        product = products[product_number - 1]
-        product_id = product["id"]
-        asin = product["asin"]
-
-        # Update field based on user input
-        if field == "prezzo":
-            await _update_price(product_id, asin, value_str, user_id, update.message)
-        elif field == "scadenza":
-            await _update_deadline(product_id, asin, value_str, user_id, update.message)
-        elif field == "soglia":
-            current_price = product["price_paid"]
-            await _update_threshold(
-                product_id, asin, value_str, current_price, user_id, update.message
-            )
-
-    except Exception as e:
-        logger.error(f"Error in update_handler for user {user_id}: {e}", exc_info=True)
-        await update.message.reply_text("❌ Errore nell'aggiornare il prodotto. Riprova più tardi.")
+# Create the ConversationHandler
+update_conversation_handler = ConversationHandler(
+    entry_points=[CommandHandler("update", start_update)],
+    states={
+        WAITING_PRODUCT_SELECTION: [
+            CallbackQueryHandler(handle_product_selection, pattern="^update_(product|cancel)_")
+        ],
+        WAITING_FIELD_SELECTION: [
+            CallbackQueryHandler(handle_field_selection, pattern="^update_(field|cancel)_")
+        ],
+        WAITING_VALUE_INPUT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_value_input)],
+    },
+    fallbacks=[CommandHandler("cancel", cancel)],
+)
