@@ -208,7 +208,9 @@ async def test_update_product(test_db):
     await database.add_user(123456, "it")
 
     deadline = date.today() + timedelta(days=30)
-    product_id = await database.add_product(123456, "Test Product", "B08N5WRWNW", "it", 59.90, deadline)
+    product_id = await database.add_product(
+        123456, "Test Product", "B08N5WRWNW", "it", 59.90, deadline
+    )
 
     # Update price
     success = await database.update_product(product_id, price_paid=55.00)
@@ -243,7 +245,9 @@ async def test_update_last_notified_price(test_db):
     await database.add_user(123456, "it")
 
     deadline = date.today() + timedelta(days=30)
-    product_id = await database.add_product(123456, "Test Product", "B08N5WRWNW", "it", 59.90, deadline)
+    product_id = await database.add_product(
+        123456, "Test Product", "B08N5WRWNW", "it", 59.90, deadline
+    )
 
     # Initially None
     products = await database.get_user_products(123456)
@@ -266,7 +270,9 @@ async def test_delete_product(test_db):
     await database.add_user(123456, "it")
 
     deadline = date.today() + timedelta(days=30)
-    product_id = await database.add_product(123456, "Test Product", "B08N5WRWNW", "it", 59.90, deadline)
+    product_id = await database.add_product(
+        123456, "Test Product", "B08N5WRWNW", "it", 59.90, deadline
+    )
 
     # Delete product
     success = await database.delete_product(product_id)
