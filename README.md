@@ -22,6 +22,9 @@ Un bot Telegram che ti avvisa se il prezzo dei tuoi acquisti Amazon scende duran
 - ✅ Notifiche intelligenti sui ribassi
 - ✅ Gestione scadenze reso
 - ✅ Soglie di risparmio personalizzabili
+- ✅ **Flussi conversazionali** per tutti i comandi
+- ✅ **Validazione robusta** con inline keyboards
+- ✅ **Limite 20 prodotti** per utente
 - ✅ Health check endpoint per monitoring
 - ✅ Webhook-only (production-ready)
 - ✅ Docker support con multi-stage build
@@ -138,21 +141,72 @@ docker run -d \
 
 ## Comandi Bot
 
+### Comandi Principali
+
 - `/start` - Messaggio di benvenuto e registrazione
-- `/add <url> <prezzo> <giorni> [soglia]` - Aggiungi prodotto da monitorare
-- `/list` - Visualizza prodotti monitorati
-- `/delete <numero>` - Rimuovi prodotto
-- `/update <numero> <campo> <valore>` - Aggiorna prodotto
-- `/feedback <messaggio>` - Invia feedback agli admin
+- `/help` - Mostra tutti i comandi disponibili con descrizioni dettagliate
+- `/add` - **Aggiungi prodotto** (flusso conversazionale guidato)
+  - Step 1: Invia URL Amazon.it
+  - Step 2: Invia prezzo pagato
+  - Step 3: Invia scadenza reso (numero giorni o data gg-mm-aaaa)
+- `/list` - **Visualizza prodotti** monitorati (mostra conteggio 5/20)
+- `/delete` - **Rimuovi prodotto** con conferma inline keyboard
+  - Mostra lista prodotti con bottoni cliccabili
+  - Richiede conferma prima di eliminare
+- `/update` - **Aggiorna prodotto** (flusso conversazionale con inline keyboards)
+  - Step 1: Seleziona prodotto da lista
+  - Step 2: Scegli campo (prezzo/scadenza/soglia)
+  - Step 3: Inserisci nuovo valore
+- `/feedback` - **Invia feedback** (flusso conversazionale con validazione)
+  - Scrivi messaggio (min 10, max 1000 caratteri)
+  - Conferma con anteprima prima di inviare
 
-### Esempi
+### Limiti
 
-```
-/add https://amazon.it/dp/B08N5WRWNW 59.90 30
-/add https://amazon.it/dp/B08N5WRWNW 59.90 2024-12-25 5
-/update 1 prezzo 55.00
-/update 1 scadenza 2024-12-30
-/delete 2
+- **Massimo 20 prodotti** per utente
+- **Validazione automatica** su tutti gli input
+- **Supporto /cancel** in ogni flusso conversazionale
+
+### Esempio Utilizzo
+
+```bash
+# 1. Aggiungi un prodotto
+Utente: /add
+Bot: Inviami il link del prodotto Amazon.it
+Utente: https://amazon.it/dp/B08N5WRWNW
+Bot: Inviami il prezzo che hai pagato in euro
+Utente: 59.90
+Bot: Inviami la scadenza del reso
+Utente: 30
+Bot: ✅ Prodotto aggiunto con successo!
+
+# 2. Visualizza lista
+Utente: /list
+Bot: Hai 1/20 prodotti monitorati. [mostra lista]
+
+# 3. Aggiorna prezzo
+Utente: /update
+Bot: [mostra lista prodotti con bottoni]
+Utente: [clicca prodotto 1]
+Bot: [mostra opzioni: Prezzo/Scadenza/Soglia]
+Utente: [clicca "Prezzo pagato"]
+Bot: Inviami il nuovo prezzo in euro
+Utente: 55.00
+Bot: ✅ Prezzo aggiornato con successo!
+
+# 4. Rimuovi prodotto
+Utente: /delete
+Bot: [mostra prodotto con conferma]
+Utente: [clicca "Sì, elimina"]
+Bot: ✅ Prodotto eliminato
+
+# 5. Invia feedback
+Utente: /feedback
+Bot: Scrivi il tuo feedback
+Utente: Il bot funziona benissimo!
+Bot: [mostra anteprima con conferma]
+Utente: [clicca "Sì, invia"]
+Bot: ✅ Feedback inviato con successo!
 ```
 
 ## Admin Script
@@ -206,20 +260,27 @@ repackit/
 ├── broadcast.py            # Admin broadcast script
 ├── health_handler.py       # Health check endpoint
 ├── database.py             # Database operations
-├── handlers/               # Command handlers
-│   ├── start.py
-│   ├── add.py
-│   ├── list.py
-│   ├── delete.py
-│   ├── update.py
-│   └── feedback.py
-├── tests/                  # Unit tests (80%+ coverage)
+├── handlers/               # Command handlers (conversational flows)
+│   ├── start.py           # Welcome message
+│   ├── help.py            # Help command
+│   ├── add.py             # Add product (3-step conversation)
+│   ├── list.py            # List products (with count)
+│   ├── delete.py          # Delete product (with confirmation)
+│   ├── update.py          # Update product (3-step conversation)
+│   └── feedback.py        # Send feedback (with validation)
+├── tests/                  # Unit tests (91%+ coverage)
+│   └── handlers/          # Handler tests
 ├── data/                   # Persistent data (gitignored)
-│   ├── users.db
-│   └── logs/
+│   ├── users.db           # SQLite database
+│   └── logs/              # Rotating logs (3 days)
 ├── Dockerfile              # Multi-stage build
 ├── docker-compose.yml      # Production orchestration
-└── .github/workflows/      # CI/CD pipelines
+├── .github/workflows/      # CI/CD pipelines
+│   ├── test.yml           # Unit tests
+│   ├── lint.yml           # Code quality (black + ruff)
+│   └── docker.yml         # Docker build
+├── CLAUDE.md              # Complete technical documentation
+└── README.md              # This file
 ```
 
 ## Monitoring
