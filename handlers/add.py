@@ -285,9 +285,10 @@ def parse_deadline(deadline_input: str) -> date:
     """
     Parse return deadline from user input.
 
-    Supports two formats:
+    Supports three formats:
     - Number of days (1-365): "30" -> 30 days from today
     - Date format gg-mm-aaaa: "25-12-2024" -> specific date
+    - Date format yyyy-mm-dd (ISO): "2024-12-25" -> specific date (for /update compatibility)
 
     Args:
         deadline_input: User input string
@@ -314,11 +315,23 @@ def parse_deadline(deadline_input: str) -> date:
             raise
         # Otherwise, continue to try date parsing
 
-    # Try parsing as date in format gg-mm-aaaa
+    # Try parsing as date in format gg-mm-aaaa or yyyy-mm-dd
     try:
-        # Parse gg-mm-aaaa
-        day, month, year = deadline_input.split("-")
-        return date(int(year), int(month), int(day))
+        parts = deadline_input.split("-")
+        if len(parts) != 3:
+            raise ValueError("Invalid date format")
+
+        # Determine format by checking which part is the year (4 digits)
+        if len(parts[0]) == 4:
+            # Format: yyyy-mm-dd (ISO format)
+            year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
+        elif len(parts[2]) == 4:
+            # Format: gg-mm-aaaa
+            day, month, year = int(parts[0]), int(parts[1]), int(parts[2])
+        else:
+            raise ValueError("Year must be 4 digits")
+
+        return date(year, month, day)
 
     except (ValueError, AttributeError):
         raise ValueError(

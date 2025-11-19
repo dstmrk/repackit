@@ -101,10 +101,10 @@ def test_parse_deadline_invalid_format():
         parse_deadline("invalid")
 
 
-def test_parse_deadline_iso_format_not_supported():
-    """Test that old ISO format (yyyy-mm-dd) now returns error."""
-    with pytest.raises(ValueError, match="Formato non valido"):
-        parse_deadline("2024-12-25")
+def test_parse_deadline_iso_format():
+    """Test parse_deadline with ISO format (yyyy-mm-dd) for /update compatibility."""
+    result = parse_deadline("2024-12-25")
+    assert result == date(2024, 12, 25)
 
 
 def test_parse_deadline_invalid_date():
