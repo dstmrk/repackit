@@ -33,8 +33,14 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
     def handle_health_check(self):
         """Handle health check endpoint."""
         try:
-            # Run async health check (asyncio.run handles event loop creation/cleanup)
-            health_data = asyncio.run(get_health_status())
+            # Create new event loop for this thread (HTTP server runs in daemon thread)
+            # We can't use asyncio.run() because it conflicts with the bot's event loop
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                health_data = loop.run_until_complete(get_health_status())
+            finally:
+                loop.close()
 
             # Send response
             self.send_response(200)
