@@ -46,8 +46,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "/delete - Rimuovi un prodotto\n"
         "/update - Modifica un prodotto\n"
         "/feedback - Invia un feedback\n\n"
-        "💡 *Esempio:*\n"
-        "`/add https://amazon.it/dp/B08N5WRWNW 59.90 30`"
+        "Usa /help per maggiori informazioni!"
     )
 
     await update.message.reply_text(welcome_message, parse_mode="Markdown")
