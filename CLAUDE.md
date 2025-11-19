@@ -486,7 +486,33 @@ I tuoi prodotti monitorati:
 **Note**: Numbers 1, 2, 3... are **not** database IDs, but list indices.
 
 #### `/delete <numero>`
-**Example**: `/delete 2` removes the 2nd item from user's list.
+**Interactive deletion with confirmation**:
+
+The `/delete` command now uses inline keyboard buttons for confirmation to prevent accidental deletions.
+
+**Flow**:
+1. User sends: `/delete 2`
+2. Bot shows product details with confirmation buttons:
+   ```
+   ⚠️ Sei sicuro di voler eliminare questo prodotto?
+
+   📦 ASIN: B08N5WRWNW
+   🌍 Marketplace: amazon.it
+   💰 Prezzo pagato: €59.90
+   📅 Scadenza reso: 25/12/2024
+
+   [✅ Sì, elimina] [❌ No, annulla]
+   ```
+3. User clicks one of the buttons:
+   - **Sì, elimina**: Product is deleted permanently
+   - **No, annulla**: Operation is canceled, product remains
+
+**Benefits**:
+- Prevents accidental deletions
+- Shows product details before confirming
+- Modern UX with inline buttons
+
+**Note**: Numbers 1, 2, 3... are **not** database IDs, but list indices from `/list`.
 
 #### `/update <numero> <campo> <valore>`
 Allows updating price_paid, return_deadline, or min_savings_threshold.
