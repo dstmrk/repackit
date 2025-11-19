@@ -18,6 +18,9 @@ from handlers.add import parse_deadline
 
 logger = logging.getLogger(__name__)
 
+# Constants
+CANCEL_MESSAGE = "❌ *Operazione annullata*\n\nNessuna modifica è stata effettuata."
+
 # Conversation states
 WAITING_PRODUCT_SELECTION, WAITING_FIELD_SELECTION, WAITING_VALUE_INPUT = range(3)
 
@@ -60,7 +63,7 @@ async def start_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        "🔄 *Aggiorna un prodotto*\n\n" "Seleziona il prodotto che vuoi modificare:",
+        "🔄 *Aggiorna un prodotto*\n\nSeleziona il prodotto che vuoi modificare:",
         parse_mode="Markdown",
         reply_markup=reply_markup,
     )
@@ -84,7 +87,7 @@ async def handle_product_selection(update: Update, context: ContextTypes.DEFAULT
     # Handle cancel
     if callback_data == "update_cancel":
         await query.edit_message_text(
-            "❌ *Operazione annullata*\n\nNessuna modifica è stata effettuata.",
+            CANCEL_MESSAGE,
             parse_mode="Markdown",
         )
         return ConversationHandler.END
@@ -141,7 +144,7 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
     # Handle cancel
     if callback_data == "update_cancel":
         await query.edit_message_text(
-            "❌ *Operazione annullata*\n\nNessuna modifica è stata effettuata.",
+            CANCEL_MESSAGE,
             parse_mode="Markdown",
         )
         context.user_data.clear()
@@ -234,9 +237,7 @@ async def handle_value_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancel the conversation."""
-    await update.message.reply_text(
-        "❌ *Operazione annullata*\n\nNessuna modifica è stata effettuata.", parse_mode="Markdown"
-    )
+    await update.message.reply_text(CANCEL_MESSAGE, parse_mode="Markdown")
     context.user_data.clear()
     return ConversationHandler.END
 
