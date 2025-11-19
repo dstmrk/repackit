@@ -3,7 +3,7 @@
 import asyncio
 import logging
 import os
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from telegram import Bot
 from telegram.error import TelegramError
@@ -295,7 +295,7 @@ async def check_and_notify() -> dict:
 
         # Update system status for health check
         await database.update_system_status(
-            "last_checker_run", datetime.now(timezone.utc).isoformat()
+            "last_checker_run", datetime.now(UTC).isoformat()
         )
 
         logger.info(

@@ -347,3 +347,68 @@ async def test_get_all_feedback_empty(test_db):
     """Test getting feedback when none exists."""
     all_feedback = await database.get_all_feedback()
     assert all_feedback == []
+
+
+# ============================================================================
+# Consecutive failures tracking tests
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_increment_consecutive_failures(test_db):
+    """Test incrementing consecutive failures count."""
+    # Add user and product
+    await database.add_user(123, "it")
+    tomorrow = date.today() + timedelta(days=1)
+    product_id = await database.add_product(
+        user_id=123,
+        asin="B08N5WRWNW",
+        marketplace="it",
+        price_paid=59.90,
+        return_deadline=tomorrow,
+    )
+
+    # Increment failures
+    count1 = await database.increment_consecutive_failures(product_id)
+    assert count1 == 1
+
+    count2 = await database.increment_consecutive_failures(product_id)
+    assert count2 == 2
+
+    count3 = await database.increment_consecutive_failures(product_id)
+    assert count3 == 3
+
+    # Verify in database
+    products = await database.get_user_products(123)
+    assert products[0]["consecutive_failures"] == 3
+
+
+@pytest.mark.asyncio
+async def test_reset_consecutive_failures(test_db):
+    """Test resetting consecutive failures count."""
+    # Add user and product
+    await database.add_user(123, "it")
+    tomorrow = date.today() + timedelta(days=1)
+    product_id = await database.add_product(
+        user_id=123,
+        asin="B08N5WRWNW",
+        marketplace="it",
+        price_paid=59.90,
+        return_deadline=tomorrow,
+    )
+
+    # Increment failures to 3
+    await database.increment_consecutive_failures(product_id)
+    await database.increment_consecutive_failures(product_id)
+    await database.increment_consecutive_failures(product_id)
+
+    # Verify it's at 3
+    products = await database.get_user_products(123)
+    assert products[0]["consecutive_failures"] == 3
+
+    # Reset
+    await database.reset_consecutive_failures(product_id)
+
+    # Verify it's back to 0
+    products = await database.get_user_products(123)
+    assert products[0]["consecutive_failures"] == 0

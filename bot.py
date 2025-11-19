@@ -5,7 +5,7 @@ import contextlib
 import logging
 import os
 import signal
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from logging.handlers import TimedRotatingFileHandler
 
 from dotenv import load_dotenv
@@ -76,7 +76,7 @@ def calculate_next_run(hour: int) -> datetime:
     Returns:
         Datetime of next scheduled run
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     next_run = now.replace(hour=hour, minute=0, second=0, microsecond=0)
 
     # If the time has already passed today, schedule for tomorrow
@@ -104,7 +104,7 @@ async def run_scraper() -> None:
 
         # Update system status
         await database.update_system_status(
-            "last_scraper_run", datetime.now(timezone.utc).isoformat()
+            "last_scraper_run", datetime.now(UTC).isoformat()
         )
 
     except Exception as e:
@@ -145,7 +145,7 @@ async def schedule_task(task_name: str, hour: int, task_func) -> None:  # pragma
     """
     while not shutdown_event.is_set():
         next_run = calculate_next_run(hour)
-        sleep_seconds = (next_run - datetime.now(timezone.utc)).total_seconds()
+        sleep_seconds = (next_run - datetime.now(UTC)).total_seconds()
 
         logger.info(f"{task_name} scheduled for {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
 

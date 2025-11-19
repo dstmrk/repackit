@@ -326,7 +326,7 @@ async def test_add_handler_multiple_marketplaces(test_db):
         ("https://www.amazon.co.uk/dp/B08N5WRNWA", "uk", 99.90),
     ]
 
-    for url, expected_marketplace, price in test_cases:
+    for url, _expected_marketplace, price in test_cases:
         context.args = [url, str(price), "30"]
         await add_handler(update, context)
 

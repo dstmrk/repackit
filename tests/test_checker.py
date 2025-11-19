@@ -326,3 +326,167 @@ async def test_send_price_drop_notification_telegram_error():
                 savings=10.00,
                 return_deadline=date.today(),
             )
+
+
+@pytest.mark.asyncio
+async def test_check_and_notify_with_unavailable_products():
+    """Test check_and_notify with products that become unavailable after 3 failures."""
+    today = date.today()
+    future_date = today + timedelta(days=10)
+
+    # Product with 2 consecutive failures (will become 3 after this check)
+    products = [
+        {
+            "id": 1,
+            "user_id": 123,
+            "asin": "UNAVAILABLE1",
+            "marketplace": "it",
+            "price_paid": 50.00,
+            "return_deadline": future_date.isoformat(),
+            "min_savings_threshold": 0,
+            "last_notified_price": None,
+            "consecutive_failures": 2,  # Will hit 3 on this run
+        }
+    ]
+
+    # Mock scraper returns None (scraping failed)
+    with patch("checker.database.get_all_active_products", return_value=products):
+        with patch("checker.scrape_prices", return_value={}):  # Empty = failed
+            with patch("checker.database.increment_consecutive_failures", return_value=3):
+                with patch("checker.database.update_system_status"):
+                    with patch("checker.TELEGRAM_TOKEN", "test_token"):
+                        with patch("checker.Bot") as MockBot:
+                            mock_bot_instance = AsyncMock()
+                            MockBot.return_value = mock_bot_instance
+
+                            stats = await checker.check_and_notify()
+
+                            # Verify unavailable notification was sent
+                            assert mock_bot_instance.send_message.called
+                            call_kwargs = mock_bot_instance.send_message.call_args.kwargs
+                            message = call_kwargs["text"]
+                            assert "Prodotto non disponibile" in message
+
+
+@pytest.mark.asyncio
+async def test_check_and_notify_reset_failures_on_success():
+    """Test that consecutive failures are reset when scraping succeeds."""
+    today = date.today()
+    future_date = today + timedelta(days=10)
+
+    # Product with 2 consecutive failures, but scraping will succeed
+    products = [
+        {
+            "id": 1,
+            "user_id": 123,
+            "asin": "RECOVERED1",
+            "marketplace": "it",
+            "price_paid": 50.00,
+            "return_deadline": future_date.isoformat(),
+            "min_savings_threshold": 0,
+            "last_notified_price": None,
+            "consecutive_failures": 2,
+        }
+    ]
+
+    # Mock scraper returns price (scraping succeeded)
+    prices = {1: 60.00}  # Price higher, no notification
+
+    with patch("checker.database.get_all_active_products", return_value=products):
+        with patch("checker.scrape_prices", return_value=prices):
+            with patch("checker.database.reset_consecutive_failures") as mock_reset:
+                with patch("checker.database.update_system_status"):
+                    with patch("checker.TELEGRAM_TOKEN", "test_token"):
+                        stats = await checker.check_and_notify()
+
+                        # Verify failures were reset
+                        mock_reset.assert_called_once_with(1)
+                        assert stats["scraped"] == 1
+
+
+# ============================================================================
+# Unavailable notification tests
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_send_unavailable_notification():
+    """Test sending unavailable product notification."""
+    mock_bot = AsyncMock()
+
+    future_date = date.today() + timedelta(days=10)
+
+    with patch("checker.build_affiliate_url", return_value="https://amazon.it/dp/TEST"):
+        await checker.send_unavailable_notification(
+            bot=mock_bot,
+            user_id=123,
+            asin="TEST",
+            marketplace="it",
+            return_deadline=future_date,
+        )
+
+    # Verify message was sent
+    assert mock_bot.send_message.called
+    call_kwargs = mock_bot.send_message.call_args.kwargs
+    assert call_kwargs["chat_id"] == 123
+    assert call_kwargs["parse_mode"] == "Markdown"
+
+    # Verify message content
+    message = call_kwargs["text"]
+    assert "Prodotto non disponibile" in message
+    assert "3 volte consecutive" in message
+    assert "tra 10 giorni" in message
+
+
+@pytest.mark.asyncio
+async def test_send_unavailable_notification_today():
+    """Test unavailable notification for deadline today."""
+    mock_bot = AsyncMock()
+
+    with patch("checker.build_affiliate_url", return_value="https://amazon.it/dp/TEST"):
+        await checker.send_unavailable_notification(
+            bot=mock_bot,
+            user_id=123,
+            asin="TEST",
+            marketplace="it",
+            return_deadline=date.today(),
+        )
+
+    message = mock_bot.send_message.call_args.kwargs["text"]
+    assert "*oggi*" in message
+
+
+@pytest.mark.asyncio
+async def test_send_unavailable_notification_expired():
+    """Test unavailable notification for expired deadline."""
+    mock_bot = AsyncMock()
+    past_date = date.today() - timedelta(days=1)
+
+    with patch("checker.build_affiliate_url", return_value="https://amazon.it/dp/TEST"):
+        await checker.send_unavailable_notification(
+            bot=mock_bot,
+            user_id=123,
+            asin="TEST",
+            marketplace="it",
+            return_deadline=past_date,
+        )
+
+    message = mock_bot.send_message.call_args.kwargs["text"]
+    assert "*scaduto*" in message
+
+
+@pytest.mark.asyncio
+async def test_send_unavailable_notification_telegram_error():
+    """Test unavailable notification error handling."""
+    mock_bot = AsyncMock()
+    mock_bot.send_message = AsyncMock(side_effect=TelegramError("Failed"))
+
+    with patch("checker.build_affiliate_url", return_value="https://amazon.it/dp/TEST"):
+        with pytest.raises(TelegramError):
+            await checker.send_unavailable_notification(
+                bot=mock_bot,
+                user_id=123,
+                asin="TEST",
+                marketplace="it",
+                return_deadline=date.today(),
+            )
