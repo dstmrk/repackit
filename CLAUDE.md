@@ -434,18 +434,40 @@ Each command in a separate file for maintainability.
 #### `/start`
 Welcome message explaining the bot's purpose.
 
-#### `/add <url> <prezzo> <giorni|data> [soglia]`
-**Examples**:
-```
-/add https://amazon.it/dp/B08N5WRWNW 59.90 30
-/add https://amazon.it/dp/B08N5WRWNW 59.90 2024-12-25 5
-```
+#### `/add`
+**Conversational flow** (step-by-step):
 
-**Validation**:
-- Parse ASIN from URL
-- Validate price > 0
-- Parse return deadline (both "30" and "2024-12-25" formats)
-- Optional threshold: must be > 0 and < price_paid
+The `/add` command now uses a conversational flow that guides users through adding a product in three steps:
+
+**Step 1 - URL**:
+- Bot asks: "Inviami il link del prodotto Amazon.it"
+- User sends: `https://amazon.it/dp/B08N5WRWNW`
+- Validation:
+  - URL must be from amazon.it (not .com, .de, etc.)
+  - ASIN must be extractable from URL
+  - Marketplace must be "it"
+
+**Step 2 - Price**:
+- Bot asks: "Inviami il prezzo che hai pagato in euro"
+- User sends: `59.90` or `59,90`
+- Validation:
+  - Must be a valid number (accepts both `.` and `,` as decimal separator)
+  - Must be positive (> 0)
+  - Max 16 digits total (including decimals)
+
+**Step 3 - Deadline**:
+- Bot asks: "Inviami la scadenza del reso"
+- User can send either:
+  - Number of days (1-365): `30` → 30 days from today
+  - Date in format gg-mm-aaaa: `25-12-2024` → specific date
+- Validation:
+  - If number: must be between 1 and 365
+  - If date: must be in format gg-mm-aaaa and in the future
+
+**Canceling**:
+- Users can type `/cancel` at any step to abort the conversation
+
+**Note**: The optional `min_savings_threshold` parameter is not asked in the conversational flow (set to NULL by default). Users can update it later with `/update` if needed.
 
 #### `/list`
 Shows user's monitored products:
