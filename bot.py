@@ -1,7 +1,6 @@
 """Main Telegram bot with webhook and scheduler."""
 
 import asyncio
-import contextlib
 import logging
 import os
 import signal
@@ -209,7 +208,32 @@ def setup_signal_handlers() -> None:  # pragma: no cover
     signal.signal(signal.SIGTERM, signal_handler)
 
 
-async def main() -> None:  # pragma: no cover
+async def post_init(application: Application) -> None:  # pragma: no cover
+    """Initialize background tasks after bot startup."""
+    logger.info("Starting background tasks...")
+
+    # Start scheduler tasks
+    scraper_task = asyncio.create_task(schedule_scraper())
+    checker_task = asyncio.create_task(schedule_checker())
+    cleanup_task = asyncio.create_task(schedule_cleanup())
+
+    # Store tasks to prevent garbage collection
+    application.bot_data["scraper_task"] = scraper_task
+    application.bot_data["checker_task"] = checker_task
+    application.bot_data["cleanup_task"] = cleanup_task
+
+    logger.info(f"Scraper scheduled for {calculate_next_run(SCRAPER_HOUR)}")
+    logger.info(f"Checker scheduled for {calculate_next_run(CHECKER_HOUR)}")
+    logger.info(f"Cleanup scheduled for {calculate_next_run(CLEANUP_HOUR)}")
+
+    # Start health check server (in background)
+    start_health_server()
+
+    # Allow event loop to process
+    await asyncio.sleep(0)
+
+
+def main() -> None:  # pragma: no cover
     """Main bot application."""
     logger.info("Starting RepackIt bot...")
 
@@ -222,17 +246,22 @@ async def main() -> None:  # pragma: no cover
         )
         return
 
-    # Initialize database
+    # Initialize database (synchronously)
     logger.info("Initializing database...")
-    await database.init_db()
+    asyncio.run(database.init_db())
 
-    # Start health check server
-    logger.info("Starting health check server...")
-    start_health_server()
-
-    # Create bot application
+    # Create bot application with post_init callback
     logger.info("Creating bot application...")
-    application = Application.builder().token(TELEGRAM_TOKEN).build()
+    application = (
+        Application.builder()
+        .token(TELEGRAM_TOKEN)
+        .post_init(post_init)
+        .connect_timeout(10.0)
+        .read_timeout(30.0)
+        .write_timeout(15.0)
+        .pool_timeout(10.0)
+        .build()
+    )
 
     # Register command handlers
     application.add_handler(CommandHandler("start", start_handler))
@@ -245,41 +274,23 @@ async def main() -> None:  # pragma: no cover
     application.add_handler(feedback_conversation_handler)
     application.add_handler(feedback_callback_handler)
 
-    # Setup webhook
-    logger.info(f"Setting up webhook: {WEBHOOK_URL}")
-    await application.bot.set_webhook(
-        url=f"{WEBHOOK_URL}/{TELEGRAM_TOKEN}",
-        secret_token=WEBHOOK_SECRET,
-        allowed_updates=["message", "callback_query"],
-    )
+    logger.info("✅ Bot configured!")
+    logger.info(f"🌐 Webhook URL: {WEBHOOK_URL}")
+    logger.info(f"🔌 Webhook port: {BOT_PORT}")
+    logger.info(f"🏥 Health check port: {HEALTH_PORT}")
+    logger.info(f"🚀 Starting webhook server...")
 
-    # Start scheduler tasks
-    logger.info("Starting scheduler tasks...")
-    scheduler_tasks = [
-        asyncio.create_task(schedule_scraper()),
-        asyncio.create_task(schedule_checker()),
-        asyncio.create_task(schedule_cleanup()),
-    ]
-
-    # Start webhook server
-    logger.info(f"Starting webhook server on port {BOT_PORT}...")
-    await application.run_webhook(
+    # Start webhook server (synchronous call, manages its own event loop)
+    application.run_webhook(
         listen="0.0.0.0",
         port=BOT_PORT,
         url_path=TELEGRAM_TOKEN,
         secret_token=WEBHOOK_SECRET,
         webhook_url=f"{WEBHOOK_URL}/{TELEGRAM_TOKEN}",
+        allowed_updates=["message", "callback_query"],
+        drop_pending_updates=True,
+        bootstrap_retries=3,
     )
-
-    # Graceful shutdown
-    logger.info("Shutting down...")
-    for task in scheduler_tasks:
-        task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await task
-
-    await application.shutdown()
-    logger.info("Bot stopped")
 
 
 if __name__ == "__main__":
@@ -288,7 +299,7 @@ if __name__ == "__main__":
 
     # Run bot
     try:
-        asyncio.run(main())
+        main()
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")
     except Exception as e:
