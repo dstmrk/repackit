@@ -348,4 +348,5 @@ update_conversation_handler = ConversationHandler(
         WAITING_VALUE_INPUT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_value_input)],
     },
     fallbacks=[CommandHandler("cancel", cancel)],
+    per_message=False,  # Suppress PTBUserWarning - we want per-conversation tracking
 )
