@@ -1,15 +1,25 @@
-"""Tests for handlers/update.py."""
+"""Tests for handlers/update.py with conversational flow."""
 
 import os
 import tempfile
 from datetime import date, timedelta
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from telegram.ext import ConversationHandler
 
 import database
-from handlers.update import update_handler
+from handlers.update import (
+    WAITING_FIELD_SELECTION,
+    WAITING_PRODUCT_SELECTION,
+    WAITING_VALUE_INPUT,
+    cancel,
+    handle_field_selection,
+    handle_product_selection,
+    handle_value_input,
+    start_update,
+)
 
 
 @pytest.fixture
@@ -31,523 +41,406 @@ async def test_db():
     Path(f"{db_path}-shm").unlink(missing_ok=True)
 
 
-@pytest.mark.asyncio
-async def test_update_handler_no_args(test_db):
-    """Test /update handler with no arguments."""
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = []
-
-    await update_handler(update, context)
-
-    # Verify usage message was sent
-    update.message.reply_text.assert_called_once()
-    call_args = update.message.reply_text.call_args
-    message = call_args[0][0]
-    assert "Utilizzo" in message
-    assert "/update" in message
+# =================================================================================================
+# start_update tests (Step 1: Show product list)
+# =================================================================================================
 
 
 @pytest.mark.asyncio
-async def test_update_handler_invalid_number(test_db):
-    """Test /update handler with invalid product number."""
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["invalid", "prezzo", "50.00"]
-
-    await update_handler(update, context)
-
-    # Verify error message
-    call_args = update.message.reply_text.call_args
-    message = call_args[0][0]
-    assert "Numero prodotto non valido" in message
-
-
-@pytest.mark.asyncio
-async def test_update_handler_negative_number(test_db):
-    """Test /update handler with negative product number."""
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["-1", "prezzo", "50.00"]
-
-    await update_handler(update, context)
-
-    # Verify error message
-    call_args = update.message.reply_text.call_args
-    message = call_args[0][0]
-    assert "Numero prodotto non valido" in message
-
-
-@pytest.mark.asyncio
-async def test_update_handler_invalid_field(test_db):
-    """Test /update handler with invalid field name."""
-    await database.add_user(user_id=123, language_code="it")
-    tomorrow = date.today() + timedelta(days=1)
-    await database.add_product(
-        user_id=123,
-        asin="ASIN00001",
-        marketplace="it",
-        price_paid=50.0,
-        return_deadline=tomorrow,
-    )
-
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["1", "invalid", "50.00"]
-
-    await update_handler(update, context)
-
-    # Verify error message
-    call_args = update.message.reply_text.call_args
-    message = call_args[0][0]
-    assert "Campo non valido" in message
-
-
-@pytest.mark.asyncio
-async def test_update_handler_no_products(test_db):
-    """Test /update handler with no products."""
+async def test_start_update_no_products(test_db):
+    """Test /update with no products."""
     await database.add_user(user_id=123, language_code="it")
 
     update = MagicMock()
     update.effective_user.id = 123
     update.message.reply_text = AsyncMock()
     context = MagicMock()
-    context.args = ["1", "prezzo", "50.00"]
 
-    await update_handler(update, context)
+    result = await start_update(update, context)
 
-    # Verify empty message
+    # Verify empty message was sent
     call_args = update.message.reply_text.call_args
     message = call_args[0][0]
     assert "Non hai prodotti" in message
 
+    # Verify conversation ended
+    assert result == ConversationHandler.END
+
 
 @pytest.mark.asyncio
-async def test_update_handler_number_too_high(test_db):
-    """Test /update handler with number exceeding product count."""
+async def test_start_update_shows_product_list(test_db):
+    """Test /update shows product list with inline buttons."""
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123,
-        asin="ASIN00001",
-        marketplace="it",
-        price_paid=50.0,
-        return_deadline=tomorrow,
+        user_id=123, asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
+    )
+    await database.add_product(
+        user_id=123, asin="ASIN00002", marketplace="it", price_paid=75.0, return_deadline=tomorrow
     )
 
     update = MagicMock()
     update.effective_user.id = 123
     update.message.reply_text = AsyncMock()
     context = MagicMock()
-    context.args = ["5", "prezzo", "50.00"]  # User only has 1 product
 
-    await update_handler(update, context)
+    result = await start_update(update, context)
 
-    # Verify error message
+    # Verify message with product list was sent
     call_args = update.message.reply_text.call_args
     message = call_args[0][0]
-    assert "Numero prodotto non valido" in message
+    assert "Seleziona il prodotto" in message
+
+    # Verify inline keyboard was provided
+    assert "reply_markup" in call_args[1]
+
+    # Verify state transition
+    assert result == WAITING_PRODUCT_SELECTION
+
+
+# =================================================================================================
+# handle_product_selection tests (Step 2: Select field to update)
+# =================================================================================================
 
 
 @pytest.mark.asyncio
-async def test_update_handler_price_success(test_db):
-    """Test /update handler with valid price update."""
+async def test_handle_product_selection_cancel(test_db):
+    """Test canceling product selection."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.callback_query = MagicMock()
+    update.callback_query.answer = AsyncMock()
+    update.callback_query.edit_message_text = AsyncMock()
+    update.callback_query.data = "update_cancel"
+
+    context = MagicMock()
+
+    result = await handle_product_selection(update, context)
+
+    # Verify cancellation message
+    call_args = update.callback_query.edit_message_text.call_args
+    message = call_args[0][0]
+    assert "annullata" in message.lower()
+
+    # Verify conversation ended
+    assert result == ConversationHandler.END
+
+
+@pytest.mark.asyncio
+async def test_handle_product_selection_shows_fields(test_db):
+    """Test product selection shows field options."""
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123,
-        asin="ASIN00001",
-        marketplace="it",
-        price_paid=50.0,
-        return_deadline=tomorrow,
+        user_id=123, asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
     )
+
+    products = await database.get_user_products(123)
+    product_id = products[0]["id"]
 
     update = MagicMock()
     update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["1", "prezzo", "55.00"]
+    update.callback_query = MagicMock()
+    update.callback_query.answer = AsyncMock()
+    update.callback_query.edit_message_text = AsyncMock()
+    update.callback_query.data = f"update_product_{product_id}"
 
-    await update_handler(update, context)
+    context = MagicMock()
+    context.user_data = {}
+
+    result = await handle_product_selection(update, context)
+
+    # Verify field selection message
+    call_args = update.callback_query.edit_message_text.call_args
+    message = call_args[0][0]
+    assert "Cosa vuoi modificare" in message
+    assert "ASIN00001" in message
+
+    # Verify product data was stored in context
+    assert context.user_data["update_product_id"] == product_id
+    assert context.user_data["update_product_asin"] == "ASIN00001"
+
+    # Verify state transition
+    assert result == WAITING_FIELD_SELECTION
+
+
+# =================================================================================================
+# handle_field_selection tests (Step 3: Ask for new value)
+# =================================================================================================
+
+
+@pytest.mark.asyncio
+async def test_handle_field_selection_price(test_db):
+    """Test selecting price field."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.callback_query = MagicMock()
+    update.callback_query.answer = AsyncMock()
+    update.callback_query.edit_message_text = AsyncMock()
+    update.callback_query.data = "update_field_prezzo"
+
+    context = MagicMock()
+    context.user_data = {}
+
+    result = await handle_field_selection(update, context)
+
+    # Verify price input message
+    call_args = update.callback_query.edit_message_text.call_args
+    message = call_args[0][0]
+    assert "prezzo" in message.lower()
+    assert "59.90" in message
+
+    # Verify field was stored
+    assert context.user_data["update_field"] == "prezzo"
+
+    # Verify state transition
+    assert result == WAITING_VALUE_INPUT
+
+
+@pytest.mark.asyncio
+async def test_handle_field_selection_deadline(test_db):
+    """Test selecting deadline field."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.callback_query = MagicMock()
+    update.callback_query.answer = AsyncMock()
+    update.callback_query.edit_message_text = AsyncMock()
+    update.callback_query.data = "update_field_scadenza"
+
+    context = MagicMock()
+    context.user_data = {}
+
+    result = await handle_field_selection(update, context)
+
+    # Verify deadline input message
+    call_args = update.callback_query.edit_message_text.call_args
+    message = call_args[0][0]
+    assert "scadenza" in message.lower()
+    assert "gg-mm-aaaa" in message
+
+    # Verify field was stored
+    assert context.user_data["update_field"] == "scadenza"
+
+    # Verify state transition
+    assert result == WAITING_VALUE_INPUT
+
+
+@pytest.mark.asyncio
+async def test_handle_field_selection_threshold(test_db):
+    """Test selecting threshold field."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.callback_query = MagicMock()
+    update.callback_query.answer = AsyncMock()
+    update.callback_query.edit_message_text = AsyncMock()
+    update.callback_query.data = "update_field_soglia"
+
+    context = MagicMock()
+    context.user_data = {"update_product_price_paid": 59.90}
+
+    result = await handle_field_selection(update, context)
+
+    # Verify threshold input message
+    call_args = update.callback_query.edit_message_text.call_args
+    message = call_args[0][0]
+    assert "soglia" in message.lower()
+    assert "€59.90" in message
+
+    # Verify field was stored
+    assert context.user_data["update_field"] == "soglia"
+
+    # Verify state transition
+    assert result == WAITING_VALUE_INPUT
+
+
+# =================================================================================================
+# handle_value_input tests (Step 4: Update the product)
+# =================================================================================================
+
+
+@pytest.mark.asyncio
+async def test_handle_value_input_price_success(test_db):
+    """Test successful price update."""
+    await database.add_user(user_id=123, language_code="it")
+    tomorrow = date.today() + timedelta(days=1)
+    await database.add_product(
+        user_id=123, asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
+    )
+
+    products = await database.get_user_products(123)
+    product_id = products[0]["id"]
+
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.message.text = "55.00"
+    update.message.reply_text = AsyncMock()
+
+    context = MagicMock()
+    context.user_data = {
+        "update_product_id": product_id,
+        "update_product_asin": "ASIN00001",
+        "update_field": "prezzo",
+    }
+
+    result = await handle_value_input(update, context)
 
     # Verify success message
     call_args = update.message.reply_text.call_args
     message = call_args[0][0]
-    assert "Prezzo aggiornato" in message
+    assert "con successo" in message.lower()
     assert "€55.00" in message
 
-    # Verify price was updated in database
-    products = await database.get_user_products(123)
-    assert products[0]["price_paid"] == 55.0
+    # Verify product was updated
+    updated_products = await database.get_user_products(123)
+    assert updated_products[0]["price_paid"] == 55.00
+
+    # Verify conversation ended
+    assert result == ConversationHandler.END
 
 
 @pytest.mark.asyncio
-async def test_update_handler_price_invalid(test_db):
-    """Test /update handler with invalid price."""
+async def test_handle_value_input_price_invalid(test_db):
+    """Test price update with invalid value."""
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123,
-        asin="ASIN00001",
-        marketplace="it",
-        price_paid=50.0,
-        return_deadline=tomorrow,
+        user_id=123, asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
     )
+
+    products = await database.get_user_products(123)
+    product_id = products[0]["id"]
 
     update = MagicMock()
     update.effective_user.id = 123
+    update.message.text = "invalid"
     update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["1", "prezzo", "invalid"]
 
-    await update_handler(update, context)
+    context = MagicMock()
+    context.user_data = {
+        "update_product_id": product_id,
+        "update_product_asin": "ASIN00001",
+        "update_field": "prezzo",
+    }
+
+    result = await handle_value_input(update, context)
 
     # Verify error message
     call_args = update.message.reply_text.call_args
     message = call_args[0][0]
-    assert "Prezzo non valido" in message
+    assert "non valido" in message.lower()
+
+    # Verify product was NOT updated
+    updated_products = await database.get_user_products(123)
+    assert updated_products[0]["price_paid"] == 50.00
+
+    # Verify stays in same state to retry
+    assert result == WAITING_VALUE_INPUT
 
 
 @pytest.mark.asyncio
-async def test_update_handler_price_negative(test_db):
-    """Test /update handler with negative price."""
+async def test_handle_value_input_deadline_success(test_db):
+    """Test successful deadline update."""
     await database.add_user(user_id=123, language_code="it")
     tomorrow = date.today() + timedelta(days=1)
     await database.add_product(
-        user_id=123,
-        asin="ASIN00001",
-        marketplace="it",
-        price_paid=50.0,
-        return_deadline=tomorrow,
+        user_id=123, asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
     )
 
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["1", "prezzo", "-10"]
-
-    await update_handler(update, context)
-
-    # Verify error message
-    call_args = update.message.reply_text.call_args
-    message = call_args[0][0]
-    assert "Prezzo non valido" in message
-
-
-@pytest.mark.asyncio
-async def test_update_handler_price_comma_separator(test_db):
-    """Test /update handler with comma decimal separator for price."""
-    await database.add_user(user_id=123, language_code="it")
-    tomorrow = date.today() + timedelta(days=1)
-    await database.add_product(
-        user_id=123,
-        asin="ASIN00001",
-        marketplace="it",
-        price_paid=50.0,
-        return_deadline=tomorrow,
-    )
-
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["1", "prezzo", "55,50"]
-
-    await update_handler(update, context)
-
-    # Verify success and correct price
     products = await database.get_user_products(123)
-    assert products[0]["price_paid"] == 55.5
-
-
-@pytest.mark.asyncio
-async def test_update_handler_deadline_success_days(test_db):
-    """Test /update handler with valid deadline update (days format)."""
-    await database.add_user(user_id=123, language_code="it")
-    tomorrow = date.today() + timedelta(days=1)
-    await database.add_product(
-        user_id=123,
-        asin="ASIN00001",
-        marketplace="it",
-        price_paid=50.0,
-        return_deadline=tomorrow,
-    )
+    product_id = products[0]["id"]
 
     update = MagicMock()
     update.effective_user.id = 123
+    update.message.text = "60"  # 60 days from now
     update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["1", "scadenza", "15"]
 
-    await update_handler(update, context)
+    context = MagicMock()
+    context.user_data = {
+        "update_product_id": product_id,
+        "update_product_asin": "ASIN00001",
+        "update_field": "scadenza",
+    }
+
+    result = await handle_value_input(update, context)
 
     # Verify success message
     call_args = update.message.reply_text.call_args
     message = call_args[0][0]
-    assert "Scadenza aggiornata" in message
-    assert "tra 15 giorni" in message
+    assert "con successo" in message.lower()
 
     # Verify deadline was updated
+    updated_products = await database.get_user_products(123)
+    expected_deadline = (date.today() + timedelta(days=60)).isoformat()
+    assert updated_products[0]["return_deadline"] == expected_deadline
+
+    # Verify conversation ended
+    assert result == ConversationHandler.END
+
+
+@pytest.mark.asyncio
+async def test_handle_value_input_threshold_success(test_db):
+    """Test successful threshold update."""
+    await database.add_user(user_id=123, language_code="it")
+    tomorrow = date.today() + timedelta(days=1)
+    await database.add_product(
+        user_id=123, asin="ASIN00001", marketplace="it", price_paid=50.0, return_deadline=tomorrow
+    )
+
     products = await database.get_user_products(123)
-    expected_deadline = (date.today() + timedelta(days=15)).isoformat()
-    assert products[0]["return_deadline"] == expected_deadline
-
-
-@pytest.mark.asyncio
-async def test_update_handler_deadline_success_iso(test_db):
-    """Test /update handler with valid deadline update (ISO date format)."""
-    await database.add_user(user_id=123, language_code="it")
-    tomorrow = date.today() + timedelta(days=1)
-    await database.add_product(
-        user_id=123,
-        asin="ASIN00001",
-        marketplace="it",
-        price_paid=50.0,
-        return_deadline=tomorrow,
-    )
+    product_id = products[0]["id"]
 
     update = MagicMock()
     update.effective_user.id = 123
+    update.message.text = "10.00"
     update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    future_date = (date.today() + timedelta(days=30)).isoformat()
-    context.args = ["1", "scadenza", future_date]
 
-    await update_handler(update, context)
+    context = MagicMock()
+    context.user_data = {
+        "update_product_id": product_id,
+        "update_product_asin": "ASIN00001",
+        "update_product_price_paid": 50.0,
+        "update_field": "soglia",
+    }
+
+    result = await handle_value_input(update, context)
 
     # Verify success message
     call_args = update.message.reply_text.call_args
     message = call_args[0][0]
-    assert "Scadenza aggiornata" in message
-
-
-@pytest.mark.asyncio
-async def test_update_handler_deadline_invalid(test_db):
-    """Test /update handler with invalid deadline."""
-    await database.add_user(user_id=123, language_code="it")
-    tomorrow = date.today() + timedelta(days=1)
-    await database.add_product(
-        user_id=123,
-        asin="ASIN00001",
-        marketplace="it",
-        price_paid=50.0,
-        return_deadline=tomorrow,
-    )
-
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["1", "scadenza", "invalid"]
-
-    await update_handler(update, context)
-
-    # Verify error message
-    call_args = update.message.reply_text.call_args
-    message = call_args[0][0]
-    assert "Scadenza non valida" in message
-
-
-@pytest.mark.asyncio
-async def test_update_handler_deadline_past(test_db):
-    """Test /update handler with deadline in the past."""
-    await database.add_user(user_id=123, language_code="it")
-    tomorrow = date.today() + timedelta(days=1)
-    await database.add_product(
-        user_id=123,
-        asin="ASIN00001",
-        marketplace="it",
-        price_paid=50.0,
-        return_deadline=tomorrow,
-    )
-
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    yesterday = (date.today() - timedelta(days=1)).isoformat()
-    context.args = ["1", "scadenza", yesterday]
-
-    await update_handler(update, context)
-
-    # Verify error message
-    call_args = update.message.reply_text.call_args
-    message = call_args[0][0]
-    assert "deve essere nel futuro" in message
-
-
-@pytest.mark.asyncio
-async def test_update_handler_threshold_success(test_db):
-    """Test /update handler with valid threshold update."""
-    await database.add_user(user_id=123, language_code="it")
-    tomorrow = date.today() + timedelta(days=1)
-    await database.add_product(
-        user_id=123,
-        asin="ASIN00001",
-        marketplace="it",
-        price_paid=50.0,
-        return_deadline=tomorrow,
-    )
-
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["1", "soglia", "10.00"]
-
-    await update_handler(update, context)
-
-    # Verify success message
-    call_args = update.message.reply_text.call_args
-    message = call_args[0][0]
-    assert "Soglia aggiornata" in message
+    assert "con successo" in message.lower()
     assert "€10.00" in message
 
     # Verify threshold was updated
-    products = await database.get_user_products(123)
-    assert products[0]["min_savings_threshold"] == 10.0
+    updated_products = await database.get_user_products(123)
+    assert updated_products[0]["min_savings_threshold"] == 10.00
+
+    # Verify conversation ended
+    assert result == ConversationHandler.END
+
+
+# =================================================================================================
+# cancel tests
+# =================================================================================================
 
 
 @pytest.mark.asyncio
-async def test_update_handler_threshold_invalid(test_db):
-    """Test /update handler with invalid threshold."""
-    await database.add_user(user_id=123, language_code="it")
-    tomorrow = date.today() + timedelta(days=1)
-    await database.add_product(
-        user_id=123,
-        asin="ASIN00001",
-        marketplace="it",
-        price_paid=50.0,
-        return_deadline=tomorrow,
-    )
-
+async def test_cancel():
+    """Test /cancel command."""
     update = MagicMock()
-    update.effective_user.id = 123
     update.message.reply_text = AsyncMock()
+
     context = MagicMock()
-    context.args = ["1", "soglia", "invalid"]
+    context.user_data = {"update_product_id": 1, "update_field": "prezzo"}
 
-    await update_handler(update, context)
+    result = await cancel(update, context)
 
-    # Verify error message
+    # Verify cancellation message
     call_args = update.message.reply_text.call_args
     message = call_args[0][0]
-    assert "Soglia non valida" in message
+    assert "annullata" in message.lower()
 
+    # Verify user_data was cleared
+    assert context.user_data == {}
 
-@pytest.mark.asyncio
-async def test_update_handler_threshold_negative(test_db):
-    """Test /update handler with negative threshold."""
-    await database.add_user(user_id=123, language_code="it")
-    tomorrow = date.today() + timedelta(days=1)
-    await database.add_product(
-        user_id=123,
-        asin="ASIN00001",
-        marketplace="it",
-        price_paid=50.0,
-        return_deadline=tomorrow,
-    )
-
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["1", "soglia", "-5"]
-
-    await update_handler(update, context)
-
-    # Verify error message
-    call_args = update.message.reply_text.call_args
-    message = call_args[0][0]
-    assert "Soglia non valida" in message
-
-
-@pytest.mark.asyncio
-async def test_update_handler_threshold_exceeds_price(test_db):
-    """Test /update handler with threshold greater than price."""
-    await database.add_user(user_id=123, language_code="it")
-    tomorrow = date.today() + timedelta(days=1)
-    await database.add_product(
-        user_id=123,
-        asin="ASIN00001",
-        marketplace="it",
-        price_paid=50.0,
-        return_deadline=tomorrow,
-    )
-
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["1", "soglia", "60.00"]
-
-    await update_handler(update, context)
-
-    # Verify error message
-    call_args = update.message.reply_text.call_args
-    message = call_args[0][0]
-    assert "Soglia non valida" in message
-
-
-@pytest.mark.asyncio
-async def test_update_handler_threshold_comma_separator(test_db):
-    """Test /update handler with comma decimal separator for threshold."""
-    await database.add_user(user_id=123, language_code="it")
-    tomorrow = date.today() + timedelta(days=1)
-    await database.add_product(
-        user_id=123,
-        asin="ASIN00001",
-        marketplace="it",
-        price_paid=50.0,
-        return_deadline=tomorrow,
-    )
-
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["1", "soglia", "10,50"]
-
-    await update_handler(update, context)
-
-    # Verify success and correct threshold
-    products = await database.get_user_products(123)
-    assert products[0]["min_savings_threshold"] == 10.5
-
-
-@pytest.mark.asyncio
-async def test_update_handler_database_error(test_db):
-    """Test /update handler handles database errors gracefully."""
-    await database.add_user(user_id=123, language_code="it")
-    tomorrow = date.today() + timedelta(days=1)
-    await database.add_product(
-        user_id=123,
-        asin="ASIN00001",
-        marketplace="it",
-        price_paid=50.0,
-        return_deadline=tomorrow,
-    )
-
-    update = MagicMock()
-    update.effective_user.id = 123
-    update.message.reply_text = AsyncMock()
-    context = MagicMock()
-    context.args = ["1", "prezzo", "55.00"]
-
-    # Mock database.update_product to raise an exception
-    with patch("handlers.update.database.update_product", side_effect=Exception("DB Error")):
-        await update_handler(update, context)
-
-        # Verify error message was sent
-        call_args = update.message.reply_text.call_args
-        message = call_args[0][0]
-        assert "Errore" in message
+    # Verify conversation ended
+    assert result == ConversationHandler.END

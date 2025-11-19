@@ -21,7 +21,7 @@ from handlers.feedback import feedback_handler
 from handlers.help import help_handler
 from handlers.list import list_handler
 from handlers.start import start_handler
-from handlers.update import update_handler
+from handlers.update import update_conversation_handler
 from health_handler import start_health_server
 
 # Load environment variables
@@ -241,7 +241,7 @@ async def main() -> None:  # pragma: no cover
     application.add_handler(CommandHandler("list", list_handler))
     application.add_handler(delete_command_handler)
     application.add_handler(delete_callback_query_handler)
-    application.add_handler(CommandHandler("update", update_handler))
+    application.add_handler(update_conversation_handler)
     application.add_handler(CommandHandler("feedback", feedback_handler))
 
     # Setup webhook
