@@ -28,7 +28,7 @@ async def _send_notification_safe(bot: Bot, notif: dict) -> bool:
 
     Args:
         bot: Telegram Bot instance
-        notif: Notification dict with keys: user_id, asin, marketplace, current_price,
+        notif: Notification dict with keys: user_id, product_name, asin, marketplace, current_price,
                price_paid, savings, return_deadline
 
     Returns:
@@ -38,6 +38,7 @@ async def _send_notification_safe(bot: Bot, notif: dict) -> bool:
         await send_price_drop_notification(
             bot=bot,
             user_id=notif["user_id"],
+            product_name=notif["product_name"],
             asin=notif["asin"],
             marketplace=notif["marketplace"],
             current_price=notif["current_price"],
@@ -113,6 +114,7 @@ async def _process_product_price_check(
     """
     product_id = product["id"]
     user_id = product["user_id"]
+    product_name = product.get("product_name")
     asin = product["asin"]
     price_paid = product["price_paid"]
     return_deadline = date.fromisoformat(product["return_deadline"])
@@ -134,6 +136,7 @@ async def _process_product_price_check(
         if new_failure_count == 3:
             return None, {
                 "user_id": user_id,
+                "product_name": product_name,
                 "asin": asin,
                 "marketplace": marketplace,
                 "return_deadline": return_deadline,
@@ -154,6 +157,7 @@ async def _process_product_price_check(
         return {
             "product_id": product_id,
             "user_id": user_id,
+            "product_name": product_name,
             "asin": asin,
             "marketplace": marketplace,
             "current_price": current_price,
@@ -236,6 +240,7 @@ async def _send_notifications_in_batches(bot: Bot, notifications: list, notifica
                 send_unavailable_notification(
                     bot,
                     notif["user_id"],
+                    notif["product_name"],
                     notif["asin"],
                     notif["marketplace"],
                     notif["return_deadline"],
@@ -353,6 +358,7 @@ async def check_and_notify() -> dict:
 async def send_price_drop_notification(
     bot: Bot,
     user_id: int,
+    product_name: str | None,
     asin: str,
     marketplace: str,
     current_price: float,
@@ -366,6 +372,7 @@ async def send_price_drop_notification(
     Args:
         bot: Telegram Bot instance
         user_id: Telegram user ID
+        product_name: User-defined product name (or None for legacy products)
         asin: Amazon product ASIN
         marketplace: Amazon marketplace (it, com, de, etc.)
         current_price: Current product price
@@ -386,10 +393,14 @@ async def send_price_drop_notification(
     # Format deadline
     deadline_str = return_deadline.strftime("%d/%m/%Y")
 
+    # Display product name or fallback
+    product_display = product_name or f"ASIN {asin}"
+
     # Build message
     message = (
         "🎉 *Prezzo in calo su Amazon!*\n\n"
-        f"Il prodotto che stai monitorando è sceso a *€{current_price:.2f}*\n"
+        f"📦 *{product_display}*\n\n"
+        f"Prezzo attuale: *€{current_price:.2f}*\n"
         f"Prezzo pagato: €{price_paid:.2f}\n"
         f"💰 Risparmio: *€{savings:.2f}*\n\n"
         f"📅 Scadenza reso: {deadline_str}"
@@ -421,6 +432,7 @@ async def send_price_drop_notification(
 async def send_unavailable_notification(
     bot: Bot,
     user_id: int,
+    product_name: str | None,
     asin: str,
     marketplace: str,
     return_deadline: date,
@@ -431,6 +443,7 @@ async def send_unavailable_notification(
     Args:
         bot: Telegram Bot instance
         user_id: Telegram user ID
+        product_name: User-defined product name (or None for legacy products)
         asin: Amazon product ASIN
         marketplace: Amazon marketplace (it, com, de, etc.)
         return_deadline: Last day to return product
@@ -446,10 +459,14 @@ async def send_unavailable_notification(
     days_remaining = (return_deadline - today).days
     deadline_str = return_deadline.strftime("%d/%m/%Y")
 
+    # Display product name or fallback
+    product_display = product_name or f"ASIN {asin}"
+
     # Build message
     message = (
         "⚠️ *Prodotto non disponibile*\n\n"
-        "Non sono riuscito a recuperare il prezzo del prodotto che stai monitorando "
+        f"📦 *{product_display}*\n\n"
+        "Non sono riuscito a recuperare il prezzo di questo prodotto "
         "per 3 volte consecutive.\n\n"
         "Il prodotto potrebbe essere:\n"
         "• Temporaneamente non disponibile\n"
