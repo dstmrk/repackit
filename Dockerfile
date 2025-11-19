@@ -45,7 +45,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -m -u 1000 repackit \
-    && mkdir -p /app/data/logs \
+    && mkdir -p /app \
     && chown -R repackit:repackit /app
 
 # Set working directory
@@ -59,7 +59,22 @@ COPY --chown=root:root --chmod=555 pyproject.toml ./
 COPY --chown=root:root --chmod=555 *.py ./
 COPY --chown=root:root --chmod=555 handlers/ ./handlers/
 
-# Switch to non-root user
+# Install gosu for user switching in entrypoint
+RUN apt-get update && apt-get install -y --no-install-recommends gosu && rm -rf /var/lib/apt/lists/*
+
+# Create entrypoint script to ensure data/logs exists with correct permissions
+# This runs as root, creates directories, then switches to repackit user
+RUN echo '#!/bin/bash\n\
+set -e\n\
+# Create data/logs directory if it does not exist (as root)\n\
+mkdir -p /app/data/logs\n\
+# Ensure correct ownership (repackit:repackit = 1000:1000)\n\
+chown -R 1000:1000 /app/data 2>/dev/null || true\n\
+# Switch to repackit user and execute the main command\n\
+exec gosu 1000:1000 "$@"' > /entrypoint.sh && \
+    chmod +x /entrypoint.sh
+
+# Switch to non-root user for Playwright installation
 USER repackit
 
 # Activate virtual environment
@@ -69,12 +84,18 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN playwright install chromium && \
     playwright install-deps chromium || true
 
+# Switch back to root for entrypoint (entrypoint will switch back to repackit)
+USER root
+
 # Expose ports
 EXPOSE 8443 8444
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import httpx; httpx.get('http://localhost:8444/health', timeout=5.0)" || exit 1
+
+# Set entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
 
 # Run the bot
 CMD ["python", "bot.py"]
