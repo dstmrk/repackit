@@ -18,6 +18,9 @@ from data_reader import extract_asin
 
 logger = logging.getLogger(__name__)
 
+# Constants
+MAX_PRODUCTS_PER_USER = 20
+
 # Conversation states
 WAITING_URL, WAITING_PRICE, WAITING_DEADLINE = range(3)
 
@@ -214,16 +217,16 @@ async def handle_deadline(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         # Register user if not exists
         await database.add_user(user_id=user_id, language_code=update.effective_user.language_code)
 
-        # Check product limit (max 10 products per user)
+        # Check product limit
         user_products = await database.get_user_products(user_id)
-        if len(user_products) >= 10:
+        if len(user_products) >= MAX_PRODUCTS_PER_USER:
             await update.message.reply_text(
                 "❌ *Limite prodotti raggiunto!*\n\n"
-                "Puoi monitorare al massimo *10 prodotti* contemporaneamente.\n\n"
-                "Usa `/delete <numero>` per rimuovere un prodotto e fare spazio.",
+                f"Puoi monitorare al massimo *{MAX_PRODUCTS_PER_USER} prodotti* contemporaneamente.\n\n"
+                "Usa /delete per rimuovere un prodotto e fare spazio.",
                 parse_mode="Markdown",
             )
-            logger.info(f"User {user_id} reached product limit (10 products)")
+            logger.info(f"User {user_id} reached product limit ({MAX_PRODUCTS_PER_USER} products)")
             # Clear user_data and end conversation
             context.user_data.clear()
             return ConversationHandler.END

@@ -11,6 +11,7 @@ from telegram.ext import ConversationHandler
 
 import database
 from handlers.add import (
+    MAX_PRODUCTS_PER_USER,
     WAITING_DEADLINE,
     WAITING_PRICE,
     WAITING_URL,
@@ -445,8 +446,8 @@ async def test_handle_deadline_product_limit(test_db):
     user_id = 123
     tomorrow = date.today() + timedelta(days=1)
 
-    # Add 10 products (reach the limit)
-    for i in range(10):
+    # Add MAX_PRODUCTS_PER_USER products (reach the limit)
+    for i in range(MAX_PRODUCTS_PER_USER):
         await database.add_product(
             user_id=user_id,
             asin=f"B08N5WRWN{i}",
@@ -473,14 +474,14 @@ async def test_handle_deadline_product_limit(test_db):
     call_args = update.message.reply_text.call_args
     message = call_args[0][0]
     assert "Limite prodotti raggiunto" in message
-    assert "10 prodotti" in message
+    assert f"{MAX_PRODUCTS_PER_USER} prodotti" in message
 
     # Verify conversation ended
     assert result == ConversationHandler.END
 
-    # Verify no 11th product was added
+    # Verify no additional product was added beyond limit
     products = await database.get_user_products(user_id)
-    assert len(products) == 10
+    assert len(products) == MAX_PRODUCTS_PER_USER
 
 
 @pytest.mark.asyncio

@@ -482,6 +482,11 @@ The `/add` command now uses a conversational flow that guides users through addi
 **Canceling**:
 - Users can type `/cancel` at any step to abort the conversation
 
+**Product Limit**:
+- Users can monitor up to **20 products** simultaneously (`MAX_PRODUCTS_PER_USER = 20`)
+- When limit is reached, bot shows clear error message with suggestion to use `/delete`
+- Prevents abuse and ensures system scalability
+
 **Note**: The optional `min_savings_threshold` parameter is not asked in the conversational flow (set to NULL by default). Users can update it later with `/update` if needed.
 
 #### `/list`
@@ -496,9 +501,15 @@ I tuoi prodotti monitorati:
 
 2. 📦 [Altro Prodotto]
    ...
+
+Hai 5/20 prodotti monitorati.
+Usa /delete per rimuoverne uno, /update per modificarne uno.
 ```
 
-**Note**: Numbers 1, 2, 3... are **not** database IDs, but list indices.
+**Features**:
+- Shows product count vs. limit (e.g., "5/20 prodotti monitorati")
+- Provides quick command references for delete and update actions
+- Numbers 1, 2, 3... are **not** database IDs, but list indices for easy reference
 
 #### `/delete <numero>`
 **Interactive deletion with confirmation**:

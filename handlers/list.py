@@ -8,6 +8,7 @@ from telegram.ext import ContextTypes
 
 import database
 from data_reader import build_affiliate_url
+from handlers.add import MAX_PRODUCTS_PER_USER
 
 logger = logging.getLogger(__name__)
 
@@ -84,8 +85,8 @@ async def list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         # Add footer
         message += (
-            f"\n_Hai {len(products)} prodotto/i monitorato/i._\n"
-            f"Usa /delete <numero> per rimuoverne uno."
+            f"\n_Hai {len(products)}/{MAX_PRODUCTS_PER_USER} prodotti monitorati._\n"
+            f"Usa /delete per rimuoverne uno, /update per modificarne uno."
         )
 
         await update.message.reply_text(
