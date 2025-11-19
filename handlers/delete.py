@@ -1,9 +1,9 @@
-"""Handler for /delete command."""
+"""Handler for /delete command with confirmation."""
 
 import logging
 
-from telegram import Update
-from telegram.ext import ContextTypes
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes
 
 import database
 
@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 async def delete_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handle /delete command.
+
+    Shows product details and asks for confirmation with inline buttons.
 
     Format: /delete <numero>
     Example: /delete 2
@@ -76,20 +78,120 @@ async def delete_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         product_to_delete = products[product_number - 1]
         product_id = product_to_delete["id"]
         asin = product_to_delete["asin"]
+        price_paid = product_to_delete["price_paid"]
+        return_deadline = product_to_delete["return_deadline"]
+        marketplace = product_to_delete.get("marketplace", "it")
 
-        # Delete product from database
-        await database.delete_product(product_id)
+        # Format deadline
+        from datetime import date
 
-        await update.message.reply_text(
-            "✅ *Prodotto rimosso con successo!*\n\n"
-            f"📦 ASIN: `{asin}`\n\n"
-            "Il prodotto non sarà più monitorato.\n"
-            "Usa /list per vedere i tuoi prodotti rimanenti.",
-            parse_mode="Markdown",
+        deadline_date = date.fromisoformat(return_deadline)
+        deadline_str = deadline_date.strftime("%d/%m/%Y")
+
+        # Create inline keyboard with confirmation buttons
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "✅ Sì, elimina", callback_data=f"delete_confirm_{product_id}"
+                ),
+                InlineKeyboardButton("❌ No, annulla", callback_data=f"delete_cancel_{product_id}"),
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        # Show confirmation message with product details
+        confirmation_message = (
+            "⚠️ *Sei sicuro di voler eliminare questo prodotto?*\n\n"
+            f"📦 ASIN: `{asin}`\n"
+            f"🌍 Marketplace: amazon.{marketplace}\n"
+            f"💰 Prezzo pagato: €{price_paid:.2f}\n"
+            f"📅 Scadenza reso: {deadline_str}\n\n"
+            "_Il prodotto non sarà più monitorato._"
         )
 
-        logger.info(f"Product deleted for user {user_id}: id={product_id}, ASIN={asin}")
+        await update.message.reply_text(
+            confirmation_message, parse_mode="Markdown", reply_markup=reply_markup
+        )
+
+        logger.info(
+            f"Confirmation requested for user {user_id}: product_id={product_id}, ASIN={asin}"
+        )
 
     except Exception as e:
         logger.error(f"Error in delete_handler for user {user_id}: {e}", exc_info=True)
-        await update.message.reply_text("❌ Errore nell'eliminare il prodotto. Riprova più tardi.")
+        await update.message.reply_text("❌ Errore nel processare la richiesta. Riprova più tardi.")
+
+
+async def delete_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handle callback queries from delete confirmation buttons.
+
+    Args:
+        update: Telegram update object
+        context: Telegram context object
+    """
+    query = update.callback_query
+    user_id = update.effective_user.id
+
+    # Answer callback query to remove loading state
+    await query.answer()
+
+    callback_data = query.data
+
+    try:
+        # Parse callback data
+        if callback_data.startswith("delete_confirm_"):
+            # Extract product_id from callback data
+            product_id = int(callback_data.replace("delete_confirm_", ""))
+
+            logger.info(f"User {user_id} confirmed deletion of product_id={product_id}")
+
+            # Get product details before deleting (for confirmation message)
+            products = await database.get_user_products(user_id)
+            product_to_delete = next((p for p in products if p["id"] == product_id), None)
+
+            if product_to_delete is None:
+                await query.edit_message_text(
+                    "❌ Prodotto non trovato. Potrebbe essere già stato eliminato."
+                )
+                return
+
+            asin = product_to_delete["asin"]
+
+            # Delete product from database
+            await database.delete_product(product_id)
+
+            # Edit message to show success
+            success_message = (
+                "✅ *Prodotto eliminato con successo!*\n\n"
+                f"📦 ASIN: `{asin}`\n\n"
+                "Il prodotto non sarà più monitorato.\n"
+                "Usa /list per vedere i tuoi prodotti rimanenti."
+            )
+
+            await query.edit_message_text(success_message, parse_mode="Markdown")
+
+            logger.info(f"Product deleted for user {user_id}: id={product_id}, ASIN={asin}")
+
+        elif callback_data.startswith("delete_cancel_"):
+            # Extract product_id from callback data
+            product_id = int(callback_data.replace("delete_cancel_", ""))
+
+            logger.info(f"User {user_id} cancelled deletion of product_id={product_id}")
+
+            # Edit message to show cancellation
+            await query.edit_message_text(
+                "❌ *Operazione annullata*\n\n" "Il prodotto non è stato eliminato.",
+                parse_mode="Markdown",
+            )
+
+    except Exception as e:
+        logger.error(f"Error in delete_callback_handler for user {user_id}: {e}", exc_info=True)
+        await query.edit_message_text("❌ Errore nell'elaborare la risposta. Riprova più tardi.")
+
+
+# Create handlers
+delete_command_handler = CommandHandler("delete", delete_handler)
+delete_callback_query_handler = CallbackQueryHandler(
+    delete_callback_handler, pattern="^delete_(confirm|cancel)_"
+)
