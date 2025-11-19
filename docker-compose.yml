@@ -1,11 +1,9 @@
-version: '3.8'
-
 services:
-  repackit-bot:
+  repackit:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: repackit-bot
+    container_name: repackit
     restart: unless-stopped
 
     # Port mapping
@@ -21,22 +19,9 @@ services:
     env_file:
       - .env
 
-    # Resource limits (optional, adjust based on your needs)
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
-
     # Logging configuration
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
-
-    # Network mode (bridge is default, change if needed)
-    network_mode: bridge
