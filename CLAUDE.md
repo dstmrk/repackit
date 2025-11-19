@@ -434,6 +434,21 @@ Each command in a separate file for maintainability.
 #### `/start`
 Welcome message explaining the bot's purpose.
 
+#### `/help`
+Shows all available commands with descriptions and explains how the bot works.
+
+**Message includes**:
+- List of all commands organized by category:
+  - Gestione prodotti: `/add`, `/list`, `/delete`, `/update`
+  - Informazioni e supporto: `/start`, `/help`, `/feedback`
+- Brief explanation of how the bot works (4-step process)
+- Automatic monitoring reminder
+
+**Benefits**:
+- Helps new users discover all features
+- Quick reference for command syntax
+- Explains the bot's purpose and workflow
+
 #### `/add`
 **Conversational flow** (step-by-step):
 

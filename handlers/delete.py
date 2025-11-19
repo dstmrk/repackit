@@ -181,7 +181,7 @@ async def delete_callback_handler(update: Update, context: ContextTypes.DEFAULT_
 
             # Edit message to show cancellation
             await query.edit_message_text(
-                "❌ *Operazione annullata*\n\n" "Il prodotto non è stato eliminato.",
+                "❌ *Operazione annullata*\n\nIl prodotto non è stato eliminato.",
                 parse_mode="Markdown",
             )
 
