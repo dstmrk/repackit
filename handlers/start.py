@@ -39,15 +39,15 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "*Come funziona:*\n"
         "1️⃣ Aggiungi un prodotto che hai già acquistato\n"
         "2️⃣ Controllo il prezzo ogni giorno\n"
-        "3️⃣ Ti avviso se scende, così puoi chiedere il rimborso parziale!\n\n"
+        "3️⃣ Ti avviso se scende, così puoi fare un nuovo ordine e restituire il precedente!\n\n"
         "*Comandi disponibili:*\n"
         "/add - Aggiungi un prodotto da monitorare\n"
         "/list - Visualizza i tuoi prodotti\n"
         "/delete - Rimuovi un prodotto\n"
         "/update - Modifica un prodotto\n"
         "/feedback - Invia un feedback\n\n"
-        "💡 *Esempio:*\n"
-        "`/add https://amazon.it/dp/B08N5WRWNW 59.90 30`"
+        "💡 *Inizia subito:*\n"
+        "Usa /add per aggiungere il tuo primo prodotto!"
     )
 
     await update.message.reply_text(welcome_message, parse_mode="Markdown")
