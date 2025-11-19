@@ -37,7 +37,7 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "1️⃣ Usa /add per aggiungere un prodotto Amazon.it che hai acquistato\n"
         "2️⃣ Il bot controllerà il prezzo ogni giorno\n"
         "3️⃣ Riceverai una notifica se il prezzo scende\n"
-        "4️⃣ Potrai fare un nuovo ordine e restituire il precedente\n\n"
+        "4️⃣ Potrai decidere in autonomia di riordinare il prodotto e fare il reso del precedente ordine\n\n"
         "_Il monitoraggio si ferma automaticamente alla scadenza del reso._"
     )
 

@@ -394,10 +394,10 @@ update_conversation_handler = ConversationHandler(
     entry_points=[CommandHandler("update", start_update)],
     states={
         WAITING_PRODUCT_SELECTION: [
-            CallbackQueryHandler(handle_product_selection, pattern="^update_(product|cancel)_")
+            CallbackQueryHandler(handle_product_selection, pattern="^update_(product_|cancel)")
         ],
         WAITING_FIELD_SELECTION: [
-            CallbackQueryHandler(handle_field_selection, pattern="^update_(field|cancel)_")
+            CallbackQueryHandler(handle_field_selection, pattern="^update_(field_|cancel)")
         ],
         WAITING_VALUE_INPUT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_value_input)],
     },

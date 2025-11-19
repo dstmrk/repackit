@@ -452,9 +452,16 @@ Shows all available commands with descriptions and explains how the bot works.
 #### `/add`
 **Conversational flow** (step-by-step):
 
-The `/add` command now uses a conversational flow that guides users through adding a product in three steps:
+The `/add` command uses a conversational flow that guides users through adding a product in five steps:
 
-**Step 1 - URL**:
+**Step 1 - Product Name**:
+- Bot asks: "Come vuoi chiamare questo prodotto?"
+- User sends: `iPhone 15 Pro` or `Cuffie Sony`
+- Validation:
+  - Must be between 3 and 100 characters
+  - Used to identify the product in lists and notifications
+
+**Step 2 - URL**:
 - Bot asks: "Inviami il link del prodotto Amazon.it"
 - User sends: `https://amazon.it/dp/B08N5WRWNW`
 - Validation:
@@ -462,7 +469,7 @@ The `/add` command now uses a conversational flow that guides users through addi
   - ASIN must be extractable from URL
   - Marketplace must be "it"
 
-**Step 2 - Price**:
+**Step 3 - Price**:
 - Bot asks: "Inviami il prezzo che hai pagato in euro"
 - User sends: `59.90` or `59,90`
 - Validation:
@@ -470,14 +477,22 @@ The `/add` command now uses a conversational flow that guides users through addi
   - Must be positive (> 0)
   - Max 16 digits total (including decimals)
 
-**Step 3 - Deadline**:
+**Step 4 - Deadline**:
 - Bot asks: "Inviami la scadenza del reso"
 - User can send either:
   - Number of days (1-365): `30` → 30 days from today
-  - Date in format gg-mm-aaaa: `25-12-2024` → specific date
+  - Date in format gg-mm-aaaa: `09-05-2025` → specific date
 - Validation:
   - If number: must be between 1 and 365
   - If date: must be in format gg-mm-aaaa and in the future
+
+**Step 5 - Minimum Savings**:
+- Bot asks: "Qual è il risparmio minimo per cui vuoi essere notificato?"
+- User sends: `5` (for €5.00) or `0` (for any price drop)
+- Validation:
+  - Must be a non-negative number
+  - Must be less than the price paid
+  - Setting to 0 means notify for any price reduction
 
 **Canceling**:
 - Users can type `/cancel` at any step to abort the conversation
@@ -487,86 +502,100 @@ The `/add` command now uses a conversational flow that guides users through addi
 - When limit is reached, bot shows clear error message with suggestion to use `/delete`
 - Prevents abuse and ensures system scalability
 
-**Note**: The optional `min_savings_threshold` parameter is not asked in the conversational flow (set to NULL by default). Users can update it later with `/update` if needed.
-
 #### `/list`
 Shows user's monitored products:
 ```
 I tuoi prodotti monitorati:
 
-1. 📦 [Nome Prodotto]
-   Prezzo pagato: €59.90
-   Scadenza: 15/12/2024
-   Soglia: €5.00
+1. 📦 [iPhone 15 Pro]
+   💰 Prezzo pagato: €59.90
+   📅 Scadenza reso: 09/05/2025 (tra 170 giorni)
+   🎯 Risparmio minimo: €5.00
 
-2. 📦 [Altro Prodotto]
-   ...
+2. 📦 [Cuffie Sony]
+   💰 Prezzo pagato: €45.00
+   📅 Scadenza reso: 15/05/2025 (tra 176 giorni)
 
 Hai 5/20 prodotti monitorati.
 Usa /delete per rimuoverne uno, /update per modificarne uno.
 ```
 
 **Features**:
+- Shows product name (user-defined) for easy identification
 - Shows product count vs. limit (e.g., "5/20 prodotti monitorati")
+- Shows minimum savings threshold only if > 0
 - Provides quick command references for delete and update actions
 - Numbers 1, 2, 3... are **not** database IDs, but list indices for easy reference
 
-#### `/delete <numero>`
-**Interactive deletion with confirmation**:
+#### `/delete`
+**Button-based selection with confirmation**:
 
-The `/delete` command now uses inline keyboard buttons for confirmation to prevent accidental deletions.
+The `/delete` command uses inline keyboard buttons for product selection and confirmation to prevent accidental deletions.
 
 **Flow**:
-1. User sends: `/delete 2`
-2. Bot shows product details with confirmation buttons:
+1. User sends: `/delete`
+2. Bot shows list of products with inline buttons:
+   ```
+   🗑️ Elimina un prodotto
+
+   Seleziona il prodotto che vuoi rimuovere dal monitoraggio:
+
+   [1. iPhone 15 Pro - €59.90]
+   [2. Cuffie Sony - €45.00]
+   [❌ Annulla]
+   ```
+3. User clicks a product button
+4. Bot shows product details with confirmation buttons:
    ```
    ⚠️ Sei sicuro di voler eliminare questo prodotto?
 
-   📦 ASIN: B08N5WRWNW
-   🌍 Marketplace: amazon.it
+   📦 iPhone 15 Pro
+   🔖 ASIN: B08N5WRWNW
    💰 Prezzo pagato: €59.90
-   📅 Scadenza reso: 25/12/2024
+   📅 Scadenza reso: 09/05/2025
+   🎯 Risparmio minimo: €5.00
 
    [✅ Sì, elimina] [❌ No, annulla]
    ```
-3. User clicks one of the buttons:
+5. User clicks one of the buttons:
    - **Sì, elimina**: Product is deleted permanently
    - **No, annulla**: Operation is canceled, product remains
 
 **Benefits**:
-- Prevents accidental deletions
-- Shows product details before confirming
+- No need to remember product numbers
+- Visual list makes selection easier
+- Prevents accidental deletions with confirmation step
+- Shows product details (including name) before confirming
 - Modern UX with inline buttons
-
-**Note**: Numbers 1, 2, 3... are **not** database IDs, but list indices from `/list`.
 
 #### `/update`
 **Conversational flow with inline buttons**:
 
-The `/update` command now uses a conversational flow that guides users through updating product information with interactive buttons.
+The `/update` command uses a conversational flow that guides users through updating product information with interactive buttons.
 
 **Flow**:
 1. User sends: `/update`
-2. Bot shows list of products with inline buttons (similar to `/list` but with click actions):
+2. Bot shows list of products with inline buttons:
    ```
    🔄 Aggiorna un prodotto
 
    Seleziona il prodotto che vuoi modificare:
 
-   [1. B08N5WRWNW - €59.90 (amazon.it)]
-   [2. B08N5WRWNY - €45.00 (amazon.it)]
+   [1. iPhone 15 Pro - €59.90]
+   [2. Cuffie Sony - €45.00]
    [❌ Annulla]
    ```
 3. User clicks a product button
 4. Bot shows field options with inline buttons:
    ```
-   📦 Prodotto selezionato: B08N5WRWNW
+   📦 Prodotto selezionato: iPhone 15 Pro
 
    Cosa vuoi modificare?
 
+   [📦 Nome prodotto]
    [💰 Prezzo pagato]
    [📅 Scadenza reso]
-   [🎯 Soglia risparmio]
+   [🎯 Risparmio minimo]
    [❌ Annulla]
    ```
 5. User clicks a field button (e.g., "Prezzo pagato")
@@ -585,24 +614,26 @@ The `/update` command now uses a conversational flow that guides users through u
    ```
    ✅ Prezzo aggiornato con successo!
 
-   📦 ASIN: B08N5WRWNW
+   📦 iPhone 15 Pro
    💰 Nuovo prezzo: €55.00
    ```
 
 **Validation Rules**:
+- **Nome prodotto**: Must be between 3 and 100 characters
 - **Prezzo**: Must be a positive number (supports both `.` and `,` as decimal separator)
 - **Scadenza**: Accepts either:
   - Number of days (1-365): `30` → 30 days from today
-  - Date in format gg-mm-aaaa: `25-12-2024` → specific date
+  - Date in format gg-mm-aaaa: `09-05-2025` → specific date
   - Must be in the future
-- **Soglia**: Must be a non-negative number less than the price paid
+- **Risparmio minimo**: Must be a non-negative number less than the price paid
 
 **Canceling**:
 - Users can click "Annulla" button at any step
 - Users can type `/cancel` when entering new value
 
 **Benefits**:
-- Intuitive product selection with visual list
+- Intuitive product selection with visual list (shows product name)
+- Can update product name for better identification
 - Clear field options with emoji icons
 - Step-by-step validation with helpful examples
 - No need to remember command syntax
