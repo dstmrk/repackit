@@ -110,13 +110,13 @@ docker-compose down
 docker-compose build
 
 # Visualizza logs
-docker-compose logs -f repackit-bot
+docker-compose logs -f repackit
 
 # Restart del container
 docker-compose restart
 
 # Accedi al container
-docker-compose exec repackit-bot /bin/bash
+docker-compose exec repackit /bin/bash
 ```
 
 ### Build manuale Docker

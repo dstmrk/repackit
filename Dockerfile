@@ -45,7 +45,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -m -u 1000 repackit \
-    && mkdir -p /app/data/logs \
+    && mkdir -p /app \
     && chown -R repackit:repackit /app
 
 # Set working directory
@@ -59,7 +59,19 @@ COPY --chown=root:root --chmod=555 pyproject.toml ./
 COPY --chown=root:root --chmod=555 *.py ./
 COPY --chown=root:root --chmod=555 handlers/ ./handlers/
 
-# Switch to non-root user
+# Install gosu and create entrypoint script in a single layer
+# This reduces image size and satisfies SonarCloud S7031
+RUN apt-get update && apt-get install -y --no-install-recommends gosu && rm -rf /var/lib/apt/lists/* && \
+    echo '#!/bin/bash\n\
+set -e\n\
+# Create data/logs directory with correct ownership (runs as root)\n\
+mkdir -p /app/data/logs\n\
+chown -R 1000:1000 /app/data 2>/dev/null || true\n\
+# Drop privileges and execute main command as repackit user\n\
+exec gosu 1000:1000 "$@"' > /entrypoint.sh && \
+    chmod +x /entrypoint.sh
+
+# Switch to non-root user for Playwright installation
 USER repackit
 
 # Activate virtual environment
@@ -76,5 +88,14 @@ EXPOSE 8443 8444
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import httpx; httpx.get('http://localhost:8444/health', timeout=5.0)" || exit 1
 
-# Run the bot
+# Switch to root for entrypoint execution only
+# IMPORTANT: The entrypoint immediately drops privileges to repackit user (uid 1000)
+# This is necessary to handle Docker volume permissions automatically on startup
+# The actual bot process runs as non-root user for security
+USER root
+
+# Set entrypoint to handle permissions, then drop to repackit user
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Run the bot (executed as repackit user via entrypoint)
 CMD ["python", "bot.py"]
