@@ -59,12 +59,10 @@ COPY --chown=root:root --chmod=555 pyproject.toml ./
 COPY --chown=root:root --chmod=555 *.py ./
 COPY --chown=root:root --chmod=555 handlers/ ./handlers/
 
-# Install gosu for secure user switching in entrypoint
-RUN apt-get update && apt-get install -y --no-install-recommends gosu && rm -rf /var/lib/apt/lists/*
-
-# Create entrypoint script to handle volume permissions automatically
-# This allows 'docker compose up -d' to work without manual setup
-RUN echo '#!/bin/bash\n\
+# Install gosu and create entrypoint script in a single layer
+# This reduces image size and satisfies SonarCloud S7031
+RUN apt-get update && apt-get install -y --no-install-recommends gosu && rm -rf /var/lib/apt/lists/* && \
+    echo '#!/bin/bash\n\
 set -e\n\
 # Create data/logs directory with correct ownership (runs as root)\n\
 mkdir -p /app/data/logs\n\
@@ -94,7 +92,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # IMPORTANT: The entrypoint immediately drops privileges to repackit user (uid 1000)
 # This is necessary to handle Docker volume permissions automatically on startup
 # The actual bot process runs as non-root user for security
-USER root  # noqa: S6471
+USER root
 
 # Set entrypoint to handle permissions, then drop to repackit user
 ENTRYPOINT ["/entrypoint.sh"]
