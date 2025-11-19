@@ -59,18 +59,17 @@ COPY --chown=root:root --chmod=555 pyproject.toml ./
 COPY --chown=root:root --chmod=555 *.py ./
 COPY --chown=root:root --chmod=555 handlers/ ./handlers/
 
-# Install gosu for user switching in entrypoint
+# Install gosu for secure user switching in entrypoint
 RUN apt-get update && apt-get install -y --no-install-recommends gosu && rm -rf /var/lib/apt/lists/*
 
-# Create entrypoint script to ensure data/logs exists with correct permissions
-# This runs as root, creates directories, then switches to repackit user
+# Create entrypoint script to handle volume permissions automatically
+# This allows 'docker compose up -d' to work without manual setup
 RUN echo '#!/bin/bash\n\
 set -e\n\
-# Create data/logs directory if it does not exist (as root)\n\
+# Create data/logs directory with correct ownership (runs as root)\n\
 mkdir -p /app/data/logs\n\
-# Ensure correct ownership (repackit:repackit = 1000:1000)\n\
 chown -R 1000:1000 /app/data 2>/dev/null || true\n\
-# Switch to repackit user and execute the main command\n\
+# Drop privileges and execute main command as repackit user\n\
 exec gosu 1000:1000 "$@"' > /entrypoint.sh && \
     chmod +x /entrypoint.sh
 
@@ -84,9 +83,6 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN playwright install chromium && \
     playwright install-deps chromium || true
 
-# Switch back to root for entrypoint (entrypoint will switch back to repackit)
-USER root
-
 # Expose ports
 EXPOSE 8443 8444
 
@@ -94,8 +90,14 @@ EXPOSE 8443 8444
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import httpx; httpx.get('http://localhost:8444/health', timeout=5.0)" || exit 1
 
-# Set entrypoint
+# Switch to root for entrypoint execution only
+# IMPORTANT: The entrypoint immediately drops privileges to repackit user (uid 1000)
+# This is necessary to handle Docker volume permissions automatically on startup
+# The actual bot process runs as non-root user for security
+USER root  # noqa: S6471
+
+# Set entrypoint to handle permissions, then drop to repackit user
 ENTRYPOINT ["/entrypoint.sh"]
 
-# Run the bot
+# Run the bot (executed as repackit user via entrypoint)
 CMD ["python", "bot.py"]
