@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RepackIt - Risparmio Post-Acquisto</title>
+    <meta name="description" content="Brutalist landing page for RepackIt, a Telegram bot for Amazon deals.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Archivo+Black&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'brutal-teal': '#008080',
+              'brutal-black': '#1a1a1a',
+              'brutal-yellow': '#fff500',
+              'brutal-white': '#f0f0f0',
+            },
+            fontFamily: {
+              'mono': ['"Space Mono"', 'monospace'],
+              'display': ['"Archivo Black"', 'sans-serif'],
+            },
+            boxShadow: {
+              'hard': '8px 8px 0px 0px #000000',
+              'hard-sm': '4px 4px 0px 0px #000000',
+              'hard-hover': '2px 2px 0px 0px #000000',
+            },
+            keyframes: {
+              marquee: {
+                '0%': { transform: 'translateX(0%)' },
+                '100%': { transform: 'translateX(-100%)' },
+              }
+            },
+            animation: {
+              marquee: 'marquee 20s linear infinite',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        background-color: #008080;
+      }
+      /* Utility for preventing layout shift with icon loading if needed, though SVGs are inline now */
+      .icon-svg {
+        display: inline-block;
+        vertical-align: middle;
+      }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="min-h-screen bg-brutal-teal p-4 md:p-8 lg:p-12 font-mono text-black selection:bg-brutal-yellow selection:text-black overflow-x-hidden">
+    
+      <!-- Header / Nav -->
+      <header class="mb-16 border-4 border-black bg-brutal-white p-6 shadow-hard flex justify-between items-center flex-wrap gap-4">
+        <div class="flex items-center gap-3">
+          <!-- ShoppingBag Icon -->
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shopping-bag"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          <h1 class="font-display text-3xl md:text-4xl tracking-tighter">REPACKIT</h1>
+        </div>
+        <div class="bg-black text-brutal-yellow px-4 py-2 font-bold text-sm tracking-wider hidden sm:block">
+          AMAZON TRACKER
+        </div>
+      </header>
+
+      <!-- Hero Section -->
+      <main class="max-w-7xl mx-auto">
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-24 items-center">
+          <div class="space-y-8">
+            <div class="bg-brutal-yellow border-4 border-black p-8 shadow-hard">
+                <h2 class="font-display text-5xl md:text-6xl lg:text-7xl text-black uppercase leading-[0.9]">
+                  Hai già <br/>
+                  comprato? <br/>
+                  <span class="text-white text-stroke-black" style="-webkit-text-stroke: 2px black;">Risparmia</span><br/>
+                  lo stesso.
+                </h2>
+            </div>
+            <p class="bg-white border-4 border-black p-6 text-lg font-bold shadow-hard-sm leading-relaxed">
+              Il prezzo su Amazon cambia continuamente. Se scende dopo il tuo acquisto, RepackIt ti avvisa. 
+              Così puoi riordinare a meno e fare il reso del vecchio ordine.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4">
+              <a 
+                href="https://t.me/repackit_bot" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                class="inline-block px-8 py-4 font-mono font-bold text-lg border-4 border-black transition-all duration-150 transform active:translate-x-[6px] active:translate-y-[6px] active:shadow-none text-center bg-brutal-yellow text-black shadow-hard hover:bg-white"
+              >
+                PROVALO ORA
+              </a>
+            </div>
+          </div>
+          
+          <!-- Hero Graphic / Visual -->
+          <div class="relative flex justify-center items-center mt-12 lg:mt-0">
+             <div class="bg-white border-4 border-black p-8 w-full shadow-hard flex flex-col gap-6 transform rotate-1">
+                <div class="flex justify-between items-center border-b-4 border-black pb-4">
+                    <span class="font-bold text-gray-500">OGGI: IPHONE 17</span>
+                    <span class="font-display text-2xl">€ 1000.00</span>
+                </div>
+                
+                <div class="flex justify-center py-2">
+                    <!-- ArrowDown Icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-down animate-bounce"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+                </div>
+
+                <div class="flex justify-between items-center bg-brutal-yellow border-4 border-black p-4 transform -rotate-1">
+                    <span class="font-bold">DOMANI: ALERT PREZZO</span>
+                    <span class="font-display text-3xl">€ 900.00</span>
+                </div>
+
+                <div class="text-center font-bold text-sm mt-2 pt-4 border-t-4 border-black border-dashed">
+                    RICOMPRI A 900€ • RENDI QUELLO DA 1000€
+                </div>
+             </div>
+          </div>
+        </section>
+
+        <!-- Marquee Divider -->
+        <div class="mb-20 border-y-4 border-black bg-white py-4 overflow-hidden transform -skew-y-1 flex">
+          <div class="whitespace-nowrap animate-marquee font-display text-3xl text-black uppercase tracking-widest pr-8">
+            MONITORAGGIO POST-ACQUISTO /// NOTIFICHE ISTANTANEE /// RISPARMIO INTELLIGENTE /// NESSUNA APP DA INSTALLARE ///
+          </div>
+          <div class="whitespace-nowrap animate-marquee font-display text-3xl text-black uppercase tracking-widest pr-8" aria-hidden="true">
+            MONITORAGGIO POST-ACQUISTO /// NOTIFICHE ISTANTANEE /// RISPARMIO INTELLIGENTE /// NESSUNA APP DA INSTALLARE ///
+          </div>
+        </div>
+
+        <!-- Features Grid -->
+        <section class="mb-24">
+            <div class="mb-12 text-center md:text-left">
+                <h2 class="font-display text-4xl md:text-5xl text-brutal-white inline-block border-b-8 border-black pb-2 leading-tight">
+                    COME FUNZIONA
+                </h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                
+                <!-- Card 1 -->
+                <div class="bg-brutal-white border-4 border-black p-6 shadow-hard flex flex-col gap-4 transition-transform duration-200 hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[10px_10px_0px_0px_#000] hover:scale-[1.02]">
+                    <div class="w-16 h-16 bg-brutal-black text-brutal-yellow flex items-center justify-center border-2 border-black text-3xl">
+                        <!-- ShoppingBag Icon -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                    </div>
+                    <h3 class="font-display text-2xl uppercase tracking-tighter leading-none border-b-4 border-black pb-2">
+                        1. LINK + PREZZO
+                    </h3>
+                    <p class="font-mono text-sm leading-relaxed font-bold">
+                        Invia al bot il link del prodotto Amazon e il prezzo a cui l'hai pagato. Basta questo per attivare il tracking.
+                    </p>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="bg-brutal-white border-4 border-black p-6 shadow-hard flex flex-col gap-4 transition-transform duration-200 hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[10px_10px_0px_0px_#000] hover:scale-[1.02]">
+                    <div class="w-16 h-16 bg-brutal-black text-brutal-yellow flex items-center justify-center border-2 border-black text-3xl">
+                        <!-- History Icon -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/></svg>
+                    </div>
+                    <h3 class="font-display text-2xl uppercase tracking-tighter leading-none border-b-4 border-black pb-2">
+                        2. MONITORAGGIO
+                    </h3>
+                    <p class="font-mono text-sm leading-relaxed font-bold">
+                        RepackIt controlla costantemente il prezzo del prodotto per tutta la durata della finestra di reso.
+                    </p>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="bg-brutal-yellow border-4 border-black p-6 shadow-hard flex flex-col gap-4 transition-transform duration-200 hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[10px_10px_0px_0px_#000] hover:scale-[1.02]">
+                    <div class="w-16 h-16 bg-brutal-black text-brutal-yellow flex items-center justify-center border-2 border-black text-3xl">
+                        <!-- BellRing Icon -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                    </div>
+                    <h3 class="font-display text-2xl uppercase tracking-tighter leading-none border-b-4 border-black pb-2">
+                        3. NOTIFICA
+                    </h3>
+                    <p class="font-mono text-sm leading-relaxed font-bold">
+                        Se il prezzo scende sotto la cifra che hai speso, ricevi immediatamente un messaggio su Telegram.
+                    </p>
+                </div>
+
+                <!-- Card 4 -->
+                <div class="bg-brutal-white border-4 border-black p-6 shadow-hard flex flex-col gap-4 transition-transform duration-200 hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[10px_10px_0px_0px_#000] hover:scale-[1.02]">
+                    <div class="w-16 h-16 bg-brutal-black text-brutal-yellow flex items-center justify-center border-2 border-black text-3xl">
+                        <!-- RefreshCcw Icon -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/><path d="M3 3v9h9"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 12"/><path d="M21 21v-9h-9"/></svg>
+                    </div>
+                    <h3 class="font-display text-2xl uppercase tracking-tighter leading-none border-b-4 border-black pb-2">
+                        4. IL REPACK
+                    </h3>
+                    <p class="font-mono text-sm leading-relaxed font-bold">
+                        Compra di nuovo a prezzo basso. Quando arriva, fai il reso del vecchio ordine rendendo quello nuovo.
+                    </p>
+                </div>
+
+                <!-- Card 5 -->
+                <div class="bg-brutal-white border-4 border-black p-6 shadow-hard flex flex-col gap-4 transition-transform duration-200 hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[10px_10px_0px_0px_#000] hover:scale-[1.02]">
+                    <div class="w-16 h-16 bg-brutal-black text-brutal-yellow flex items-center justify-center border-2 border-black text-3xl">
+                        <!-- Banknote Icon -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+                    </div>
+                    <h3 class="font-display text-2xl uppercase tracking-tighter leading-none border-b-4 border-black pb-2">
+                        5. 100% GRATIS
+                    </h3>
+                    <p class="font-mono text-sm leading-relaxed font-bold">
+                        Nessun abbonamento o costo nascosto. Il bot è completamente gratuito per tutti gli utenti Telegram.
+                    </p>
+                </div>
+                
+                <!-- Card 6 -->
+                <div class="bg-brutal-white border-4 border-black p-6 shadow-hard flex flex-col gap-4 transition-transform duration-200 hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[10px_10px_0px_0px_#000] hover:scale-[1.02]">
+                    <div class="w-16 h-16 bg-brutal-black text-brutal-yellow flex items-center justify-center border-2 border-black text-3xl">
+                        <!-- Shield Icon -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+                    </div>
+                    <h3 class="font-display text-2xl uppercase tracking-tighter leading-none border-b-4 border-black pb-2">
+                        6. PRIVACY TOTALE
+                    </h3>
+                    <p class="font-mono text-sm leading-relaxed font-bold">
+                        Non chiediamo login Amazon né dati di pagamento. Il bot lavora solo con i link pubblici dei prodotti.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Call to Action Footer -->
+        <section class="bg-black text-brutal-white border-4 border-black p-8 md:p-12 text-center shadow-hard mb-12">
+            <h2 class="font-display text-3xl md:text-5xl mb-6 uppercase">
+                Smetti di pagare troppo.
+            </h2>
+            <p class="font-mono text-lg mb-8 max-w-2xl mx-auto text-gray-300">
+                È gratuito, sicuro e funziona direttamente nella chat che usi ogni giorno.
+            </p>
+            <a 
+              href="https://t.me/repackit_bot" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              class="inline-block px-8 py-4 font-mono font-bold text-lg border-4 border-black transition-all duration-150 transform active:translate-x-[6px] active:translate-y-[6px] active:shadow-none text-center bg-brutal-yellow text-black shadow-hard hover:bg-white"
+            >
+              AVVIA IL BOT ORA
+            </a>
+        </section>
+
+        <!-- Disclaimer -->
+        <div class="max-w-4xl mx-auto mb-12 text-center px-4 opacity-80">
+            <p class="font-mono text-xs leading-relaxed">
+                <strong>DISCLAIMER:</strong> RepackIt è un progetto indipendente e non è in alcun modo affiliato, sponsorizzato o associato ad Amazon né alle sue società controllate. 
+                Il servizio si limita a monitorare i prezzi pubblici dei prodotti. La verifica dell'eleggibilità al reso e il rispetto delle politiche di reso del venditore sono di esclusiva responsabilità dell'utente, che deve accertarsi di operare in conformità con i termini e le condizioni del marketplace.
+            </p>
+        </div>
+
+        <footer class="border-t-4 border-black pt-8 pb-8 flex justify-center">
+            <div class="text-center font-bold text-lg">
+                © 2025 REPACKIT - <a href="https://t.me/repackit_bot" class="underline hover:bg-black hover:text-white px-1 transition-colors">@repackit_bot</a>
+            </div>
+        </footer>
+
+      </main>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
