@@ -19,6 +19,10 @@ services:
     env_file:
       - .env
 
+    # Set timezone to Europe/Rome
+    environment:
+      - TZ=Europe/Rome
+
     # Logging configuration
     logging:
       driver: "json-file"

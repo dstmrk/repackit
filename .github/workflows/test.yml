@@ -12,6 +12,7 @@ on:
       - 'docker-compose.yml'
       - '.dockerignore'
       - '.env.example'
+      - 'static/**'
       - '.github/workflows/**'
       - '!.github/workflows/test.yml'  # Still run if test.yml itself changes
   pull_request:
@@ -25,6 +26,7 @@ on:
       - 'docker-compose.yml'
       - '.dockerignore'
       - '.env.example'
+      - 'static/**'
       - '.github/workflows/**'
       - '!.github/workflows/test.yml'  # Still run if test.yml itself changes
 
