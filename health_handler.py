@@ -13,8 +13,9 @@ import database
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Get health port from environment
+# Get health check configuration from environment
 HEALTH_PORT = int(os.getenv("HEALTH_PORT", "8444"))
+HEALTH_BIND_ADDRESS = os.getenv("HEALTH_BIND_ADDRESS", "0.0.0.0")
 
 # Health check thresholds
 MAX_DAYS_SINCE_LAST_RUN = 2  # Consider stale if task hasn't run in 2 days
@@ -140,9 +141,38 @@ async def get_health_status() -> dict:
 
 
 def run_server():
-    """Run health check HTTP server."""
-    server = HTTPServer(("0.0.0.0", HEALTH_PORT), HealthCheckHandler)
-    logger.info(f"Health check server running on port {HEALTH_PORT}")
+    """
+    Run health check HTTP server.
+
+    Security Note:
+    This server uses HTTP (not HTTPS) intentionally for internal health checks.
+    In production deployments, HTTPS should be handled by infrastructure:
+    - Reverse proxy (nginx, Caddy, Traefik)
+    - Load balancer (AWS ALB, Google Cloud Load Balancer)
+    - CDN/WAF (Cloudflare, Fastly)
+
+    The health check endpoint does not transmit sensitive data and is typically
+    accessed by monitoring services (UptimeRobot, Datadog) or orchestration
+    platforms (Kubernetes, Docker Swarm) within a secured network.
+
+    For enhanced security in production:
+    - Set HEALTH_BIND_ADDRESS=127.0.0.1 to restrict access to localhost only
+    - Use firewall rules to limit access to monitoring services
+    - Place behind a reverse proxy that handles HTTPS termination
+
+    Configuration:
+    - HEALTH_PORT: Port to listen on (default: 8444)
+    - HEALTH_BIND_ADDRESS: Address to bind to (default: 0.0.0.0)
+        - 0.0.0.0 = All interfaces (required for Docker/Kubernetes)
+        - 127.0.0.1 = Localhost only (for reverse proxy setups)
+    """
+    # SECURITY: HTTP is used for internal health checks. HTTPS should be handled
+    # by reverse proxy/load balancer in production. See docstring for details.
+    server = HTTPServer((HEALTH_BIND_ADDRESS, HEALTH_PORT), HealthCheckHandler)
+    logger.info(
+        f"Health check server running on {HEALTH_BIND_ADDRESS}:{HEALTH_PORT} "
+        f"(HTTP - HTTPS should be handled by reverse proxy)"
+    )
     server.serve_forever()
 
 
