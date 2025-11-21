@@ -9,6 +9,7 @@ on:
       - 'LICENSE'
       - '.gitignore'
       - '.gitattributes'
+      - 'static/**'
       - '.github/workflows/**'
       - '!.github/workflows/docker.yml'  # Still run if docker.yml itself changes
   pull_request:
@@ -19,6 +20,7 @@ on:
       - 'LICENSE'
       - '.gitignore'
       - '.gitattributes'
+      - 'static/**'
       - '.github/workflows/**'
       - '!.github/workflows/docker.yml'  # Still run if docker.yml itself changes
 

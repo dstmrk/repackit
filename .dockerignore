@@ -39,6 +39,9 @@ data/
 !README.md
 docs/
 
+# Static files (GitHub Pages)
+static/
+
 # CI/CD
 .github/
 .pre-commit-config.yaml

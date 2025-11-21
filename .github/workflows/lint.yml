@@ -12,6 +12,7 @@ on:
       - 'docker-compose.yml'
       - '.dockerignore'
       - '.env.example'
+      - 'static/**'
       - '.github/workflows/**'
       - '!.github/workflows/lint.yml'  # Still run if lint.yml itself changes
   pull_request:
@@ -25,6 +26,7 @@ on:
       - 'docker-compose.yml'
       - '.dockerignore'
       - '.env.example'
+      - 'static/**'
       - '.github/workflows/**'
       - '!.github/workflows/lint.yml'  # Still run if lint.yml itself changes
 
