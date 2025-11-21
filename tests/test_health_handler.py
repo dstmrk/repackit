@@ -260,7 +260,6 @@ async def test_health_status_includes_thresholds(test_db):
 async def test_health_check_handler_get_health(test_db):
     """Test HealthCheckHandler responds to /health endpoint."""
     from io import BytesIO
-    import asyncio
 
     # Add some test data
     now = datetime.now()
