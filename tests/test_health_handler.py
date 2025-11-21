@@ -260,7 +260,6 @@ async def test_health_status_includes_thresholds(test_db):
 async def test_health_check_handler_get_health(test_db):
     """Test HealthCheckHandler responds to /health endpoint."""
     from io import BytesIO
-    import asyncio
 
     # Add some test data
     now = datetime.now()
@@ -273,9 +272,7 @@ async def test_health_check_handler_get_health(test_db):
     expected_health_data = await health_handler.get_health_status()
 
     # Create handler without calling __init__ (which would try to handle request)
-    handler = health_handler.HealthCheckHandler.__new__(
-        health_handler.HealthCheckHandler
-    )
+    handler = health_handler.HealthCheckHandler.__new__(health_handler.HealthCheckHandler)
 
     # Mock the necessary attributes
     handler.path = "/health"
@@ -314,9 +311,7 @@ async def test_health_check_handler_get_health(test_db):
 async def test_health_check_handler_404(test_db):
     """Test HealthCheckHandler returns 404 for unknown paths."""
     # Create handler without calling __init__
-    handler = health_handler.HealthCheckHandler.__new__(
-        health_handler.HealthCheckHandler
-    )
+    handler = health_handler.HealthCheckHandler.__new__(health_handler.HealthCheckHandler)
 
     # Mock the necessary attributes
     handler.path = "/unknown"
@@ -335,9 +330,7 @@ async def test_health_check_handler_error_handling(test_db):
     from io import BytesIO
 
     # Create handler without calling __init__
-    handler = health_handler.HealthCheckHandler.__new__(
-        health_handler.HealthCheckHandler
-    )
+    handler = health_handler.HealthCheckHandler.__new__(health_handler.HealthCheckHandler)
 
     # Mock the necessary attributes
     handler.path = "/health"
@@ -362,9 +355,7 @@ async def test_health_check_handler_error_handling(test_db):
 def test_health_check_handler_log_message():
     """Test HealthCheckHandler custom log_message method."""
     # Create handler without calling __init__
-    handler = health_handler.HealthCheckHandler.__new__(
-        health_handler.HealthCheckHandler
-    )
+    handler = health_handler.HealthCheckHandler.__new__(health_handler.HealthCheckHandler)
 
     # Mock address_string
     handler.address_string = MagicMock(return_value="127.0.0.1")
@@ -393,9 +384,7 @@ async def test_check_task_health_invalid_timestamp(test_db):
     threshold = datetime.now()
 
     # Call _check_task_health
-    task_status, is_healthy = health_handler._check_task_health(
-        "scraper", system_status, threshold
-    )
+    task_status, is_healthy = health_handler._check_task_health("scraper", system_status, threshold)
 
     # Verify error status
     assert task_status["status"] == "error"
