@@ -277,6 +277,8 @@ async def scrape_prices(products: list[dict], rate_limit_seconds: float = 1.5) -
     Scrape prices for multiple products efficiently.
 
     Uses a single browser instance and applies rate limiting to avoid detection.
+    Optimizes scraping by deduplicating ASINs - each unique ASIN is scraped only once,
+    even if multiple users are monitoring the same product.
 
     Args:
         products: List of product dicts with keys: id, asin, (optional) marketplace
@@ -285,8 +287,30 @@ async def scrape_prices(products: list[dict], rate_limit_seconds: float = 1.5) -
     Returns:
         Dict mapping product_id -> price
         Products that failed to scrape are omitted from result
+
+    Example:
+        If 10 users monitor the same ASIN, it will be scraped only once,
+        and the price will be mapped to all 10 product IDs.
     """
     results = {}
+
+    # Group products by (asin, marketplace) to deduplicate scraping
+    asin_to_product_ids = {}
+    for product in products:
+        product_id = product["id"]
+        asin = product["asin"]
+        marketplace = product.get("marketplace", "it")
+        key = (asin, marketplace)
+
+        if key not in asin_to_product_ids:
+            asin_to_product_ids[key] = []
+        asin_to_product_ids[key].append(product_id)
+
+    unique_asins = list(asin_to_product_ids.keys())
+    logger.info(
+        f"Scraping {len(unique_asins)} unique ASINs for {len(products)} total products "
+        f"(deduplication saved {len(products) - len(unique_asins)} requests)"
+    )
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(
@@ -295,19 +319,21 @@ async def scrape_prices(products: list[dict], rate_limit_seconds: float = 1.5) -
         )
 
         try:
-            for product in products:
-                product_id = product["id"]
-                asin = product["asin"]
-                marketplace = product.get("marketplace", "it")
-
-                # Scrape price
+            for i, (asin, marketplace) in enumerate(unique_asins):
+                # Scrape price once for this ASIN
                 price = await _scrape_single_price(browser, asin, marketplace)
 
+                # Map price to all product IDs that share this ASIN
                 if price is not None:
-                    results[product_id] = price
+                    product_ids = asin_to_product_ids[(asin, marketplace)]
+                    for product_id in product_ids:
+                        results[product_id] = price
+                    logger.debug(
+                        f"ASIN {asin} (€{price:.2f}) mapped to {len(product_ids)} product(s)"
+                    )
 
                 # Rate limiting: wait before next request
-                if product != products[-1]:  # Don't wait after last product
+                if i < len(unique_asins) - 1:  # Don't wait after last ASIN
                     await asyncio.sleep(rate_limit_seconds)
 
         finally:

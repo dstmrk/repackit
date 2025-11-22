@@ -291,3 +291,94 @@ async def test_scrape_prices_with_custom_marketplace():
 
             results = await data_reader.scrape_prices(products)
             assert results[1] == 50.00
+
+
+@pytest.mark.asyncio
+async def test_scrape_prices_deduplication():
+    """Test that duplicate ASINs are scraped only once."""
+    # 5 products: 3 share ASIN00001, 2 share ASIN00002
+    products = [
+        {"id": 1, "asin": "ASIN00001", "marketplace": "it"},
+        {"id": 2, "asin": "ASIN00001", "marketplace": "it"},  # Duplicate ASIN
+        {"id": 3, "asin": "ASIN00001", "marketplace": "it"},  # Duplicate ASIN
+        {"id": 4, "asin": "ASIN00002", "marketplace": "it"},
+        {"id": 5, "asin": "ASIN00002", "marketplace": "it"},  # Duplicate ASIN
+    ]
+
+    # Track how many times each ASIN is scraped
+    scrape_counts = {"ASIN00001": 0, "ASIN00002": 0}
+
+    async def mock_scrape(browser, asin, marketplace):
+        # Count scrapes for each ASIN
+        scrape_counts[asin] += 1
+
+        # Return different prices for different ASINs
+        if asin == "ASIN00001":
+            return 100.00
+        elif asin == "ASIN00002":
+            return 200.00
+
+    with patch("data_reader._scrape_single_price", side_effect=mock_scrape):
+        with patch("data_reader.async_playwright") as mock_playwright:
+            mock_browser = AsyncMock()
+            mock_playwright.return_value.__aenter__.return_value.chromium.launch = AsyncMock(
+                return_value=mock_browser
+            )
+            mock_browser.close = AsyncMock()
+
+            # Call function
+            results = await data_reader.scrape_prices(products, rate_limit_seconds=0)
+
+            # Verify each ASIN was scraped only once
+            assert scrape_counts["ASIN00001"] == 1, "ASIN00001 should be scraped only once"
+            assert scrape_counts["ASIN00002"] == 1, "ASIN00002 should be scraped only once"
+
+            # Verify all products got the correct price
+            assert len(results) == 5  # All products should have results
+            assert results[1] == 100.00  # Product 1 (ASIN00001)
+            assert results[2] == 100.00  # Product 2 (ASIN00001)
+            assert results[3] == 100.00  # Product 3 (ASIN00001)
+            assert results[4] == 200.00  # Product 4 (ASIN00002)
+            assert results[5] == 200.00  # Product 5 (ASIN00002)
+
+
+@pytest.mark.asyncio
+async def test_scrape_prices_deduplication_different_marketplaces():
+    """Test that same ASIN on different marketplaces are scraped separately."""
+    # Same ASIN on different marketplaces should be scraped separately
+    products = [
+        {"id": 1, "asin": "ASIN00001", "marketplace": "it"},
+        {"id": 2, "asin": "ASIN00001", "marketplace": "de"},  # Different marketplace
+        {"id": 3, "asin": "ASIN00001", "marketplace": "it"},  # Duplicate (it)
+    ]
+
+    scrape_counts = {}
+
+    async def mock_scrape(browser, asin, marketplace):
+        key = f"{asin}-{marketplace}"
+        scrape_counts[key] = scrape_counts.get(key, 0) + 1
+
+        # Return different prices for different marketplaces
+        if marketplace == "it":
+            return 100.00
+        elif marketplace == "de":
+            return 120.00
+
+    with patch("data_reader._scrape_single_price", side_effect=mock_scrape):
+        with patch("data_reader.async_playwright") as mock_playwright:
+            mock_browser = AsyncMock()
+            mock_playwright.return_value.__aenter__.return_value.chromium.launch = AsyncMock(
+                return_value=mock_browser
+            )
+            mock_browser.close = AsyncMock()
+
+            results = await data_reader.scrape_prices(products, rate_limit_seconds=0)
+
+            # Verify each (ASIN, marketplace) combination was scraped once
+            assert scrape_counts["ASIN00001-it"] == 1
+            assert scrape_counts["ASIN00001-de"] == 1
+
+            # Verify correct prices
+            assert results[1] == 100.00  # it marketplace
+            assert results[2] == 120.00  # de marketplace
+            assert results[3] == 100.00  # it marketplace (duplicate)
