@@ -14,6 +14,7 @@ services:
     # Volume for persistent data
     volumes:
       - ./data:/app/data
+      - ./debug_output:/app/debug_output
 
     # Environment variables (from .env file)
     env_file:
