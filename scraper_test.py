@@ -233,7 +233,10 @@ async def run_scraper_test(
 
             # Save debug files if requested
             if save_debug:
-                output_dir = Path("/tmp")
+                # Use secure temporary directory instead of /tmp
+                # Create debug_output directory in current working directory
+                output_dir = Path.cwd() / "debug_output"
+                output_dir.mkdir(exist_ok=True)
                 html_path, screenshot_path = await save_debug_files(
                     browser, asin, marketplace, output_dir
                 )
@@ -252,16 +255,8 @@ async def run_scraper_test(
     return results
 
 
-def print_results(results: dict) -> None:
-    """
-    Print test results in formatted output.
-
-    Args:
-        results: Dict with test results from test_scraper()
-    """
-    print_header("🔍 Amazon Scraper Test Results")
-
-    # Product info
+def _print_product_info(results: dict) -> None:
+    """Print product information section."""
     print(f"\n{Colors.BOLD}📦 Product Information:{Colors.ENDC}")
     print_result("ASIN", results["asin"])
     print_result("Marketplace", f"amazon.{results['marketplace']}")
@@ -269,7 +264,9 @@ def print_results(results: dict) -> None:
     affiliate_url = build_affiliate_url(results["asin"], results["marketplace"])
     print_result("URL", affiliate_url)
 
-    # Scraping results
+
+def _print_scraping_results(results: dict) -> None:
+    """Print scraping results section."""
     print(f"\n{Colors.BOLD}📊 Scraping Results:{Colors.ENDC}")
 
     if results["success"]:
@@ -287,7 +284,6 @@ def print_results(results: dict) -> None:
         else:
             diff = abs(scraped - expected)
             print_result("Match", f"{Colors.WARNING}❌ NO (difference: €{diff:.2f}){Colors.ENDC}")
-
     else:
         print_error("SCRAPING FAILED")
         if results.get("error"):
@@ -295,29 +291,50 @@ def print_results(results: dict) -> None:
 
     print_result("Duration", f"{results['duration_seconds']:.2f}s")
 
-    # Price verification in HTML
-    if results.get("price_found_in_html") is not None:
-        print(f"\n{Colors.BOLD}🔎 Expected Price in HTML:{Colors.ENDC}")
-        if results["price_found_in_html"]:
-            print_success(
-                f"Found '{results['expected_price']:.2f}' in page HTML "
-                f"({results['price_occurrences']} occurrences)"
-            )
-            if results.get("price_contexts"):
-                print(f"\n{' ' * 3}{Colors.BOLD}Sample contexts:{Colors.ENDC}")
-                for i, context in enumerate(results["price_contexts"][:3], 1):
-                    print(f"{' ' * 5}{i}. \"{context[:80]}...\"")
-        else:
-            print_error("Expected price NOT found in page HTML")
 
-    # Debug files
-    if results["debug_files"]:
-        print(f"\n{Colors.BOLD}💾 Debug Files:{Colors.ENDC}")
-        if "html" in results["debug_files"]:
-            print_result("HTML", results["debug_files"]["html"])
-        if "screenshot" in results["debug_files"]:
-            print_result("Screenshot", results["debug_files"]["screenshot"])
+def _print_price_verification(results: dict) -> None:
+    """Print price verification in HTML section."""
+    if results.get("price_found_in_html") is None:
+        return
 
+    print(f"\n{Colors.BOLD}🔎 Expected Price in HTML:{Colors.ENDC}")
+    if results["price_found_in_html"]:
+        print_success(
+            f"Found '{results['expected_price']:.2f}' in page HTML "
+            f"({results['price_occurrences']} occurrences)"
+        )
+        if results.get("price_contexts"):
+            print(f"\n{' ' * 3}{Colors.BOLD}Sample contexts:{Colors.ENDC}")
+            for i, context in enumerate(results["price_contexts"][:3], 1):
+                print(f"{' ' * 5}{i}. \"{context[:80]}...\"")
+    else:
+        print_error("Expected price NOT found in page HTML")
+
+
+def _print_debug_files(results: dict) -> None:
+    """Print debug files section."""
+    if not results["debug_files"]:
+        return
+
+    print(f"\n{Colors.BOLD}💾 Debug Files:{Colors.ENDC}")
+    if "html" in results["debug_files"]:
+        print_result("HTML", results["debug_files"]["html"])
+    if "screenshot" in results["debug_files"]:
+        print_result("Screenshot", results["debug_files"]["screenshot"])
+
+
+def print_results(results: dict) -> None:
+    """
+    Print test results in formatted output.
+
+    Args:
+        results: Dict with test results from run_scraper_test()
+    """
+    print_header("🔍 Amazon Scraper Test Results")
+    _print_product_info(results)
+    _print_scraping_results(results)
+    _print_price_verification(results)
+    _print_debug_files(results)
     print("\n" + "=" * 60 + "\n")
 
 
@@ -423,7 +440,7 @@ async def main() -> int:
     print_info(f"Expected price: €{args.expected_price:.2f}")
 
     if args.save_debug:
-        print_info("Debug files will be saved to /tmp")
+        print_info("Debug files will be saved to ./debug_output")
 
     results = await run_scraper_test(
         asin=args.asin,

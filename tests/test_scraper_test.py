@@ -7,6 +7,10 @@ import pytest
 
 import scraper_test
 from scraper_test import (
+    _print_debug_files,
+    _print_price_verification,
+    _print_product_info,
+    _print_scraping_results,
     find_price_in_html,
     get_page_html,
     parse_args,
@@ -183,6 +187,90 @@ class TestPrintFunctions:
         captured = capsys.readouterr()
         assert "Label:" in captured.out
         assert "Value" in captured.out
+
+    def test_print_product_info(self, capsys):
+        """Test product info section printing."""
+        results = {
+            "asin": "B08N5WRWNW",
+            "marketplace": "it",
+            "expected_price": 59.90,
+        }
+        _print_product_info(results)
+        captured = capsys.readouterr()
+        assert "Product Information" in captured.out
+        assert "B08N5WRWNW" in captured.out
+        assert "amazon.it" in captured.out
+        assert "59.90" in captured.out
+
+    def test_print_scraping_results_success(self, capsys):
+        """Test scraping results section with success."""
+        results = {
+            "success": True,
+            "scraped_price": 45.00,
+            "expected_price": 59.90,
+            "duration_seconds": 2.5,
+        }
+        _print_scraping_results(results)
+        captured = capsys.readouterr()
+        assert "SUCCESSFUL" in captured.out
+        assert "45.00" in captured.out
+
+    def test_print_scraping_results_failure(self, capsys):
+        """Test scraping results section with failure."""
+        results = {
+            "success": False,
+            "error": "Test error",
+            "duration_seconds": 30.0,
+        }
+        _print_scraping_results(results)
+        captured = capsys.readouterr()
+        assert "FAILED" in captured.out
+        assert "Test error" in captured.out
+
+    def test_print_price_verification_found(self, capsys):
+        """Test price verification when price is found."""
+        results = {
+            "price_found_in_html": True,
+            "expected_price": 59.90,
+            "price_occurrences": 3,
+            "price_contexts": ["Context 1", "Context 2"],
+        }
+        _print_price_verification(results)
+        captured = capsys.readouterr()
+        assert "Expected Price in HTML" in captured.out
+        assert "Found" in captured.out
+
+    def test_print_price_verification_not_found(self, capsys):
+        """Test price verification when price is not found."""
+        results = {
+            "price_found_in_html": False,
+            "expected_price": 59.90,
+        }
+        _print_price_verification(results)
+        captured = capsys.readouterr()
+        assert "NOT found" in captured.out
+
+    def test_print_debug_files_present(self, capsys):
+        """Test debug files section when files are present."""
+        results = {
+            "debug_files": {
+                "html": "./debug_output/test.html",
+                "screenshot": "./debug_output/test.png",
+            }
+        }
+        _print_debug_files(results)
+        captured = capsys.readouterr()
+        assert "Debug Files" in captured.out
+        assert "test.html" in captured.out
+        assert "test.png" in captured.out
+
+    def test_print_debug_files_empty(self, capsys):
+        """Test debug files section when no files."""
+        results = {"debug_files": {}}
+        _print_debug_files(results)
+        captured = capsys.readouterr()
+        # Should print nothing
+        assert "Debug Files" not in captured.out
 
 
 class TestPrintResults:
