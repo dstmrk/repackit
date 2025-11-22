@@ -26,12 +26,24 @@ ASIN_PATTERN = re.compile(r"/dp/([A-Z0-9]{10})|/gp/product/([A-Z0-9]{10})|/d/([A
 MARKETPLACE_PATTERN = re.compile(r"amazon\.(?:co\.)?([a-z]{2,3})")
 
 # Price selectors to try in order (Amazon's HTML structure changes frequently)
+# More specific selectors first to avoid capturing wrong prices (variants, other sellers, etc.)
 PRICE_SELECTORS = [
-    ".a-price .a-offscreen",  # Most common
-    "#priceblock_ourprice",  # Legacy
-    "#priceblock_dealprice",  # Deal price
+    # Desktop buy box - most specific
+    "#corePriceDisplay_desktop_feature_div .a-price[data-a-color='price'] .a-offscreen",
+    # Core price section with explicit price color
+    "#corePrice_feature_div .a-price[data-a-color='price'] .a-offscreen",
+    # Buy box with large text (typical of main price)
+    ".a-section.a-spacing-none.aok-align-center .a-price[data-a-size='xl'] .a-offscreen",
+    # Mobile buy box
+    "#corePriceDisplay_mobile_feature_div .a-price .a-offscreen",
+    # Generic core price (less specific, but still better than completely generic)
+    "#corePrice_feature_div .a-price .a-offscreen",
+    # Legacy selectors (old Amazon layout)
+    "#priceblock_ourprice",
+    "#priceblock_dealprice",
+    # Fallback to generic selector (may pick wrong price, but better than nothing)
+    ".a-price .a-offscreen",
     ".a-price-whole",  # Separated price (need to combine with decimal)
-    "#corePrice_feature_div .a-price .a-offscreen",  # Another common location
 ]
 
 
@@ -193,15 +205,16 @@ async def _scrape_single_price(browser: Browser, asin: str, marketplace: str) ->
 
         # Try each price selector
         price_text = None
-        for selector in PRICE_SELECTORS:
+        for i, selector in enumerate(PRICE_SELECTORS, 1):
             try:
                 element = await page.wait_for_selector(selector, timeout=2000)
                 if element:
                     price_text = await element.inner_text()
                     if price_text:
-                        logger.debug(f"Found price with selector '{selector}': {price_text}")
+                        logger.info(f"Found price with selector #{i} '{selector}': {price_text}")
                         break
             except TimeoutError:
+                logger.debug(f"Selector #{i} '{selector}' not found, trying next...")
                 continue
 
         await page.close()
