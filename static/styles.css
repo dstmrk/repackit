@@ -9,14 +9,6 @@
   border-width: 0;
   border-style: solid;
   border-color: currentColor;
-  /* Transform defaults for transform utilities */
-  --tw-translate-x: 0;
-  --tw-translate-y: 0;
-  --tw-rotate: 0;
-  --tw-skew-x: 0;
-  --tw-skew-y: 0;
-  --tw-scale-x: 1;
-  --tw-scale-y: 1;
 }
 
 html {
@@ -202,6 +194,8 @@ button { cursor: pointer; }
 .duration-200 { transition-duration: 200ms; }
 
 .transform { transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y)); }
+/* Defaults for transform */
+*, ::before, ::after { --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; }
 
 .rotate-1 { --tw-rotate: 1deg; transform: rotate(1deg); }
 .-rotate-1 { --tw-rotate: -1deg; transform: rotate(-1deg); }
@@ -212,6 +206,24 @@ button { cursor: pointer; }
 /* Custom Text Stroke */
 .text-stroke-black {
   -webkit-text-stroke: 2px black;
+}
+
+/* Custom Sticker */
+.sticker-beta {
+  position: absolute;
+  top: -0.5rem;
+  right: -1.2rem;
+  background-color: var(--c-yellow);
+  color: var(--c-black);
+  border: 2px solid var(--c-black);
+  padding: 0.1rem 0.5rem;
+  font-family: var(--f-mono);
+  font-weight: 700;
+  font-size: 0.75rem;
+  transform: rotate(12deg);
+  box-shadow: 2px 2px 0px 0px #000;
+  z-index: 10;
+  pointer-events: none; /* Let clicks pass through */
 }
 
 /* --- STATES (Hover / Active) --- */
