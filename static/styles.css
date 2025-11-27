@@ -83,7 +83,9 @@ button { cursor: pointer; }
 .m-0 { margin: 0; }
 .mx-auto { margin-left: auto; margin-right: auto; }
 .mt-2 { margin-top: 0.5rem; }
+.mt-8 { margin-top: 2rem; }
 .mt-12 { margin-top: 3rem; }
+.mb-2 { margin-bottom: 0.5rem; }
 .mb-6 { margin-bottom: 1.5rem; }
 .mb-8 { margin-bottom: 2rem; }
 .mb-12 { margin-bottom: 3rem; }
@@ -120,6 +122,7 @@ button { cursor: pointer; }
 .w-full { width: 100%; }
 .max-w-2xl { max-width: 42rem; }
 .max-w-4xl { max-width: 56rem; }
+.max-w-5xl { max-width: 64rem; }
 .max-w-7xl { max-width: 80rem; }
 .min-h-screen { min-height: 100vh; }
 
@@ -131,6 +134,7 @@ button { cursor: pointer; }
 .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
 .text-base { font-size: 1rem; line-height: 1.5rem; }
 .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+.text-xl { font-size: 1.25rem; line-height: 1.75rem; }
 .text-2xl { font-size: 1.5rem; line-height: 2rem; }
 .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
 .text-4xl { font-size: 2.25rem; line-height: 2.5rem; }
@@ -256,6 +260,7 @@ button { cursor: pointer; }
 
 /* md (768px) */
 @media (min-width: 768px) {
+  .md\:flex-row { flex-direction: row; }
   .md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .md\:p-8 { padding: 2rem; }
   .md\:p-12 { padding: 3rem; }
