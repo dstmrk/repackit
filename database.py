@@ -51,6 +51,7 @@ async def init_db() -> None:
                 return_deadline DATE NOT NULL,
                 min_savings_threshold REAL DEFAULT 0,
                 last_notified_price REAL,
+                consecutive_failures INTEGER DEFAULT 0,
                 added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(user_id)
             )
@@ -86,24 +87,6 @@ async def init_db() -> None:
         await db.execute(
             "CREATE INDEX IF NOT EXISTS idx_return_deadline ON products(return_deadline)"
         )
-
-        # Migration: Add marketplace column if it doesn't exist (for existing databases)
-        async with db.execute("PRAGMA table_info(products)") as cursor:
-            columns = await cursor.fetchall()
-            column_names = [col[1] for col in columns]
-            if "marketplace" not in column_names:
-                logger.info("Migrating database: adding marketplace column")
-                await db.execute(
-                    "ALTER TABLE products ADD COLUMN marketplace TEXT NOT NULL DEFAULT 'it'"
-                )
-            if "consecutive_failures" not in column_names:
-                logger.info("Migrating database: adding consecutive_failures column")
-                await db.execute(
-                    "ALTER TABLE products ADD COLUMN consecutive_failures INTEGER DEFAULT 0"
-                )
-            if "product_name" not in column_names:
-                logger.info("Migrating database: adding product_name column")
-                await db.execute("ALTER TABLE products ADD COLUMN product_name TEXT")
 
         await db.commit()
         logger.info(f"Database initialized at {DATABASE_PATH}")
