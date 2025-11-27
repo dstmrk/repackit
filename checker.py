@@ -102,15 +102,12 @@ def _should_notify(
     return True, savings
 
 
-async def _process_product_price_check(
-    product: dict, current_prices: dict
-) -> tuple[dict | None, dict | None]:
+async def _process_product_price_check(product: dict, current_prices: dict) -> dict | None:
     """
     Process a single product for price checking.
 
     Returns:
-        Tuple of (price_drop_notification, unavailable_notification)
-        Either can be None if no notification needed.
+        Price drop notification dict if price dropped, None otherwise
     """
     product_id = product["id"]
     user_id = product["user_id"]
@@ -121,32 +118,13 @@ async def _process_product_price_check(
     min_savings = product["min_savings_threshold"] or 0
     last_notified = product["last_notified_price"]
     marketplace = product.get("marketplace", "it")
-    consecutive_failures = product.get("consecutive_failures", 0)
 
     current_price = current_prices.get(product_id)
 
-    # Handle scraping failure
+    # Handle scraping failure - skip silently, retry next day
     if current_price is None:
-        new_failure_count = await database.increment_consecutive_failures(product_id)
-        logger.debug(
-            f"No price data for product {product_id} (ASIN: {asin}), "
-            f"consecutive failures: {new_failure_count}"
-        )
-
-        if new_failure_count == 3:
-            return None, {
-                "user_id": user_id,
-                "product_name": product_name,
-                "asin": asin,
-                "marketplace": marketplace,
-                "return_deadline": return_deadline,
-            }
-        return None, None
-
-    # Scraping succeeded - reset failures if needed
-    if consecutive_failures > 0:
-        await database.reset_consecutive_failures(product_id)
-        logger.debug(f"Product {product_id} scraped successfully, failures reset")
+        logger.debug(f"No price data for product {product_id} (ASIN: {asin}), skipping")
+        return None
 
     # Check if we should notify about price drop
     should_notify, savings = _should_notify(
@@ -164,9 +142,9 @@ async def _process_product_price_check(
             "price_paid": price_paid,
             "savings": savings,
             "return_deadline": return_deadline,
-        }, None
+        }
 
-    return None, None
+    return None
 
 
 async def _send_price_drop_notifications_batch(bot: Bot, notifications: list) -> dict:
@@ -221,50 +199,6 @@ async def _send_price_drop_notifications_batch(bot: Bot, notifications: list) ->
     return stats
 
 
-async def _send_notifications_in_batches(bot: Bot, notifications: list, notification_type: str):
-    """
-    Send unavailable product notifications in batches with rate limiting.
-
-    Args:
-        bot: Telegram Bot instance
-        notifications: List of notification dicts
-        notification_type: Type of notification (currently only "unavailable" supported)
-    """
-    stats = {"sent": 0, "errors": 0}
-
-    for i in range(0, len(notifications), NOTIFICATION_BATCH_SIZE):
-        batch = notifications[i : i + NOTIFICATION_BATCH_SIZE]
-
-        batch_results = await asyncio.gather(
-            *[
-                send_unavailable_notification(
-                    bot,
-                    notif["user_id"],
-                    notif["product_name"],
-                    notif["asin"],
-                    notif["marketplace"],
-                    notif["return_deadline"],
-                )
-                for notif in batch
-            ],
-            return_exceptions=True,
-        )
-
-        # Process results
-        for result in batch_results:
-            if isinstance(result, Exception):
-                logger.error(f"Error sending {notification_type} notification: {result}")
-                stats["errors"] += 1
-            else:
-                stats["sent"] += 1
-
-        # Rate limiting between batches
-        if i + NOTIFICATION_BATCH_SIZE < len(notifications):
-            await asyncio.sleep(DELAY_BETWEEN_BATCHES)
-
-    return stats
-
-
 async def check_and_notify() -> dict:
     """
     Check all active products for price drops and send notifications.
@@ -311,32 +245,18 @@ async def check_and_notify() -> dict:
 
         bot = Bot(token=TELEGRAM_TOKEN)
 
-        # Process each product and collect notifications
+        # Process each product and collect price drop notifications
         price_drop_notifications = []
-        unavailable_notifications = []
 
         for product in products:
-            price_drop, unavailable = await _process_product_price_check(product, current_prices)
+            price_drop = await _process_product_price_check(product, current_prices)
             if price_drop:
                 price_drop_notifications.append(price_drop)
-            if unavailable:
-                unavailable_notifications.append(unavailable)
 
         # Send price drop notifications
         logger.info(f"Found {len(price_drop_notifications)} price drop notifications to send")
         if price_drop_notifications:
             result_stats = await _send_price_drop_notifications_batch(bot, price_drop_notifications)
-            stats["notifications_sent"] += result_stats["sent"]
-            stats["errors"] += result_stats["errors"]
-
-        # Send unavailable product notifications
-        logger.info(
-            f"Found {len(unavailable_notifications)} unavailable product notifications to send"
-        )
-        if unavailable_notifications:
-            result_stats = await _send_notifications_in_batches(
-                bot, unavailable_notifications, "unavailable"
-            )
             stats["notifications_sent"] += result_stats["sent"]
             stats["errors"] += result_stats["errors"]
 
@@ -426,78 +346,6 @@ async def send_price_drop_notification(
         )
     except TelegramError as e:
         logger.error(f"Failed to send message to user {user_id}: {e}")
-        raise
-
-
-async def send_unavailable_notification(
-    bot: Bot,
-    user_id: int,
-    product_name: str | None,
-    asin: str,
-    marketplace: str,
-    return_deadline: date,
-) -> None:
-    """
-    Send notification about potentially unavailable product.
-
-    Args:
-        bot: Telegram Bot instance
-        user_id: Telegram user ID
-        product_name: User-defined product name (or None for legacy products)
-        asin: Amazon product ASIN
-        marketplace: Amazon marketplace (it, com, de, etc.)
-        return_deadline: Last day to return product
-
-    Raises:
-        TelegramError: If notification fails to send
-    """
-    # Build affiliate URL
-    product_url = build_affiliate_url(asin, marketplace)
-
-    # Calculate days remaining
-    today = date.today()
-    days_remaining = (return_deadline - today).days
-    deadline_str = return_deadline.strftime("%d/%m/%Y")
-
-    # Display product name or fallback
-    product_display = product_name or f"ASIN {asin}"
-
-    # Build message
-    message = (
-        "⚠️ *Prodotto non disponibile*\n\n"
-        f"📦 *{product_display}*\n\n"
-        "Non sono riuscito a recuperare il prezzo di questo prodotto "
-        "per 3 volte consecutive.\n\n"
-        "Il prodotto potrebbe essere:\n"
-        "• Temporaneamente non disponibile\n"
-        "• Rimosso da Amazon\n"
-        "• Bloccato geograficamente\n\n"
-        f"📅 Scadenza reso: {deadline_str}"
-    )
-
-    # Add days remaining info
-    if days_remaining > 0:
-        message += f" (tra {days_remaining} giorni)"
-    elif days_remaining == 0:
-        message += " (*oggi*)"
-    else:
-        message += " (*scaduto*)"
-
-    message += (
-        f"\n\n🔗 [Controlla il prodotto]({product_url})\n\n"
-        "_Continuerò a monitorarlo. Se il prezzo torna disponibile, riceverai una notifica._"
-    )
-
-    # Send message
-    try:
-        await bot.send_message(
-            chat_id=user_id,
-            text=message,
-            parse_mode="Markdown",
-            disable_web_page_preview=False,
-        )
-    except TelegramError as e:
-        logger.error(f"Failed to send unavailable notification to user {user_id}: {e}")
         raise
 
 
