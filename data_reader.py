@@ -197,18 +197,12 @@ async def _scrape_single_price(browser: Browser, asin: str, marketplace: str) ->
 
 def _parse_price(price_text: str) -> float | None:
     """
-    Parse price from text, handling various formats including thousands separators.
+    Parse price from text, supporting both Italian and English formats.
 
-    Examples:
-    - "€59,90" -> 59.90
-    - "59.90" -> 59.90
-    - "59,90 €" -> 59.90
-    - "$59.90" -> 59.90
-    - "1.999,99" (Italian: thousands.decimal) -> 1999.99
-    - "1,999.99" (English: thousands.decimal) -> 1999.99
+    Handles: "€59,90", "59.90", "1.999,99", "$1,999.99", price ranges.
 
     Args:
-        price_text: Raw price text from page
+        price_text: Raw price text from page (e.g., "€59,90" or "$59.90")
 
     Returns:
         Price as float or None if parsing fails
@@ -217,28 +211,24 @@ def _parse_price(price_text: str) -> float | None:
         # Remove currency symbols and whitespace
         cleaned = price_text.strip().replace("€", "").replace("$", "").replace(" ", "")
 
-        # Determine decimal separator by checking which appears last
-        # (decimal separator is always at the end, thousands in the middle)
+        # Auto-detect format: decimal separator is always rightmost
         last_comma = cleaned.rfind(",")
         last_dot = cleaned.rfind(".")
 
         if last_comma > last_dot:
-            # Format: "1.999,99" (Italian) - comma is decimal separator
+            # Italian format: "1.999,99" → remove dots, comma becomes decimal
             cleaned = cleaned.replace(".", "").replace(",", ".")
         elif last_dot > last_comma:
-            # Format: "1,999.99" (English) - dot is decimal separator
+            # English format: "1,999.99" → remove commas, dot is already decimal
             cleaned = cleaned.replace(",", "")
-        # else: no separators or only one type - handle normally
 
-        # Extract first number (handles cases like "59.90 - 69.90")
+        # Extract first number (handles ranges: "59.90 - 69.90")
         match = re.search(r"(\d+\.?\d*)", cleaned)
         if match:
             price = float(match.group(1))
-            # Sanity check: prices should be reasonable (0.01 to 999999)
             if 0.01 <= price <= 999999:
                 return price
             logger.warning(f"Price {price} out of reasonable range from '{price_text}'")
-            return None
 
         return None
     except (ValueError, AttributeError) as e:
