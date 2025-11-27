@@ -229,7 +229,7 @@ repackit/
 ├── tests/                  # Unit tests (91%+ coverage)
 │   └── handlers/          # Handler tests
 ├── data/                   # Persistent data (gitignored)
-│   ├── users.db           # SQLite database
+│   ├── repackit.db        # SQLite database
 │   └── logs/              # Rotating logs (3 days)
 ├── Dockerfile              # Multi-stage build
 ├── docker-compose.yml      # Production orchestration
@@ -289,7 +289,7 @@ BOT_PORT=8443
 HEALTH_PORT=8444
 
 # Database
-DATABASE_PATH=./data/users.db
+DATABASE_PATH=./data/repackit.db
 
 # Scheduler (24h format)
 SCRAPER_HOUR=9
@@ -323,7 +323,7 @@ LOG_LEVEL=INFO
 ### Database locked
 
 1. Assicurati che solo un'istanza del bot sia in esecuzione
-2. Verifica permessi file: `chmod 644 data/users.db`
+2. Verifica permessi file: `chmod 644 data/repackit.db`
 3. Considera WAL mode: `PRAGMA journal_mode=WAL;`
 
 ## Contributing

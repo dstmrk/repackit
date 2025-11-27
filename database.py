@@ -10,7 +10,7 @@ import aiosqlite
 logger = logging.getLogger(__name__)
 
 # Get database path from environment
-DATABASE_PATH = os.getenv("DATABASE_PATH", "./data/users.db")
+DATABASE_PATH = os.getenv("DATABASE_PATH", "./data/repackit.db")
 
 
 async def init_db() -> None:
