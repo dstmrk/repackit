@@ -107,7 +107,10 @@ def build_affiliate_url(asin: str, marketplace: str = "it") -> str:
 
 async def scrape_price(asin: str, marketplace: str = "it") -> float | None:
     """
-    Scrape current price from Amazon product page.
+    Scrape current price from Amazon product page (convenience wrapper for manual testing).
+
+    This is a thin wrapper around scrape_prices() for convenience when testing single products.
+    For production use with multiple products, use scrape_prices() directly for better performance.
 
     Args:
         asin: Amazon Standard Identification Number
@@ -117,60 +120,18 @@ async def scrape_price(asin: str, marketplace: str = "it") -> float | None:
         Current price as float (e.g., 59.90)
         None if price cannot be scraped
 
-    Note:
-        This function launches a new browser instance for each scrape.
-        For bulk scraping, use scrape_prices() instead.
+    Example:
+        >>> price = await scrape_price("B08N5WRWNW", "it")
+        >>> print(f"Price: €{price:.2f}")
     """
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        try:
-            price = await _retry_with_backoff(_scrape_single_price, browser, asin, marketplace)
-            return price
-        finally:
-            await browser.close()
+    # Create a fake product dict for scrape_prices()
+    fake_product = {"id": 0, "asin": asin, "marketplace": marketplace}
 
+    # Use scrape_prices with single product (benefits from shared browser, optimized logic)
+    results = await scrape_prices([fake_product])
 
-async def _retry_with_backoff(func, *args, **kwargs):
-    """
-    Retry a function with exponential backoff on failure.
-
-    Args:
-        func: Async function to retry
-        *args: Positional arguments for func
-        **kwargs: Keyword arguments for func
-
-    Returns:
-        Result from func if successful, None if all retries fail
-    """
-    delay = INITIAL_RETRY_DELAY
-
-    for attempt in range(MAX_RETRIES):
-        try:
-            result = await func(*args, **kwargs)
-            if result is not None:  # Success
-                return result
-
-            # Result was None, retry
-            if attempt < MAX_RETRIES - 1:
-                logger.debug(
-                    f"Attempt {attempt + 1}/{MAX_RETRIES} returned None, "
-                    f"retrying in {delay:.1f}s..."
-                )
-                await asyncio.sleep(delay)
-                delay *= BACKOFF_MULTIPLIER
-        except Exception as e:
-            if attempt < MAX_RETRIES - 1:
-                logger.warning(
-                    f"Attempt {attempt + 1}/{MAX_RETRIES} failed: {e}, "
-                    f"retrying in {delay:.1f}s..."
-                )
-                await asyncio.sleep(delay)
-                delay *= BACKOFF_MULTIPLIER
-            else:
-                logger.error(f"All {MAX_RETRIES} attempts failed for scraping")
-                raise
-
-    return None
+    # Return price or None
+    return results.get(0)
 
 
 async def _scrape_single_price(browser: Browser, asin: str, marketplace: str) -> float | None:
@@ -357,26 +318,114 @@ async def scrape_prices(products: list[dict], rate_limit_seconds: float = 1.5) -
 
 
 if __name__ == "__main__":
+    import sys
+
+    from dotenv import load_dotenv
+
+    import database
+
     # Setup logging for manual testing
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
-    # Test ASIN extraction
-    test_urls = [
-        "https://www.amazon.it/dp/B08N5WRWNW",
-        "https://amazon.it/gp/product/B08N5WRWNW/ref=something",
-        "https://www.amazon.it/Product-Name/dp/B08N5WRWNW/ref=sr_1_1",
-    ]
+    # Load environment variables
+    load_dotenv()
 
-    print("Testing ASIN extraction:")
-    for url in test_urls:
-        asin, marketplace = extract_asin(url)
-        print(f"  {url}")
-        print(f"    -> ASIN: {asin}, Marketplace: {marketplace}")
-        print(f"    -> Affiliate URL: {build_affiliate_url(asin, marketplace)}")
-        print()
+    async def main():
+        """Main function for manual testing and scraping."""
+        # Test ASIN extraction (always shown)
+        test_urls = [
+            "https://www.amazon.it/dp/B08N5WRWNW",
+            "https://amazon.it/gp/product/B08N5WRWNW/ref=something",
+            "https://www.amazon.it/Product-Name/dp/B08N5WRWNW/ref=sr_1_1",
+        ]
 
-    # Test price scraping (requires real network call)
-    print("Testing price scraping (requires internet):")
-    print("Run 'uv run python data_reader.py' to test live scraping")
+        print("=" * 70)
+        print("ASIN EXTRACTION TEST")
+        print("=" * 70)
+        for url in test_urls:
+            asin, marketplace = extract_asin(url)
+            print(f"\nURL: {url}")
+            print(f"  ASIN: {asin}")
+            print(f"  Marketplace: amazon.{marketplace}")
+            print(f"  Affiliate URL: {build_affiliate_url(asin, marketplace)}")
+
+        print("\n" + "=" * 70)
+
+        # Mode 1: Scrape single ASIN from command line
+        if len(sys.argv) > 1:
+            asin = sys.argv[1]
+            marketplace = sys.argv[2] if len(sys.argv) > 2 else "it"
+
+            print(f"SINGLE PRODUCT SCRAPE: {asin} (amazon.{marketplace})")
+            print("=" * 70)
+
+            price = await scrape_price(asin, marketplace)
+            if price:
+                print(f"✅ Price: €{price:.2f}")
+            else:
+                print("❌ Failed to scrape price")
+                print("\nPossible reasons:")
+                print("  - ASIN not found on amazon.{marketplace}")
+                print("  - Network error")
+                print("  - Amazon blocked the request")
+
+        # Mode 2: Scrape all products from database
+        else:
+            print("ALL PRODUCTS SCRAPE (from database)")
+            print("=" * 70)
+
+            # Initialize database
+            await database.init_db()
+
+            # Get all active products
+            products = await database.get_all_active_products()
+
+            if not products:
+                print("❌ No active products found in database")
+                print("\nTo scrape a single product, use:")
+                print("  python data_reader.py <ASIN> [marketplace]")
+                print("\nExamples:")
+                print("  python data_reader.py B08N5WRWNW")
+                print("  python data_reader.py B08N5WRWNW de")
+                return
+
+            print(f"Found {len(products)} active products\n")
+
+            # Scrape all prices
+            results = await scrape_prices(products)
+
+            # Show results
+            print("\n" + "=" * 70)
+            print("SCRAPING RESULTS")
+            print("=" * 70)
+
+            for product in products:
+                product_id = product["id"]
+                asin = product["asin"]
+                marketplace = product.get("marketplace", "it")
+                product_name = product.get("product_name") or f"ASIN {asin}"
+
+                price = results.get(product_id)
+
+                if price:
+                    print(f"\n✅ {product_name}")
+                    print(f"   ASIN: {asin} (amazon.{marketplace})")
+                    print(f"   Price: €{price:.2f}")
+                else:
+                    print(f"\n❌ {product_name}")
+                    print(f"   ASIN: {asin} (amazon.{marketplace})")
+                    print("   Failed to scrape")
+
+            # Summary
+            success_count = len(results)
+            total_count = len(products)
+            success_rate = (success_count / total_count * 100) if total_count > 0 else 0
+
+            print("\n" + "=" * 70)
+            print(f"Successfully scraped: {success_count}/{total_count} ({success_rate:.1f}%)")
+            print("=" * 70)
+
+    # Run async main
+    asyncio.run(main())
