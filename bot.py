@@ -29,12 +29,9 @@ load_dotenv()
 # Configure logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
-# Create logs directory if it doesn't exist
-os.makedirs("data/logs", exist_ok=True)
-
 # Setup rotating file handler (daily rotation, keep 2 backups + today = 3 days total)
 file_handler = TimedRotatingFileHandler(
-    filename="data/logs/bot.log",
+    filename="data/repackit.log",
     when="midnight",
     interval=1,
     backupCount=2,

@@ -208,7 +208,6 @@ __marimo__/
 
 # RepackIt specific
 data/
-logs/
 *.db
 *.db-shm
 *.db-wal

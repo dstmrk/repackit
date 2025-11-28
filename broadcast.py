@@ -28,7 +28,7 @@ load_dotenv()
 # Configure logging
 # Setup rotating file handler (daily rotation, keep 2 backups + today = 3 days total)
 file_handler = TimedRotatingFileHandler(
-    filename="data/logs/broadcast.log",
+    filename="data/broadcast.log",
     when="midnight",
     interval=1,
     backupCount=2,

@@ -56,7 +56,8 @@ repackit/
 │       └── ...
 ├── data/                     # Persistent data (mounted volume)
 │   ├── repackit.db
-│   └── logs/
+│   ├── repackit.log
+│   └── broadcast.log
 ├── .env                      # Environment variables (gitignored)
 ├── .env.example              # Template for .env
 ├── pyproject.toml            # uv dependencies + tool config
@@ -694,18 +695,16 @@ The `/feedback` command uses a conversational flow to collect user feedback with
 - Use `TimedRotatingFileHandler` with daily rotation
 - Keep only last 3 days of logs (today + 2 previous days)
 - Log format: `%(asctime)s - %(name)s - %(levelname)s - %(message)s`
-- Separate log files in `data/logs/`:
-  - `bot.log` - Main bot operations
-  - `scraper.log` - Scraping activities
-  - `checker.log` - Price checks
-  - `cleanup.log` - Cleanup operations
+- Log files stored directly in `data/`:
+  - `repackit.log` - Main bot operations (bot.py, scraper, checker, cleanup)
+  - `broadcast.log` - Broadcast script operations
 
 **Example Setup**:
 ```python
 from logging.handlers import TimedRotatingFileHandler
 
 handler = TimedRotatingFileHandler(
-    filename='data/logs/bot.log',
+    filename='data/repackit.log',
     when='midnight',
     interval=1,
     backupCount=2  # Keep today + 2 previous days
@@ -992,7 +991,7 @@ browser = await p.chromium.launch(
 ### Bot Not Receiving Messages
 1. Check `WEBHOOK_URL` is publicly accessible (HTTPS required)
 2. Verify webhook is set: `curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo`
-3. Check logs: `docker-compose logs -f` or `tail -f data/logs/bot.log`
+3. Check logs: `docker-compose logs -f` or `tail -f data/repackit.log`
 
 ### Scraping Failures
 1. Check if Amazon changed HTML structure (update selectors)
