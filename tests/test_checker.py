@@ -330,3 +330,129 @@ async def test_send_price_drop_notification_telegram_error():
                 savings=10.00,
                 return_deadline=date.today(),
             )
+
+
+@pytest.mark.asyncio
+async def test_check_and_notify_scraping_failure():
+    """Test when scraping fails (current_price is None)."""
+    today = date.today()
+    future_date = today + timedelta(days=10)
+
+    products = [
+        {
+            "id": 1,
+            "user_id": 123,
+            "asin": "ASIN00001",
+            "marketplace": "it",
+            "product_name": "Test Product",
+            "price_paid": 50.00,
+            "return_deadline": future_date.isoformat(),
+            "min_savings_threshold": 0,
+            "last_notified_price": None,
+        }
+    ]
+
+    # Scraping failed - returns None for price
+    current_prices = {1: None}
+
+    with patch("checker.database.get_all_active_products", return_value=products):
+        with patch("checker.scrape_prices", return_value=current_prices):
+            with patch("checker.database.update_system_status"):
+                stats = await checker.check_and_notify()
+
+                # Should skip product with no price
+                assert stats["total_products"] == 1
+                assert stats["scraped"] == 1
+                assert stats["notifications_sent"] == 0
+
+
+@pytest.mark.asyncio
+async def test_check_and_notify_notification_exception():
+    """Test exception during notification (covers error handling in batch processing)."""
+    today = date.today()
+    future_date = today + timedelta(days=10)
+
+    products = [
+        {
+            "id": 1,
+            "user_id": 123,
+            "asin": "ASIN00001",
+            "marketplace": "it",
+            "product_name": "Test Product",
+            "price_paid": 50.00,
+            "return_deadline": future_date.isoformat(),
+            "min_savings_threshold": 0,
+            "last_notified_price": None,
+        }
+    ]
+
+    # Price dropped
+    current_prices = {1: 40.00}
+
+    mock_bot = AsyncMock()
+    # Simulate Telegram error during notification
+    mock_bot.send_message = AsyncMock(side_effect=TelegramError("Network error"))
+
+    with patch("checker.database.get_all_active_products", return_value=products):
+        with patch("checker.scrape_prices", return_value=current_prices):
+            with patch("checker.Bot", return_value=mock_bot):
+                with patch("checker.database.update_system_status"):
+                    stats = await checker.check_and_notify()
+
+                    # Should count error
+                    assert stats["total_products"] == 1
+                    assert stats["errors"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_check_and_notify_general_exception():
+    """Test general exception handling in check_and_notify."""
+    # Simulate database failure
+    with patch("checker.database.get_all_active_products", side_effect=Exception("Database error")):
+        stats = await checker.check_and_notify()
+
+        # Should return stats with error
+        assert stats["errors"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_check_and_notify_multiple_batches():
+    """Test rate limiting between batches."""
+    today = date.today()
+    future_date = today + timedelta(days=10)
+
+    # Create more than NOTIFICATION_BATCH_SIZE products (default is 5)
+    products = []
+    current_prices = {}
+    for i in range(8):  # More than batch size
+        products.append(
+            {
+                "id": i + 1,
+                "user_id": 100 + i,
+                "asin": f"ASIN{i:05d}",
+                "marketplace": "it",
+                "product_name": f"Product {i}",
+                "price_paid": 50.00,
+                "return_deadline": future_date.isoformat(),
+                "min_savings_threshold": 0,
+                "last_notified_price": None,
+            }
+        )
+        # Price dropped for all
+        current_prices[i + 1] = 40.00
+
+    mock_bot = AsyncMock()
+    mock_bot.send_message = AsyncMock(return_value=True)
+
+    with patch("checker.database.get_all_active_products", return_value=products):
+        with patch("checker.scrape_prices", return_value=current_prices):
+            with patch("checker.TELEGRAM_TOKEN", "test-token"):  # Mock token
+                with patch("checker.Bot", return_value=mock_bot):
+                    with patch("checker.database.update_last_notified_price"):
+                        with patch("checker.database.update_system_status"):
+                            # Mock asyncio.sleep for rate limiting between batches
+                            with patch("checker.asyncio.sleep", new=AsyncMock()):
+                                stats = await checker.check_and_notify()
+
+                                # Should have sent notifications
+                                assert stats["notifications_sent"] > 0

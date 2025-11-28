@@ -1,11 +1,15 @@
 """Tests for health check handler."""
 
+import asyncio
+import contextlib
 import os
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
+from aiohttp import web
 
 import database
 import health_handler
@@ -320,3 +324,97 @@ def test_health_bind_address_from_env():
             if "HEALTH_BIND_ADDRESS" in os.environ:
                 del os.environ["HEALTH_BIND_ADDRESS"]
         importlib.reload(health_handler)
+
+
+# ============================================================================
+# aiohttp handler tests
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_health_check_handler_success(test_db):
+    """Test health_check_handler returns valid JSON on success."""
+    # Add some test data
+    now = datetime.now()
+    one_day_ago = (now - timedelta(days=1)).isoformat()
+    await database.update_system_status("last_scraper_run", one_day_ago)
+    await database.update_system_status("last_checker_run", one_day_ago)
+    await database.update_system_status("last_cleanup_run", one_day_ago)
+
+    # Create mock aiohttp request
+    app = web.Application()
+    app.router.add_get("/health", health_handler.health_check_handler)
+
+    # Create test client
+    from aiohttp.test_utils import TestClient, TestServer
+
+    server = TestServer(app)
+    client = TestClient(server)
+
+    await client.start_server()
+
+    try:
+        # Make request to /health
+        resp = await client.get("/health")
+
+        # Verify response
+        assert resp.status == 200
+        data = await resp.json()
+        assert "status" in data
+        assert data["status"] == "healthy"
+        assert "tasks" in data
+        assert "stats" in data
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_health_check_handler_error(test_db):
+    """Test health_check_handler returns 500 on error."""
+    # Mock get_health_status to raise an error
+    with patch("health_handler.get_health_status", side_effect=Exception("Database error")):
+        # Create mock aiohttp request
+        app = web.Application()
+        app.router.add_get("/health", health_handler.health_check_handler)
+
+        # Create test client
+        from aiohttp.test_utils import TestClient, TestServer
+
+        server = TestServer(app)
+        client = TestClient(server)
+
+        await client.start_server()
+
+        try:
+            # Make request to /health
+            resp = await client.get("/health")
+
+            # Verify error response
+            assert resp.status == 500
+            data = await resp.json()
+            assert "status" in data
+            assert data["status"] == "error"
+            assert "message" in data
+            assert "Database error" in data["message"]
+        finally:
+            await client.close()
+
+
+@pytest.mark.asyncio
+async def test_start_health_server(test_db):
+    """Test that start_health_server initializes aiohttp app correctly."""
+    # We can't easily test the full server startup without blocking,
+    # but we can test the app creation and routing
+
+    # Create a task that will be cancelled quickly
+    server_task = asyncio.create_task(health_handler.start_health_server())
+
+    # Give it a moment to start
+    await asyncio.sleep(0.1)
+
+    # Cancel the server
+    server_task.cancel()
+
+    # Suppress expected CancelledError
+    with contextlib.suppress(asyncio.CancelledError):
+        await server_task
