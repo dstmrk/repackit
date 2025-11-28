@@ -235,22 +235,34 @@ async def test_health_status_just_over_threshold(test_db):
 
 @pytest.mark.asyncio
 async def test_health_status_includes_timestamp(test_db):
-    """Test that health status includes current timestamp."""
+    """Test that health status includes current timestamp in yyyy-mm-dd hh:mm:ss format."""
     health = await health_handler.get_health_status()
 
     assert "timestamp" in health
-    # Verify it's a valid ISO timestamp
-    timestamp = datetime.fromisoformat(health["timestamp"])
+    # Verify it's in the format yyyy-mm-dd hh:mm:ss
+    timestamp = datetime.strptime(health["timestamp"], "%Y-%m-%d %H:%M:%S")
     assert isinstance(timestamp, datetime)
 
 
 @pytest.mark.asyncio
-async def test_health_status_includes_thresholds(test_db):
-    """Test that health status includes threshold information."""
+async def test_health_status_task_timestamps_formatted(test_db):
+    """Test that task timestamps are formatted as yyyy-mm-dd hh:mm:ss."""
+    now = datetime.now()
+    one_day_ago = (now - timedelta(days=1)).isoformat()
+
+    # Set all tasks as recently run
+    await database.update_system_status("last_scraper_run", one_day_ago)
+    await database.update_system_status("last_checker_run", one_day_ago)
+    await database.update_system_status("last_cleanup_run", one_day_ago)
+
     health = await health_handler.get_health_status()
 
-    assert "thresholds" in health
-    assert health["thresholds"]["max_days_since_last_run"] == 2
+    # Verify each task's last_run timestamp is in the correct format
+    for task_name in ["scraper", "checker", "cleanup"]:
+        last_run = health["tasks"][task_name]["last_run"]
+        # This will raise ValueError if format is wrong
+        timestamp = datetime.strptime(last_run, "%Y-%m-%d %H:%M:%S")
+        assert isinstance(timestamp, datetime)
 
 
 @pytest.mark.asyncio

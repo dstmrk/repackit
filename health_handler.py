@@ -20,6 +20,19 @@ HEALTH_BIND_ADDRESS = os.getenv("HEALTH_BIND_ADDRESS", "0.0.0.0")
 MAX_DAYS_SINCE_LAST_RUN = 2  # Consider stale if task hasn't run in 2 days
 
 
+def _format_datetime(dt: datetime) -> str:
+    """
+    Format datetime to yyyy-mm-dd hh:mm:ss format.
+
+    Args:
+        dt: Datetime object to format
+
+    Returns:
+        Formatted string
+    """
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+
 def _check_task_health(
     task_name: str, system_status: dict, threshold: datetime
 ) -> tuple[dict, bool]:
@@ -50,7 +63,7 @@ def _check_task_health(
         is_healthy = last_run >= threshold
         status_dict = {
             "status": "ok" if is_healthy else "stale",
-            "last_run": last_run_str,
+            "last_run": _format_datetime(last_run),
         }
         return status_dict, is_healthy
 
@@ -88,16 +101,13 @@ async def get_health_status() -> dict:
 
     return {
         "status": "healthy" if all_healthy else "unhealthy",
-        "timestamp": now.isoformat(),
+        "timestamp": _format_datetime(now),
         "stats": {
             "users": stats["user_count"],
             "products_total": stats["product_count"],
             "products_active": stats["active_product_count"],
         },
         "tasks": tasks,
-        "thresholds": {
-            "max_days_since_last_run": MAX_DAYS_SINCE_LAST_RUN,
-        },
     }
 
 
