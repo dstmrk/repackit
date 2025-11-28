@@ -90,7 +90,7 @@ async def test_get_stats_empty(test_db):
     stats = await database.get_stats()
     assert stats["user_count"] == 0
     assert stats["product_count"] == 0
-    assert stats["active_product_count"] == 0
+    assert stats["unique_product_count"] == 0
 
 
 @pytest.mark.asyncio
@@ -102,18 +102,50 @@ async def test_get_stats_with_data(test_db):
     await database.add_user(111, "it")
     await database.add_user(222, "en")
 
-    # Add products
+    # Add products (all different ASINs)
     future_date = date.today() + timedelta(days=10)
-    past_date = date.today() - timedelta(days=1)
 
-    await database.add_product(111, "Active 1", "ACTIVE01", "it", 50.0, future_date)
-    await database.add_product(111, "Active 2", "ACTIVE02", "it", 60.0, future_date)
-    await database.add_product(222, "Expired", "EXPIRED1", "it", 70.0, past_date)
+    await database.add_product(111, "Product 1", "ASIN001", "it", 50.0, future_date)
+    await database.add_product(111, "Product 2", "ASIN002", "it", 60.0, future_date)
+    await database.add_product(222, "Product 3", "ASIN003", "it", 70.0, future_date)
 
     stats = await database.get_stats()
     assert stats["user_count"] == 2
     assert stats["product_count"] == 3
-    assert stats["active_product_count"] == 2  # Only non-expired
+    assert stats["unique_product_count"] == 3  # All different ASINs
+
+
+@pytest.mark.asyncio
+async def test_get_stats_deduplication(test_db):
+    """Test that unique_product_count correctly deduplicates by (asin, marketplace)."""
+    from datetime import date
+
+    # Add users
+    await database.add_user(111, "it")
+    await database.add_user(222, "it")
+    await database.add_user(333, "en")
+
+    future_date = date.today() + timedelta(days=10)
+
+    # Add products with duplicates
+    # Same ASIN, same marketplace (should count as 1 unique)
+    await database.add_product(111, "iPhone 15 User1", "ASIN001", "it", 50.0, future_date)
+    await database.add_product(222, "iPhone 15 User2", "ASIN001", "it", 55.0, future_date)
+    await database.add_product(333, "iPhone 15 User3", "ASIN001", "it", 60.0, future_date)
+
+    # Same ASIN, different marketplace (should count as separate unique)
+    await database.add_product(111, "iPhone 15 DE", "ASIN001", "de", 65.0, future_date)
+
+    # Different ASIN (should count as separate unique)
+    await database.add_product(222, "MacBook", "ASIN002", "it", 1000.0, future_date)
+
+    stats = await database.get_stats()
+    assert stats["user_count"] == 3
+    assert stats["product_count"] == 5  # Total 5 products
+    assert stats["unique_product_count"] == 3  # Only 3 unique (asin, marketplace) pairs:
+    # 1. (ASIN001, it)
+    # 2. (ASIN001, de)
+    # 3. (ASIN002, it)
 
 
 # ============================================================================
@@ -195,7 +227,7 @@ async def test_health_status_includes_stats(test_db):
     assert "stats" in health
     assert health["stats"]["users"] == 2
     assert health["stats"]["products_total"] == 1
-    assert health["stats"]["products_active"] == 1
+    assert health["stats"]["products_unique"] == 1
 
 
 @pytest.mark.asyncio

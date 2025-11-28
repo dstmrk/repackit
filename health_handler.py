@@ -105,7 +105,7 @@ async def get_health_status() -> dict:
         "stats": {
             "users": stats["user_count"],
             "products_total": stats["product_count"],
-            "products_active": stats["active_product_count"],
+            "products_unique": stats["unique_product_count"],
         },
         "tasks": tasks,
     }
