@@ -1,10 +1,11 @@
 services:
   repackit:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # Use pre-built image from GHCR (production)
+    # For local development, override with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+    image: ghcr.io/dstmrk/repackit:latest
     container_name: repackit
     restart: unless-stopped
+    pull_policy: always  # Always pull latest image when running
 
     # Port mapping
     ports:

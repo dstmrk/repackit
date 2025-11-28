@@ -4,6 +4,8 @@
 [![Unit Tests](https://github.com/dstmrk/repackit/actions/workflows/test.yml/badge.svg)](https://github.com/dstmrk/repackit/actions/workflows/test.yml)
 [![Lint](https://github.com/dstmrk/repackit/actions/workflows/lint.yml/badge.svg)](https://github.com/dstmrk/repackit/actions/workflows/lint.yml)
 [![Docker Build](https://github.com/dstmrk/repackit/actions/workflows/docker.yml/badge.svg)](https://github.com/dstmrk/repackit/actions/workflows/docker.yml)
+[![Docker Publish](https://github.com/dstmrk/repackit/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/dstmrk/repackit/actions/workflows/docker-publish.yml)
+[![Docker Image Version](https://ghcr-badge.egpl.dev/dstmrk/repackit/latest_tag?trim=major&label=latest)](https://github.com/dstmrk/repackit/pkgs/container/repackit)
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=dstmrk_repackit&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=dstmrk_repackit)
 [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=dstmrk_repackit&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=dstmrk_repackit)
@@ -79,14 +81,15 @@ uv run python bot.py
 
 ## Deployment con Docker (Produzione)
 
-### Quick Start
+### Quick Start (Immagine Pre-Built da GHCR)
 
 ```bash
 # 1. Configura .env
 cp .env.example .env
 vim .env  # Inserisci le tue credenziali
 
-# 2. Build e avvia con docker-compose
+# 2. Avvia con docker-compose (usa immagine da GHCR)
+docker-compose pull  # Scarica ultima versione
 docker-compose up -d
 
 # 3. Verifica i logs
@@ -94,6 +97,42 @@ docker-compose logs -f
 
 # 4. Controlla health status
 curl http://localhost:8444/health
+
+# 5. Aggiorna a nuova versione
+docker-compose pull
+docker-compose up -d
+```
+
+### Build Locale (Sviluppo)
+
+Per sviluppare localmente e fare build dell'immagine:
+
+```bash
+# Usa il file di override per build locale
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+# Oppure crea un alias per comodità
+alias dc-dev='docker-compose -f docker-compose.yml -f docker-compose.dev.yml'
+dc-dev up -d
+```
+
+### Pubblicazione Nuova Versione
+
+Il workflow GitHub pubblica automaticamente nuove immagini su GHCR quando viene creato un tag:
+
+```bash
+# 1. Crea un nuovo tag (semantic versioning)
+git tag v1.0.0
+git push origin v1.0.0
+
+# 2. Il workflow GitHub Actions:
+#    - Builda l'immagine Docker
+#    - La pubblica su ghcr.io/dstmrk/repackit:v1.0.0
+#    - La tagga anche come :latest
+
+# 3. Gli utenti possono aggiornare con:
+docker-compose pull
+docker-compose up -d
 ```
 
 ## Comandi Bot
