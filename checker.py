@@ -184,6 +184,8 @@ async def _send_price_drop_notifications_batch(bot: Bot, notifications: list) ->
                 await database.update_last_notified_price(
                     notif["product_id"], notif["current_price"]
                 )
+                # Increment promotional metric: total savings generated
+                await database.increment_metric("total_savings_generated", notif["savings"])
                 stats["sent"] += 1
                 logger.info(
                     f"Notification sent to user {notif['user_id']} for product "

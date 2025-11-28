@@ -412,3 +412,108 @@ async def test_get_all_feedback_empty(test_db):
     """Test getting feedback when none exists."""
     all_feedback = await database.get_all_feedback()
     assert all_feedback == []
+
+
+# ============================================================================
+# System status and metrics operation tests
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_increment_metric_creates_new_key(test_db):
+    """Test incrementing a metric that doesn't exist yet."""
+    # Increment by default amount (1.0)
+    await database.increment_metric("test_counter")
+
+    value = await database.get_metric("test_counter")
+    assert value == 1.0
+
+
+@pytest.mark.asyncio
+async def test_increment_metric_with_custom_amount(test_db):
+    """Test incrementing a metric with custom amount."""
+    # Increment by 5.5
+    await database.increment_metric("test_counter", 5.5)
+
+    value = await database.get_metric("test_counter")
+    assert value == 5.5
+
+
+@pytest.mark.asyncio
+async def test_increment_metric_multiple_times(test_db):
+    """Test incrementing a metric multiple times."""
+    await database.increment_metric("test_counter", 10.0)
+    await database.increment_metric("test_counter", 5.0)
+    await database.increment_metric("test_counter", 2.5)
+
+    value = await database.get_metric("test_counter")
+    assert value == 17.5
+
+
+@pytest.mark.asyncio
+async def test_increment_metric_products_total_count(test_db):
+    """Test incrementing products_total_count metric (promotional metric)."""
+    # Simulate adding 3 products
+    await database.increment_metric("products_total_count")
+    await database.increment_metric("products_total_count")
+    await database.increment_metric("products_total_count")
+
+    value = await database.get_metric("products_total_count")
+    assert value == 3.0
+
+
+@pytest.mark.asyncio
+async def test_increment_metric_total_savings_generated(test_db):
+    """Test incrementing total_savings_generated metric (promotional metric)."""
+    # Simulate 3 notifications with different savings
+    await database.increment_metric("total_savings_generated", 10.50)
+    await database.increment_metric("total_savings_generated", 5.25)
+    await database.increment_metric("total_savings_generated", 15.00)
+
+    value = await database.get_metric("total_savings_generated")
+    assert value == 30.75
+
+
+@pytest.mark.asyncio
+async def test_get_metric_nonexistent(test_db):
+    """Test getting a metric that doesn't exist returns 0.0."""
+    value = await database.get_metric("nonexistent_metric")
+    assert value == 0.0
+
+
+@pytest.mark.asyncio
+async def test_get_stats_includes_promotional_metrics(test_db):
+    """Test that get_stats includes promotional metrics."""
+    # Add some test data
+    await database.add_user(123456, "it")
+    deadline = date.today() + timedelta(days=30)
+    await database.add_product(123456, "Test Product", "B08N5WRWNW", "it", 59.90, deadline)
+
+    # Increment promotional metrics
+    await database.increment_metric("products_total_count", 5.0)
+    await database.increment_metric("total_savings_generated", 25.50)
+
+    # Get stats
+    stats = await database.get_stats()
+
+    # Check standard fields
+    assert stats["user_count"] == 1
+    assert stats["product_count"] == 1
+    assert stats["unique_product_count"] == 1
+
+    # Check promotional metrics
+    assert stats["products_total_count"] == 5
+    assert stats["total_savings_generated"] == 25.50
+
+
+@pytest.mark.asyncio
+async def test_get_stats_promotional_metrics_default_zero(test_db):
+    """Test that promotional metrics default to 0 when not set."""
+    # Add user but don't increment metrics
+    await database.add_user(123456, "it")
+
+    stats = await database.get_stats()
+
+    # Promotional metrics should be 0
+    assert stats["products_total_count"] == 0
+    assert stats["total_savings_generated"] == 0.0

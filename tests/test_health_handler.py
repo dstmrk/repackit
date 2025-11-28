@@ -222,12 +222,19 @@ async def test_health_status_includes_stats(test_db):
     future_date = date.today() + timedelta(days=10)
     await database.add_product(111, "Active Product", "ACTIVE01", "it", 50.0, future_date)
 
+    # Add promotional metrics
+    await database.increment_metric("products_total_count", 10.0)
+    await database.increment_metric("total_savings_generated", 125.50)
+
     health = await health_handler.get_health_status()
 
     assert "stats" in health
     assert health["stats"]["users"] == 2
     assert health["stats"]["products_total"] == 1
     assert health["stats"]["products_unique"] == 1
+    # Check promotional metrics
+    assert health["stats"]["products_total_count"] == 10
+    assert health["stats"]["total_savings_generated"] == 125.50
 
 
 @pytest.mark.asyncio

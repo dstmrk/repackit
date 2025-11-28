@@ -151,13 +151,16 @@ async def test_check_and_notify_success():
             with patch("checker.scrape_prices", return_value=current_prices):
                 with patch("checker.Bot", return_value=mock_bot):
                     with patch("checker.database.update_last_notified_price") as mock_update_price:
-                        with patch("checker.database.update_system_status"):
-                            stats = await checker.check_and_notify()
+                        with patch("checker.database.increment_metric") as mock_increment:
+                            with patch("checker.database.update_system_status"):
+                                stats = await checker.check_and_notify()
 
     assert stats["notifications_sent"] == 1
     assert stats["errors"] == 0
     mock_bot.send_message.assert_called_once()
     mock_update_price.assert_called_once_with(1, 35.00)
+    # Verify that total_savings_generated was incremented
+    mock_increment.assert_called_once_with("total_savings_generated", 15.00)
 
 
 @pytest.mark.asyncio
@@ -449,10 +452,11 @@ async def test_check_and_notify_multiple_batches():
             with patch("checker.TELEGRAM_TOKEN", "test-token"):  # Mock token
                 with patch("checker.Bot", return_value=mock_bot):
                     with patch("checker.database.update_last_notified_price"):
-                        with patch("checker.database.update_system_status"):
-                            # Mock asyncio.sleep for rate limiting between batches
-                            with patch("checker.asyncio.sleep", new=AsyncMock()):
-                                stats = await checker.check_and_notify()
+                        with patch("checker.database.increment_metric"):
+                            with patch("checker.database.update_system_status"):
+                                # Mock asyncio.sleep for rate limiting between batches
+                                with patch("checker.asyncio.sleep", new=AsyncMock()):
+                                    stats = await checker.check_and_notify()
 
-                                # Should have sent notifications
-                                assert stats["notifications_sent"] > 0
+                                    # Should have sent notifications
+                                    assert stats["notifications_sent"] > 0

@@ -508,17 +508,74 @@ async def get_all_system_status() -> dict[str, dict]:
             return {row["key"]: dict(row) for row in rows}
 
 
+async def increment_metric(key: str, amount: float = 1.0) -> None:
+    """
+    Increment a metric counter in system_status.
+
+    If the key doesn't exist, it will be created with the initial value.
+    If it exists, the amount will be added to the current value.
+
+    Args:
+        key: Metric key (e.g., "products_total_count", "total_savings_generated")
+        amount: Amount to increment by (default: 1.0)
+    """
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        # Get current value
+        async with db.execute("SELECT value FROM system_status WHERE key = ?", (key,)) as cursor:
+            row = await cursor.fetchone()
+            current_value = float(row[0]) if row else 0.0
+
+        # Increment and update
+        new_value = current_value + amount
+
+        await db.execute(
+            """
+            INSERT INTO system_status (key, value, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (key, str(new_value)),
+        )
+        await db.commit()
+        logger.debug(f"Metric incremented: {key} += {amount} (new value: {new_value})")
+
+
+async def get_metric(key: str) -> float:
+    """
+    Get a metric counter value from system_status.
+
+    Args:
+        key: Metric key (e.g., "products_total_count", "total_savings_generated")
+
+    Returns:
+        Metric value as float, or 0.0 if key doesn't exist
+    """
+    status = await get_system_status(key)
+    if status is None:
+        return 0.0
+    try:
+        return float(status["value"])
+    except (ValueError, TypeError):
+        logger.warning(f"Invalid metric value for {key}: {status['value']}")
+        return 0.0
+
+
 async def get_stats() -> dict:
     """
     Get database statistics for health check.
 
     Returns:
-        Dict with keys: user_count, product_count, unique_product_count
+        Dict with keys: user_count, product_count, unique_product_count,
+        products_total_count, total_savings_generated
 
         - product_count: Total products in database (includes duplicates)
         - unique_product_count: Unique products by (asin, marketplace) pair
           This reflects how many products the scraper actually processes,
           since duplicate ASINs are deduplicated during scraping.
+        - products_total_count: Total products registered since beginning (promotional metric)
+        - total_savings_generated: Total € savings notified to users (promotional metric)
     """
     async with aiosqlite.connect(DATABASE_PATH) as db:
         # Count users
@@ -536,8 +593,14 @@ async def get_stats() -> dict:
         ) as cursor:
             unique_product_count = (await cursor.fetchone())[0]
 
+    # Get promotional metrics from system_status
+    products_total_count = await get_metric("products_total_count")
+    total_savings_generated = await get_metric("total_savings_generated")
+
     return {
         "user_count": user_count,
         "product_count": product_count,
         "unique_product_count": unique_product_count,
+        "products_total_count": int(products_total_count),
+        "total_savings_generated": round(total_savings_generated, 2),
     }
