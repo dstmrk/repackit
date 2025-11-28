@@ -382,3 +382,53 @@ async def test_scrape_prices_deduplication_different_marketplaces():
             assert results[1] == 100.00  # it marketplace
             assert results[2] == 120.00  # de marketplace
             assert results[3] == 100.00  # it marketplace (duplicate)
+
+
+# ============================================================================
+# scrape_price() wrapper tests
+# ============================================================================
+
+
+async def test_scrape_price_success():
+    """Test scrape_price() wrapper calls scrape_prices() correctly."""
+    with patch("data_reader.scrape_prices") as mock_scrape_prices:
+        # Mock scrape_prices to return a price for product id 0
+        mock_scrape_prices.return_value = {0: 99.99}
+
+        price = await data_reader.scrape_price("B08N5WRWNW", "it")
+
+        # Verify scrape_prices was called with correct fake product
+        mock_scrape_prices.assert_called_once()
+        call_args = mock_scrape_prices.call_args[0][0]
+        assert len(call_args) == 1
+        assert call_args[0]["id"] == 0
+        assert call_args[0]["asin"] == "B08N5WRWNW"
+        assert call_args[0]["marketplace"] == "it"
+
+        # Verify correct price returned
+        assert price == 99.99
+
+
+async def test_scrape_price_failure():
+    """Test scrape_price() returns None when scraping fails."""
+    with patch("data_reader.scrape_prices") as mock_scrape_prices:
+        # Mock scrape_prices to return empty dict (scraping failed)
+        mock_scrape_prices.return_value = {}
+
+        price = await data_reader.scrape_price("B08N5WRWNW", "it")
+
+        # Verify None returned
+        assert price is None
+
+
+async def test_scrape_price_custom_marketplace():
+    """Test scrape_price() with custom marketplace."""
+    with patch("data_reader.scrape_prices") as mock_scrape_prices:
+        mock_scrape_prices.return_value = {0: 199.99}
+
+        price = await data_reader.scrape_price("B08XYZ1234", "de")
+
+        # Verify marketplace passed correctly
+        call_args = mock_scrape_prices.call_args[0][0]
+        assert call_args[0]["marketplace"] == "de"
+        assert price == 199.99

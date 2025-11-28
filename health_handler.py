@@ -1,12 +1,11 @@
-"""Health check HTTP server for monitoring."""
+"""Health check HTTP server for monitoring using aiohttp."""
 
 import asyncio
-import json
 import logging
 import os
 from datetime import UTC, datetime, timedelta
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from threading import Thread
+
+from aiohttp import web
 
 import database
 
@@ -19,44 +18,6 @@ HEALTH_BIND_ADDRESS = os.getenv("HEALTH_BIND_ADDRESS", "0.0.0.0")
 
 # Health check thresholds
 MAX_DAYS_SINCE_LAST_RUN = 2  # Consider stale if task hasn't run in 2 days
-
-
-class HealthCheckHandler(BaseHTTPRequestHandler):
-    """HTTP request handler for health checks."""
-
-    def do_GET(self):
-        """Handle GET requests."""
-        if self.path == "/health":
-            self.handle_health_check()
-        else:
-            self.send_error(404, "Not Found")
-
-    def handle_health_check(self):
-        """Handle health check endpoint."""
-        try:
-            # Create new event loop for this thread (HTTP server runs in daemon thread)
-            # We can't use asyncio.run() because it conflicts with the bot's event loop
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                health_data = loop.run_until_complete(get_health_status())
-            finally:
-                loop.close()
-
-            # Send response
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps(health_data, indent=2).encode())
-
-        except Exception as e:
-            logger.error(f"Health check error: {e}", exc_info=True)
-            self.send_error(500, f"Internal Server Error: {str(e)}")
-
-    def log_message(self, format, *args):
-        """Override to use custom logger."""
-        message = format % args
-        logger.info(f"{self.address_string()} - {message}")
 
 
 def _check_task_health(
@@ -140,9 +101,27 @@ async def get_health_status() -> dict:
     }
 
 
-def run_server():
+async def health_check_handler(request: web.Request) -> web.Response:
     """
-    Run health check HTTP server.
+    Handle GET /health requests.
+
+    Args:
+        request: aiohttp Request object
+
+    Returns:
+        JSON response with health status
+    """
+    try:
+        health_data = await get_health_status()
+        return web.json_response(health_data)
+    except Exception as e:
+        logger.error(f"Health check error: {e}", exc_info=True)
+        return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+
+async def start_health_server():
+    """
+    Start aiohttp health check server.
 
     Security Note:
     This server uses HTTP (not HTTPS) intentionally for internal health checks.
@@ -166,21 +145,24 @@ def run_server():
         - 0.0.0.0 = All interfaces (required for Docker/Kubernetes)
         - 127.0.0.1 = Localhost only (for reverse proxy setups)
     """
-    # SECURITY: HTTP is used for internal health checks. HTTPS should be handled
-    # by reverse proxy/load balancer in production. See docstring for details.
-    server = HTTPServer((HEALTH_BIND_ADDRESS, HEALTH_PORT), HealthCheckHandler)
+    # Create aiohttp application
+    app = web.Application()
+    app.router.add_get("/health", health_check_handler)
+
+    # Setup and start server
+    runner = web.AppRunner(app)
+    await runner.setup()
+
+    site = web.TCPSite(runner, HEALTH_BIND_ADDRESS, HEALTH_PORT)
+    await site.start()
+
     logger.info(
         f"Health check server running on {HEALTH_BIND_ADDRESS}:{HEALTH_PORT} "
         f"(HTTP - HTTPS should be handled by reverse proxy)"
     )
-    server.serve_forever()
 
-
-def start_health_server():
-    """Start health check server in background thread."""
-    thread = Thread(target=run_server, daemon=True)
-    thread.start()
-    logger.info("Health check server started in background")
+    # Keep server running forever
+    await asyncio.Event().wait()
 
 
 if __name__ == "__main__":
@@ -190,8 +172,13 @@ if __name__ == "__main__":
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    # Initialize database
-    asyncio.run(database.init_db())
+    async def main():
+        """Main function for standalone execution."""
+        # Initialize database
+        await database.init_db()
 
-    # Run server
-    run_server()
+        # Start server
+        await start_health_server()
+
+    # Run async main
+    asyncio.run(main())

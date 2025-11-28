@@ -128,6 +128,64 @@ async def test_get_all_users(test_db):
     assert {u["user_id"] for u in users} == {111, 222, 333}
 
 
+@pytest.mark.asyncio
+async def test_get_user_product_limit_nonexistent_user(test_db):
+    """Test getting product limit for user that doesn't exist."""
+    # Should return INITIAL_MAX_PRODUCTS (5) for non-existent users
+    limit = await database.get_user_product_limit(999999)
+    assert limit == database.INITIAL_MAX_PRODUCTS
+
+
+@pytest.mark.asyncio
+async def test_get_user_product_limit_null_max_products(test_db):
+    """Test getting product limit for user with NULL max_products (admin/VIP)."""
+    # Add user without setting max_products (defaults to NULL)
+    await database.add_user(111, "it")
+
+    # NULL should return DEFAULT_MAX_PRODUCTS (21)
+    limit = await database.get_user_product_limit(111)
+    assert limit == database.DEFAULT_MAX_PRODUCTS
+
+
+@pytest.mark.asyncio
+async def test_get_user_product_limit_with_custom_limit(test_db):
+    """Test getting product limit for user with custom limit."""
+    # Add user and set custom limit
+    await database.add_user(111, "it")
+    await database.set_user_max_products(111, 10)
+
+    # Should return the custom limit
+    limit = await database.get_user_product_limit(111)
+    assert limit == 10
+
+
+@pytest.mark.asyncio
+async def test_set_user_max_products(test_db):
+    """Test setting user's max products."""
+    await database.add_user(111, "it")
+
+    # Set to 10
+    await database.set_user_max_products(111, 10)
+    limit = await database.get_user_product_limit(111)
+    assert limit == 10
+
+    # Update to 15
+    await database.set_user_max_products(111, 15)
+    limit = await database.get_user_product_limit(111)
+    assert limit == 15
+
+
+@pytest.mark.asyncio
+async def test_set_user_max_products_capped_at_default(test_db):
+    """Test that set_user_max_products caps at DEFAULT_MAX_PRODUCTS."""
+    await database.add_user(111, "it")
+
+    # Try to set to 100 (should be capped to DEFAULT_MAX_PRODUCTS = 21)
+    await database.set_user_max_products(111, 100)
+    limit = await database.get_user_product_limit(111)
+    assert limit == database.DEFAULT_MAX_PRODUCTS
+
+
 # ============================================================================
 # Product operation tests
 # ============================================================================
@@ -354,70 +412,3 @@ async def test_get_all_feedback_empty(test_db):
     """Test getting feedback when none exists."""
     all_feedback = await database.get_all_feedback()
     assert all_feedback == []
-
-
-# ============================================================================
-# Consecutive failures tracking tests
-# ============================================================================
-
-
-@pytest.mark.asyncio
-async def test_increment_consecutive_failures(test_db):
-    """Test incrementing consecutive failures count."""
-    # Add user and product
-    await database.add_user(123, "it")
-    tomorrow = date.today() + timedelta(days=1)
-    product_id = await database.add_product(
-        user_id=123,
-        product_name="Test Product",
-        asin="B08N5WRWNW",
-        marketplace="it",
-        price_paid=59.90,
-        return_deadline=tomorrow,
-    )
-
-    # Increment failures
-    count1 = await database.increment_consecutive_failures(product_id)
-    assert count1 == 1
-
-    count2 = await database.increment_consecutive_failures(product_id)
-    assert count2 == 2
-
-    count3 = await database.increment_consecutive_failures(product_id)
-    assert count3 == 3
-
-    # Verify in database
-    products = await database.get_user_products(123)
-    assert products[0]["consecutive_failures"] == 3
-
-
-@pytest.mark.asyncio
-async def test_reset_consecutive_failures(test_db):
-    """Test resetting consecutive failures count."""
-    # Add user and product
-    await database.add_user(123, "it")
-    tomorrow = date.today() + timedelta(days=1)
-    product_id = await database.add_product(
-        user_id=123,
-        product_name="Test Product",
-        asin="B08N5WRWNW",
-        marketplace="it",
-        price_paid=59.90,
-        return_deadline=tomorrow,
-    )
-
-    # Increment failures to 3
-    await database.increment_consecutive_failures(product_id)
-    await database.increment_consecutive_failures(product_id)
-    await database.increment_consecutive_failures(product_id)
-
-    # Verify it's at 3
-    products = await database.get_user_products(123)
-    assert products[0]["consecutive_failures"] == 3
-
-    # Reset
-    await database.reset_consecutive_failures(product_id)
-
-    # Verify it's back to 0
-    products = await database.get_user_products(123)
-    assert products[0]["consecutive_failures"] == 0

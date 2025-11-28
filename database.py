@@ -12,6 +12,10 @@ logger = logging.getLogger(__name__)
 # Get database path from environment
 DATABASE_PATH = os.getenv("DATABASE_PATH", "./data/repackit.db")
 
+# Product limit configuration
+DEFAULT_MAX_PRODUCTS = int(os.getenv("DEFAULT_MAX_PRODUCTS", "21"))
+INITIAL_MAX_PRODUCTS = int(os.getenv("INITIAL_MAX_PRODUCTS", "5"))
+
 
 async def init_db() -> None:
     """
@@ -33,6 +37,7 @@ async def init_db() -> None:
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
                 language_code TEXT,
+                max_products INTEGER DEFAULT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """
@@ -86,24 +91,6 @@ async def init_db() -> None:
         await db.execute(
             "CREATE INDEX IF NOT EXISTS idx_return_deadline ON products(return_deadline)"
         )
-
-        # Migration: Add marketplace column if it doesn't exist (for existing databases)
-        async with db.execute("PRAGMA table_info(products)") as cursor:
-            columns = await cursor.fetchall()
-            column_names = [col[1] for col in columns]
-            if "marketplace" not in column_names:
-                logger.info("Migrating database: adding marketplace column")
-                await db.execute(
-                    "ALTER TABLE products ADD COLUMN marketplace TEXT NOT NULL DEFAULT 'it'"
-                )
-            if "consecutive_failures" not in column_names:
-                logger.info("Migrating database: adding consecutive_failures column")
-                await db.execute(
-                    "ALTER TABLE products ADD COLUMN consecutive_failures INTEGER DEFAULT 0"
-                )
-            if "product_name" not in column_names:
-                logger.info("Migrating database: adding product_name column")
-                await db.execute("ALTER TABLE products ADD COLUMN product_name TEXT")
 
         await db.commit()
         logger.info(f"Database initialized at {DATABASE_PATH}")
@@ -164,6 +151,50 @@ async def get_all_users() -> list[dict]:
         async with db.execute("SELECT * FROM users") as cursor:
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
+
+
+async def get_user_product_limit(user_id: int) -> int:
+    """
+    Get product limit for a specific user.
+
+    Args:
+        user_id: Telegram user ID
+
+    Returns:
+        Product limit for this user.
+        - If max_products is NULL: returns DEFAULT_MAX_PRODUCTS (21, for admin/special users)
+        - If max_products is set: returns that value (personalized limit)
+        - If user doesn't exist: returns INITIAL_MAX_PRODUCTS (5, for new users)
+    """
+    user = await get_user(user_id)
+    if not user:
+        return INITIAL_MAX_PRODUCTS
+
+    # NULL means admin/special user with max limit
+    if user["max_products"] is None:
+        return DEFAULT_MAX_PRODUCTS
+
+    return user["max_products"]
+
+
+async def set_user_max_products(user_id: int, limit: int) -> None:
+    """
+    Set product limit for a specific user.
+
+    Args:
+        user_id: Telegram user ID
+        limit: New product limit (capped at DEFAULT_MAX_PRODUCTS)
+    """
+    # Cap at DEFAULT_MAX_PRODUCTS
+    limit = min(limit, DEFAULT_MAX_PRODUCTS)
+
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        await db.execute(
+            "UPDATE users SET max_products = ? WHERE user_id = ?",
+            (limit, user_id),
+        )
+        await db.commit()
+        logger.info(f"User {user_id} max_products set to {limit}")
 
 
 # ============================================================================
@@ -339,49 +370,6 @@ async def update_last_notified_price(product_id: int, price: float) -> None:
         )
         await db.commit()
         logger.debug(f"Product {product_id} last_notified_price updated to {price}")
-
-
-async def increment_consecutive_failures(product_id: int) -> int:
-    """
-    Increment consecutive failures count for a product.
-
-    Args:
-        product_id: Database product ID
-
-    Returns:
-        New consecutive failures count
-    """
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        await db.execute(
-            "UPDATE products SET consecutive_failures = consecutive_failures + 1 WHERE id = ?",
-            (product_id,),
-        )
-        await db.commit()
-
-        # Get the new count
-        async with db.execute(
-            "SELECT consecutive_failures FROM products WHERE id = ?", (product_id,)
-        ) as cursor:
-            row = await cursor.fetchone()
-            count = row[0] if row else 0
-            logger.debug(f"Product {product_id} consecutive_failures incremented to {count}")
-            return count
-
-
-async def reset_consecutive_failures(product_id: int) -> None:
-    """
-    Reset consecutive failures count to 0 for a product.
-
-    Args:
-        product_id: Database product ID
-    """
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        await db.execute(
-            "UPDATE products SET consecutive_failures = 0 WHERE id = ?",
-            (product_id,),
-        )
-        await db.commit()
-        logger.debug(f"Product {product_id} consecutive_failures reset to 0")
 
 
 async def delete_product(product_id: int) -> bool:

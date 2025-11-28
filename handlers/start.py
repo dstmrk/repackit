@@ -28,7 +28,14 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     # Register user in database if not exists
     try:
-        await database.add_user(user_id=user_id, language_code=language_code)
+        existing_user = await database.get_user(user_id)
+        if not existing_user:
+            # New user: add to DB and set initial product limit
+            await database.add_user(user_id=user_id, language_code=language_code)
+            await database.set_user_max_products(user_id, database.INITIAL_MAX_PRODUCTS)
+            logger.info(
+                f"New user {user_id} registered with {database.INITIAL_MAX_PRODUCTS} product slots"
+            )
     except Exception as e:
         logger.error(f"Error registering user {user_id}: {e}", exc_info=True)
 

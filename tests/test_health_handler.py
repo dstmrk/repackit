@@ -1,13 +1,15 @@
 """Tests for health check handler."""
 
-import json
+import asyncio
+import contextlib
 import os
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
+from aiohttp import web
 
 import database
 import health_handler
@@ -251,128 +253,6 @@ async def test_health_status_includes_thresholds(test_db):
     assert health["thresholds"]["max_days_since_last_run"] == 2
 
 
-# ============================================================================
-# HTTP Handler tests
-# ============================================================================
-
-
-@pytest.mark.asyncio
-async def test_health_check_handler_get_health(test_db):
-    """Test HealthCheckHandler responds to /health endpoint."""
-    from io import BytesIO
-
-    # Add some test data
-    now = datetime.now()
-    one_day_ago = (now - timedelta(days=1)).isoformat()
-    await database.update_system_status("last_scraper_run", one_day_ago)
-    await database.update_system_status("last_checker_run", one_day_ago)
-    await database.update_system_status("last_cleanup_run", one_day_ago)
-
-    # Get expected health data
-    expected_health_data = await health_handler.get_health_status()
-
-    # Create handler without calling __init__ (which would try to handle request)
-    handler = health_handler.HealthCheckHandler.__new__(health_handler.HealthCheckHandler)
-
-    # Mock the necessary attributes
-    handler.path = "/health"
-    response_buffer = BytesIO()
-    handler.wfile = response_buffer
-    handler.send_response = MagicMock()
-    handler.send_header = MagicMock()
-    handler.end_headers = MagicMock()
-    handler.send_error = MagicMock()
-
-    # Mock asyncio.new_event_loop and loop.run_until_complete to avoid nested loop issue
-    mock_loop = MagicMock()
-    mock_loop.run_until_complete.return_value = expected_health_data
-    mock_loop.close = MagicMock()
-
-    with patch("asyncio.new_event_loop", return_value=mock_loop):
-        with patch("asyncio.set_event_loop"):
-            # Call do_GET
-            handler.do_GET()
-
-    # Verify response was sent
-    handler.send_response.assert_called_once_with(200)
-    handler.send_header.assert_called_with("Content-type", "application/json")
-    handler.end_headers.assert_called_once()
-
-    # Verify response contains valid JSON
-    response_data = response_buffer.getvalue()
-    response_json = json.loads(response_data.decode())
-
-    assert "status" in response_json
-    assert response_json["status"] == "healthy"
-    assert "tasks" in response_json
-
-
-@pytest.mark.asyncio
-async def test_health_check_handler_404(test_db):
-    """Test HealthCheckHandler returns 404 for unknown paths."""
-    # Create handler without calling __init__
-    handler = health_handler.HealthCheckHandler.__new__(health_handler.HealthCheckHandler)
-
-    # Mock the necessary attributes
-    handler.path = "/unknown"
-    handler.send_error = MagicMock()
-
-    # Call do_GET
-    handler.do_GET()
-
-    # Verify 404 was sent
-    handler.send_error.assert_called_once_with(404, "Not Found")
-
-
-@pytest.mark.asyncio
-async def test_health_check_handler_error_handling(test_db):
-    """Test HealthCheckHandler error handling when database fails."""
-    from io import BytesIO
-
-    # Create handler without calling __init__
-    handler = health_handler.HealthCheckHandler.__new__(health_handler.HealthCheckHandler)
-
-    # Mock the necessary attributes
-    handler.path = "/health"
-    handler.wfile = BytesIO()
-    handler.send_response = MagicMock()
-    handler.send_header = MagicMock()
-    handler.end_headers = MagicMock()
-    handler.send_error = MagicMock()
-
-    # Mock get_health_status to raise an error
-    with patch("health_handler.get_health_status", side_effect=Exception("DB Error")):
-        # Call do_GET
-        handler.do_GET()
-
-        # Verify error response was sent
-        handler.send_error.assert_called_once()
-        call_args = handler.send_error.call_args[0]
-        assert call_args[0] == 500
-        assert "Internal Server Error" in call_args[1]
-
-
-def test_health_check_handler_log_message():
-    """Test HealthCheckHandler custom log_message method."""
-    # Create handler without calling __init__
-    handler = health_handler.HealthCheckHandler.__new__(health_handler.HealthCheckHandler)
-
-    # Mock address_string
-    handler.address_string = MagicMock(return_value="127.0.0.1")
-
-    # Capture log messages
-    with patch.object(health_handler.logger, "info") as mock_log:
-        # Call log_message
-        handler.log_message("GET %s %s", "/health", "200")
-
-        # Verify logger.info was called
-        mock_log.assert_called_once()
-        log_message = mock_log.call_args[0][0]
-        assert "127.0.0.1" in log_message
-        assert "/health" in log_message
-        assert "200" in log_message
-
-
 @pytest.mark.asyncio
 async def test_check_task_health_invalid_timestamp(test_db):
     """Test _check_task_health with invalid timestamp format."""
@@ -446,137 +326,95 @@ def test_health_bind_address_from_env():
         importlib.reload(health_handler)
 
 
-def test_run_server_uses_bind_address():
-    """Test that run_server uses the configured bind address."""
-    with patch("health_handler.HTTPServer") as mock_http_server:
-        # Mock HTTPServer to prevent actual server startup
-        mock_server_instance = MagicMock()
-        mock_http_server.return_value = mock_server_instance
-
-        # Mock serve_forever to return immediately instead of blocking
-        mock_server_instance.serve_forever = MagicMock(return_value=None)
-
-        # Call run_server (it should return immediately thanks to the mock)
-        # We need to call it in a way that doesn't block, so we'll patch first
-        try:
-            # This would normally block, but our mock prevents it
-            import threading
-
-            def run_with_timeout():
-                health_handler.run_server()
-
-            thread = threading.Thread(target=run_with_timeout, daemon=True)
-            thread.start()
-            thread.join(timeout=1)  # Wait max 1 second
-
-            # Verify HTTPServer was called with correct bind address
-            mock_http_server.assert_called_once()
-            call_args = mock_http_server.call_args[0]
-            bind_address, port = call_args[0]
-
-            assert bind_address == health_handler.HEALTH_BIND_ADDRESS
-            assert port == health_handler.HEALTH_PORT
-        finally:
-            # Make sure we don't leave any hanging threads
-            pass
+# ============================================================================
+# aiohttp handler tests
+# ============================================================================
 
 
-def test_run_server_with_custom_bind_address():
-    """Test that run_server respects HEALTH_BIND_ADDRESS environment variable."""
-    import importlib
+@pytest.mark.asyncio
+async def test_health_check_handler_success(test_db):
+    """Test health_check_handler returns valid JSON on success."""
+    # Add some test data
+    now = datetime.now()
+    one_day_ago = (now - timedelta(days=1)).isoformat()
+    await database.update_system_status("last_scraper_run", one_day_ago)
+    await database.update_system_status("last_checker_run", one_day_ago)
+    await database.update_system_status("last_cleanup_run", one_day_ago)
 
-    # Save original value
-    original_value = os.environ.get("HEALTH_BIND_ADDRESS")
-    original_bind_address = health_handler.HEALTH_BIND_ADDRESS
+    # Create mock aiohttp request
+    app = web.Application()
+    app.router.add_get("/health", health_handler.health_check_handler)
+
+    # Create test client
+    from aiohttp.test_utils import TestClient, TestServer
+
+    server = TestServer(app)
+    client = TestClient(server)
+
+    await client.start_server()
 
     try:
-        # Set custom bind address
-        os.environ["HEALTH_BIND_ADDRESS"] = "127.0.0.1"
+        # Make request to /health
+        resp = await client.get("/health")
 
-        # Reload module to pick up new value
-        importlib.reload(health_handler)
-
-        with patch("health_handler.HTTPServer") as mock_http_server:
-            # Mock HTTPServer
-            mock_server_instance = MagicMock()
-            mock_http_server.return_value = mock_server_instance
-            mock_server_instance.serve_forever = MagicMock(return_value=None)
-
-            # Call run_server in a thread with timeout
-            import threading
-
-            def run_with_timeout():
-                health_handler.run_server()
-
-            thread = threading.Thread(target=run_with_timeout, daemon=True)
-            thread.start()
-            thread.join(timeout=1)
-
-            # Verify HTTPServer was called with 127.0.0.1
-            mock_http_server.assert_called_once()
-            call_args = mock_http_server.call_args[0]
-            bind_address, port = call_args[0]
-
-            assert bind_address == "127.0.0.1"
-            assert port == health_handler.HEALTH_PORT
-
+        # Verify response
+        assert resp.status == 200
+        data = await resp.json()
+        assert "status" in data
+        assert data["status"] == "healthy"
+        assert "tasks" in data
+        assert "stats" in data
     finally:
-        # Restore original value
-        if original_value is not None:
-            os.environ["HEALTH_BIND_ADDRESS"] = original_value
-        else:
-            if "HEALTH_BIND_ADDRESS" in os.environ:
-                del os.environ["HEALTH_BIND_ADDRESS"]
-
-        # Restore module state
-        health_handler.HEALTH_BIND_ADDRESS = original_bind_address
-        importlib.reload(health_handler)
+        await client.close()
 
 
-@patch("health_handler.Thread")
-@patch("health_handler.run_server")
-def test_start_health_server(mock_run_server, mock_thread):
-    """Test that start_health_server starts server in daemon thread."""
-    # Mock Thread instance
-    mock_thread_instance = MagicMock()
-    mock_thread.return_value = mock_thread_instance
+@pytest.mark.asyncio
+async def test_health_check_handler_error(test_db):
+    """Test health_check_handler returns 500 on error."""
+    # Mock get_health_status to raise an error
+    with patch("health_handler.get_health_status", side_effect=Exception("Database error")):
+        # Create mock aiohttp request
+        app = web.Application()
+        app.router.add_get("/health", health_handler.health_check_handler)
 
-    # Call start_health_server
-    health_handler.start_health_server()
+        # Create test client
+        from aiohttp.test_utils import TestClient, TestServer
 
-    # Verify Thread was created with correct parameters
-    mock_thread.assert_called_once_with(target=health_handler.run_server, daemon=True)
+        server = TestServer(app)
+        client = TestClient(server)
 
-    # Verify thread.start() was called
-    mock_thread_instance.start.assert_called_once()
+        await client.start_server()
+
+        try:
+            # Make request to /health
+            resp = await client.get("/health")
+
+            # Verify error response
+            assert resp.status == 500
+            data = await resp.json()
+            assert "status" in data
+            assert data["status"] == "error"
+            assert "message" in data
+            assert "Database error" in data["message"]
+        finally:
+            await client.close()
 
 
-def test_run_server_logs_configuration(caplog):
-    """Test that run_server logs the bind address and port configuration."""
-    import logging
-    import threading
+@pytest.mark.asyncio
+async def test_start_health_server(test_db):
+    """Test that start_health_server initializes aiohttp app correctly."""
+    # We can't easily test the full server startup without blocking,
+    # but we can test the app creation and routing
 
-    with patch("health_handler.HTTPServer") as mock_http_server:
-        # Mock HTTPServer to prevent actual server startup
-        mock_server_instance = MagicMock()
-        mock_http_server.return_value = mock_server_instance
-        mock_server_instance.serve_forever = MagicMock(return_value=None)
+    # Create a task that will be cancelled quickly
+    server_task = asyncio.create_task(health_handler.start_health_server())
 
-        # Set log level to capture INFO logs
-        with caplog.at_level(logging.INFO):
+    # Give it a moment to start
+    await asyncio.sleep(0.1)
 
-            # Call run_server in a thread with timeout
-            def run_with_timeout():
-                health_handler.run_server()
+    # Cancel the server
+    server_task.cancel()
 
-            thread = threading.Thread(target=run_with_timeout, daemon=True)
-            thread.start()
-            thread.join(timeout=1)
-
-        # Verify log message includes bind address and port
-        assert any(
-            str(health_handler.HEALTH_BIND_ADDRESS) in record.message
-            and str(health_handler.HEALTH_PORT) in record.message
-            and "reverse proxy" in record.message.lower()
-            for record in caplog.records
-        )
+    # Suppress expected CancelledError
+    with contextlib.suppress(asyncio.CancelledError):
+        await server_task
