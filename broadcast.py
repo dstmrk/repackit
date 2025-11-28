@@ -26,9 +26,12 @@ import database
 load_dotenv()
 
 # Configure logging
+# Create data directory if it doesn't exist
+os.makedirs("data", exist_ok=True)
+
 # Setup rotating file handler (daily rotation, keep 2 backups + today = 3 days total)
 file_handler = TimedRotatingFileHandler(
-    filename="data/logs/broadcast.log",
+    filename="data/broadcast.log",
     when="midnight",
     interval=1,
     backupCount=2,
