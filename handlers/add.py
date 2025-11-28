@@ -276,6 +276,9 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
             min_savings_threshold=min_savings,
         )
 
+        # Increment promotional metric: total products registered
+        await database.increment_metric("products_total_count")
+
         # Build success message
         days_remaining = (return_deadline - date.today()).days
         message = (
