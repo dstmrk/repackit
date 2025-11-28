@@ -55,7 +55,7 @@ repackit/
 │       ├── test_start.py
 │       └── ...
 ├── data/                     # Persistent data (mounted volume)
-│   ├── users.db
+│   ├── repackit.db
 │   └── logs/
 ├── .env                      # Environment variables (gitignored)
 ├── .env.example              # Template for .env
@@ -141,7 +141,7 @@ BOT_PORT=8443          # Telegram webhook listener
 HEALTH_PORT=8444       # Health check endpoint
 
 # Database
-DATABASE_PATH=./data/users.db
+DATABASE_PATH=./data/repackit.db
 
 # Scheduler (24-hour format, e.g., 9 = 09:00)
 SCRAPER_HOUR=9         # Daily scraping time
@@ -1002,7 +1002,7 @@ browser = await p.chromium.launch(
 ### Database Locked Errors
 SQLite doesn't support high concurrency. If errors occur:
 1. Ensure only one bot instance is running
-2. Check file permissions on `data/users.db`
+2. Check file permissions on `data/repackit.db`
 3. Consider WAL mode: `PRAGMA journal_mode=WAL;`
 
 ### Coverage Below 80%
