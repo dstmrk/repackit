@@ -513,26 +513,31 @@ async def get_stats() -> dict:
     Get database statistics for health check.
 
     Returns:
-        Dict with keys: user_count, product_count, active_product_count
+        Dict with keys: user_count, product_count, unique_product_count
+
+        - product_count: Total products in database (includes duplicates)
+        - unique_product_count: Unique products by (asin, marketplace) pair
+          This reflects how many products the scraper actually processes,
+          since duplicate ASINs are deduplicated during scraping.
     """
-    today = date.today().isoformat()
     async with aiosqlite.connect(DATABASE_PATH) as db:
         # Count users
         async with db.execute("SELECT COUNT(*) FROM users") as cursor:
             user_count = (await cursor.fetchone())[0]
 
-        # Count total products
+        # Count total products (includes duplicates)
         async with db.execute("SELECT COUNT(*) FROM products") as cursor:
             product_count = (await cursor.fetchone())[0]
 
-        # Count active products (not expired)
+        # Count unique products by (asin, marketplace) pair
+        # This matches the scraper's deduplication logic in data_reader.py
         async with db.execute(
-            "SELECT COUNT(*) FROM products WHERE return_deadline >= ?", (today,)
+            "SELECT COUNT(DISTINCT asin || '|' || marketplace) FROM products"
         ) as cursor:
-            active_product_count = (await cursor.fetchone())[0]
+            unique_product_count = (await cursor.fetchone())[0]
 
     return {
         "user_count": user_count,
         "product_count": product_count,
-        "active_product_count": active_product_count,
+        "unique_product_count": unique_product_count,
     }
