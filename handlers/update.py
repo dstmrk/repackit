@@ -137,6 +137,58 @@ async def handle_product_selection(update: Update, context: ContextTypes.DEFAULT
     return WAITING_FIELD_SELECTION
 
 
+def _get_field_update_message(field: str, context_data: dict) -> str:
+    """
+    Get the appropriate update message for a given field.
+
+    Args:
+        field: Field name (nome, prezzo, scadenza, soglia)
+        context_data: User data from context
+
+    Returns:
+        Formatted message string
+    """
+    if field == "nome":
+        current_name = context_data["update_product_name"]
+        return (
+            "📦 *Aggiorna nome prodotto*\n\n"
+            f"Nome attuale: *{current_name}*\n\n"
+            "Inviami il nuovo nome (tra 3 e 100 caratteri).\n\n"
+            "Esempio: `iPhone 15 Pro` oppure `Cuffie Sony`\n\n"
+            "Oppure scrivi /cancel per annullare."
+        )
+    elif field == "soglia":
+        current_price = context_data["update_product_price_paid"]
+        return (
+            "🎯 *Aggiorna soglia risparmio*\n\n"
+            "Inviami la nuova soglia minima di risparmio in euro.\n\n"
+            f"Deve essere minore del prezzo pagato (€{current_price:.2f})\n\n"
+            "Esempio: `5.00` oppure `5,00`\n\n"
+            "Oppure scrivi /cancel per annullare."
+        )
+
+    # Static messages for prezzo and scadenza
+    messages = {
+        "prezzo": (
+            "💰 *Aggiorna prezzo pagato*\n\n"
+            "Inviami il nuovo prezzo in euro.\n\n"
+            "Esempio: `59.90` oppure `59,90`\n\n"
+            "Oppure scrivi /cancel per annullare."
+        ),
+        "scadenza": (
+            "📅 *Aggiorna scadenza reso*\n\n"
+            "Inviami la nuova scadenza.\n\n"
+            "Puoi inviarmi:\n"
+            "• Un numero di giorni (da 1 a 365)\n"
+            "  Esempio: `30`\n\n"
+            "• Una data nel formato gg-mm-aaaa\n"
+            "  Esempio: `09-05-2025`\n\n"
+            "Oppure scrivi /cancel per annullare."
+        ),
+    }
+    return messages[field]
+
+
 async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Handle field selection.
@@ -165,43 +217,8 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
 
     logger.info(f"User {user_id} selected field={field} for update")
 
-    # Show appropriate message based on field
-    if field == "nome":
-        current_name = context.user_data["update_product_name"]
-        message = (
-            "📦 *Aggiorna nome prodotto*\n\n"
-            f"Nome attuale: *{current_name}*\n\n"
-            "Inviami il nuovo nome (tra 3 e 100 caratteri).\n\n"
-            "Esempio: `iPhone 15 Pro` oppure `Cuffie Sony`\n\n"
-            "Oppure scrivi /cancel per annullare."
-        )
-    elif field == "prezzo":
-        message = (
-            "💰 *Aggiorna prezzo pagato*\n\n"
-            "Inviami il nuovo prezzo in euro.\n\n"
-            "Esempio: `59.90` oppure `59,90`\n\n"
-            "Oppure scrivi /cancel per annullare."
-        )
-    elif field == "scadenza":
-        message = (
-            "📅 *Aggiorna scadenza reso*\n\n"
-            "Inviami la nuova scadenza.\n\n"
-            "Puoi inviarmi:\n"
-            "• Un numero di giorni (da 1 a 365)\n"
-            "  Esempio: `30`\n\n"
-            "• Una data nel formato gg-mm-aaaa\n"
-            "  Esempio: `09-05-2025`\n\n"
-            "Oppure scrivi /cancel per annullare."
-        )
-    elif field == "soglia":
-        current_price = context.user_data["update_product_price_paid"]
-        message = (
-            "🎯 *Aggiorna soglia risparmio*\n\n"
-            "Inviami la nuova soglia minima di risparmio in euro.\n\n"
-            f"Deve essere minore del prezzo pagato (€{current_price:.2f})\n\n"
-            "Esempio: `5.00` oppure `5,00`\n\n"
-            "Oppure scrivi /cancel per annullare."
-        )
+    # Get message for selected field using dictionary dispatch
+    message = _get_field_update_message(field, context.user_data)
 
     await query.edit_message_text(message, parse_mode="Markdown")
 
