@@ -1,0 +1,12 @@
+# Docker Compose override for local development
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Or create an alias: alias dc-dev='docker-compose -f docker-compose.yml -f docker-compose.dev.yml'
+
+services:
+  repackit:
+    # Override image with local build for development
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: repackit:dev
+    pull_policy: never  # Don't pull, always build locally
