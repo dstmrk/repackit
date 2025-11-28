@@ -128,6 +128,64 @@ async def test_get_all_users(test_db):
     assert {u["user_id"] for u in users} == {111, 222, 333}
 
 
+@pytest.mark.asyncio
+async def test_get_user_product_limit_nonexistent_user(test_db):
+    """Test getting product limit for user that doesn't exist."""
+    # Should return INITIAL_MAX_PRODUCTS (5) for non-existent users
+    limit = await database.get_user_product_limit(999999)
+    assert limit == database.INITIAL_MAX_PRODUCTS
+
+
+@pytest.mark.asyncio
+async def test_get_user_product_limit_null_max_products(test_db):
+    """Test getting product limit for user with NULL max_products (admin/VIP)."""
+    # Add user without setting max_products (defaults to NULL)
+    await database.add_user(111, "it")
+
+    # NULL should return DEFAULT_MAX_PRODUCTS (21)
+    limit = await database.get_user_product_limit(111)
+    assert limit == database.DEFAULT_MAX_PRODUCTS
+
+
+@pytest.mark.asyncio
+async def test_get_user_product_limit_with_custom_limit(test_db):
+    """Test getting product limit for user with custom limit."""
+    # Add user and set custom limit
+    await database.add_user(111, "it")
+    await database.set_user_max_products(111, 10)
+
+    # Should return the custom limit
+    limit = await database.get_user_product_limit(111)
+    assert limit == 10
+
+
+@pytest.mark.asyncio
+async def test_set_user_max_products(test_db):
+    """Test setting user's max products."""
+    await database.add_user(111, "it")
+
+    # Set to 10
+    await database.set_user_max_products(111, 10)
+    limit = await database.get_user_product_limit(111)
+    assert limit == 10
+
+    # Update to 15
+    await database.set_user_max_products(111, 15)
+    limit = await database.get_user_product_limit(111)
+    assert limit == 15
+
+
+@pytest.mark.asyncio
+async def test_set_user_max_products_capped_at_default(test_db):
+    """Test that set_user_max_products caps at DEFAULT_MAX_PRODUCTS."""
+    await database.add_user(111, "it")
+
+    # Try to set to 100 (should be capped to DEFAULT_MAX_PRODUCTS = 21)
+    await database.set_user_max_products(111, 100)
+    limit = await database.get_user_product_limit(111)
+    assert limit == database.DEFAULT_MAX_PRODUCTS
+
+
 # ============================================================================
 # Product operation tests
 # ============================================================================
