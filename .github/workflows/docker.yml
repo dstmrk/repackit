@@ -155,13 +155,16 @@ jobs:
 
       - name: Test docker-compose configuration
         run: |
-          # Validate docker-compose.yml syntax (using Docker Compose v2)
+          # Validate docker-compose.yml syntax (production - GHCR image)
           docker compose config
+
+          # Validate docker-compose.dev.yml syntax (development - local build)
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml config
 
       - name: Build with docker-compose
         run: |
-          # Build using Docker Compose v2
-          docker compose build
+          # Build using Docker Compose v2 with dev override (for local builds)
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml build
 
       - name: Verify build succeeded
         run: |
