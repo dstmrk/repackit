@@ -15,6 +15,7 @@ dependencies = [
     "aiosqlite>=0.19",
     "python-dotenv>=1.0",
     "httpx>=0.25",
+    "aiohttp>=3.9",
 ]
 
 [project.optional-dependencies]
