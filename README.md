@@ -141,18 +141,19 @@ docker-compose up -d
 
 - `/start` - Messaggio di benvenuto e registrazione
 - `/help` - Mostra tutti i comandi disponibili con descrizioni dettagliate
-- `/add` - **Aggiungi prodotto** (flusso conversazionale guidato)
-  - Step 1: Invia URL Amazon.it
-  - Step 2: Invia prezzo pagato
-  - Step 3: Invia scadenza reso (numero giorni o data gg-mm-aaaa)
-  - Step 4: Invia la soglia di risparmio minimo che vuoi avere
+- `/add` - **Aggiungi prodotto** (flusso conversazionale in 5 step)
+  - Step 1: Nome prodotto
+  - Step 2: URL Amazon.it
+  - Step 3: Prezzo pagato
+  - Step 4: Scadenza reso (numero giorni o data gg-mm-aaaa)
+  - Step 5: Risparmio minimo per notifica
 - `/list` - **Visualizza prodotti** monitorati (mostra conteggio 5/20)
 - `/delete` - **Rimuovi prodotto** con conferma inline keyboard
   - Mostra lista prodotti con bottoni cliccabili
   - Richiede conferma prima di eliminare
 - `/update` - **Aggiorna prodotto** (flusso conversazionale con inline keyboards)
   - Step 1: Seleziona prodotto da lista
-  - Step 2: Scegli campo (prezzo/scadenza/soglia)
+  - Step 2: Scegli campo (nome/prezzo/scadenza/soglia)
   - Step 3: Inserisci nuovo valore
 - `/feedback` - **Invia feedback** (flusso conversazionale con validazione)
   - Scrivi messaggio (min 10, max 1000 caratteri)
@@ -166,44 +167,34 @@ docker-compose up -d
 
 ### Esempio Utilizzo
 
-```bash
+```
 # 1. Aggiungi un prodotto
 Utente: /add
+Bot: Come vuoi chiamare questo prodotto?
+Utente: iPhone 15 Pro
 Bot: Inviami il link del prodotto Amazon.it
 Utente: https://amazon.it/dp/B08N5WRWNW
 Bot: Inviami il prezzo che hai pagato in euro
 Utente: 59.90
 Bot: Inviami la scadenza del reso
 Utente: 30
+Bot: Qual è il risparmio minimo per cui vuoi essere notificato?
+Utente: 5
 Bot: ✅ Prodotto aggiunto con successo!
 
 # 2. Visualizza lista
 Utente: /list
-Bot: Hai 1/20 prodotti monitorati. [mostra lista]
+Bot: Hai 1/20 prodotti monitorati. [mostra lista con nomi]
 
-# 3. Aggiorna prezzo
+# 3. Aggiorna prodotto
 Utente: /update
 Bot: [mostra lista prodotti con bottoni]
-Utente: [clicca prodotto 1]
-Bot: [mostra opzioni: Prezzo/Scadenza/Soglia]
+Utente: [clicca su "iPhone 15 Pro"]
+Bot: [mostra opzioni: Nome/Prezzo/Scadenza/Soglia]
 Utente: [clicca "Prezzo pagato"]
 Bot: Inviami il nuovo prezzo in euro
 Utente: 55.00
 Bot: ✅ Prezzo aggiornato con successo!
-
-# 4. Rimuovi prodotto
-Utente: /delete
-Bot: [mostra prodotto con conferma]
-Utente: [clicca "Sì, elimina"]
-Bot: ✅ Prodotto eliminato
-
-# 5. Invia feedback
-Utente: /feedback
-Bot: Scrivi il tuo feedback
-Utente: Il bot funziona benissimo!
-Bot: [mostra anteprima con conferma]
-Utente: [clicca "Sì, invia"]
-Bot: ✅ Feedback inviato con successo!
 ```
 
 ## Admin Script
@@ -260,11 +251,12 @@ repackit/
 ├── handlers/               # Command handlers (conversational flows)
 │   ├── start.py           # Welcome message
 │   ├── help.py            # Help command
-│   ├── add.py             # Add product (3-step conversation)
+│   ├── add.py             # Add product (5-step conversation)
 │   ├── list.py            # List products (with count)
 │   ├── delete.py          # Delete product (with confirmation)
-│   ├── update.py          # Update product (3-step conversation)
-│   └── feedback.py        # Send feedback (with validation)
+│   ├── update.py          # Update product (conversational flow)
+│   ├── feedback.py        # Send feedback (with validation)
+│   └── validators.py      # Shared validation logic
 ├── tests/                  # Unit tests (91%+ coverage)
 │   └── handlers/          # Handler tests
 ├── data/                   # Persistent data (gitignored)
@@ -292,16 +284,18 @@ Risposta esempio:
 ```json
 {
   "status": "healthy",
-  "timestamp": "2024-11-18T14:30:00.123456",
+  "timestamp": "2024-11-18 14:30:00",
   "stats": {
     "users": 150,
     "products_total": 245,
-    "products_active": 180
+    "products_unique": 180,
+    "products_total_count": 1250,
+    "total_savings_generated": 3450.75
   },
   "tasks": {
-    "scraper": {"status": "ok", "last_run": "2024-11-18T09:00:00"},
-    "checker": {"status": "ok", "last_run": "2024-11-18T10:00:00"},
-    "cleanup": {"status": "ok", "last_run": "2024-11-18T02:00:00"}
+    "scraper": {"status": "ok", "last_run": "2024-11-18 09:00:00"},
+    "checker": {"status": "ok", "last_run": "2024-11-18 10:00:00"},
+    "cleanup": {"status": "ok", "last_run": "2024-11-18 02:00:00"}
   }
 }
 ```
