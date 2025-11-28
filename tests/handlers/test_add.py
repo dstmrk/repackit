@@ -22,9 +22,9 @@ from handlers.add import (
     handle_price,
     handle_product_name,
     handle_url,
-    parse_deadline,
     start_add,
 )
+from handlers.validators import parse_deadline
 
 
 @pytest.fixture
@@ -89,14 +89,14 @@ def test_parse_deadline_days_above_range():
 
 def test_parse_deadline_gg_mm_aaaa_format():
     """Test parse_deadline with gg-mm-aaaa date format."""
-    result = parse_deadline("25-12-2024")
-    assert result == date(2024, 12, 25)
+    result = parse_deadline("25-12-2025")
+    assert result == date(2025, 12, 25)
 
 
 def test_parse_deadline_gg_mm_aaaa_format_leap_year():
     """Test parse_deadline with leap year date."""
-    result = parse_deadline("29-02-2024")
-    assert result == date(2024, 2, 29)
+    result = parse_deadline("29-02-2028")
+    assert result == date(2028, 2, 29)
 
 
 def test_parse_deadline_invalid_format():
@@ -107,14 +107,14 @@ def test_parse_deadline_invalid_format():
 
 def test_parse_deadline_iso_format():
     """Test parse_deadline with ISO format (yyyy-mm-dd) for /update compatibility."""
-    result = parse_deadline("2024-12-25")
-    assert result == date(2024, 12, 25)
+    result = parse_deadline("2025-12-25")
+    assert result == date(2025, 12, 25)
 
 
 def test_parse_deadline_invalid_date():
     """Test parse_deadline with invalid date (e.g., 32nd day)."""
-    with pytest.raises(ValueError, match="Formato non valido"):
-        parse_deadline("32-13-2024")
+    with pytest.raises(ValueError, match="Data non valida"):
+        parse_deadline("32-13-2025")
 
 
 # ============================================================================
@@ -504,7 +504,7 @@ async def test_handle_deadline_past_date(test_db):
     # Verify error message
     call_args = update.message.reply_text.call_args
     message = call_args[0][0]
-    assert "deve essere nel futuro" in message
+    assert "nel passato" in message
 
     # Verify it stays in same state
     assert result == WAITING_DEADLINE

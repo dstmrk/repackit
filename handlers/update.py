@@ -16,7 +16,7 @@ from telegram.ext import (
 from telegram.warnings import PTBUserWarning
 
 import database
-from handlers.add import parse_deadline
+from handlers import validators
 
 # Suppress PTBUserWarning for per_message=False in ConversationHandler
 # This is intentional - we want per-conversation tracking, not per-message
@@ -264,25 +264,11 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def _update_name(product_id: int, value_str: str, user_id: int, message) -> bool:
     """Update product name. Returns True if successful."""
-    new_name = value_str.strip()
+    # Validate product name using shared validator
+    is_valid, new_name, error_msg = validators.validate_product_name(value_str)
 
-    # Validate length (between 3 and 100 characters)
-    if len(new_name) < 3:
-        await message.reply_text(
-            "❌ *Nome troppo corto*\n\n"
-            "Il nome del prodotto deve contenere almeno 3 caratteri.\n\n"
-            "Riprova oppure /cancel per annullare.",
-            parse_mode="Markdown",
-        )
-        return False
-
-    if len(new_name) > 100:
-        await message.reply_text(
-            "❌ *Nome troppo lungo*\n\n"
-            "Il nome del prodotto può contenere al massimo 100 caratteri.\n\n"
-            "Riprova oppure /cancel per annullare.",
-            parse_mode="Markdown",
-        )
+    if not is_valid:
+        await message.reply_text(error_msg, parse_mode="Markdown")
         return False
 
     await database.update_product(product_id, product_name=new_name)
@@ -298,16 +284,11 @@ async def _update_name(product_id: int, value_str: str, user_id: int, message) -
 
 async def _update_price(product_id: int, asin: str, value_str: str, user_id: int, message) -> bool:
     """Update product price. Returns True if successful."""
-    try:
-        new_price = float(value_str.replace(",", "."))
-        if new_price <= 0:
-            raise ValueError("Price must be positive")
-    except ValueError:
-        await message.reply_text(
-            f"❌ Prezzo non valido: `{value_str}`\n\nUsa un numero positivo (es. 59.90 o 59,90)\n\n"
-            "Riprova oppure /cancel per annullare.",
-            parse_mode="Markdown",
-        )
+    # Validate price using shared validator
+    is_valid, new_price, error_msg = validators.validate_price(value_str, max_digits=16)
+
+    if not is_valid:
+        await message.reply_text(error_msg, parse_mode="Markdown")
         return False
 
     await database.update_product(product_id, price_paid=new_price)
@@ -325,20 +306,13 @@ async def _update_deadline(
     product_id: int, asin: str, value_str: str, user_id: int, message
 ) -> bool:
     """Update product deadline. Returns True if successful."""
+    # Parse deadline using shared validator (already validates future date)
     try:
-        new_deadline = parse_deadline(value_str)
+        new_deadline = validators.parse_deadline(value_str)
     except ValueError as e:
         await message.reply_text(
             f"❌ Scadenza non valida: {e}\n\n"
             "Usa giorni (es. 30) o data gg-mm-aaaa (es. 09-05-2025)\n\n"
-            "Riprova oppure /cancel per annullare."
-        )
-        return False
-
-    if new_deadline < date.today():
-        await message.reply_text(
-            "❌ La scadenza deve essere nel futuro!\n\n"
-            f"Data specificata: {new_deadline.strftime('%d/%m/%Y')}\n\n"
             "Riprova oppure /cancel per annullare."
         )
         return False
@@ -362,18 +336,13 @@ async def _update_threshold(
     product_id: int, asin: str, value_str: str, current_price: float, user_id: int, message
 ) -> bool:
     """Update product threshold. Returns True if successful."""
-    try:
-        new_threshold = float(value_str.replace(",", "."))
-        if new_threshold < 0:
-            raise ValueError("Threshold must be non-negative")
-        if new_threshold >= current_price:
-            raise ValueError("Threshold must be less than price paid")
-    except ValueError as e:
-        await message.reply_text(
-            f"❌ Soglia non valida: {e}\n\n"
-            "La soglia deve essere un numero positivo minore del prezzo pagato.\n\n"
-            "Riprova oppure /cancel per annullare."
-        )
+    # Validate threshold using shared validator
+    is_valid, new_threshold, error_msg = validators.validate_threshold(
+        value_str, max_value=current_price
+    )
+
+    if not is_valid:
+        await message.reply_text(error_msg, parse_mode="Markdown")
         return False
 
     await database.update_product(product_id, min_savings_threshold=new_threshold)
