@@ -59,7 +59,9 @@ jobs:
         uv run pytest --cov=. --cov-report=xml --cov-report=term-missing
 
     - name: Upload coverage to SonarCloud
-      uses: SonarSource/sonarcloud-github-action@master
+      # Skip SonarCloud for Dependabot PRs (no access to secrets)
+      if: github.actor != 'dependabot[bot]'
+      uses: SonarSource/sonarqube-scan-action@v5
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
