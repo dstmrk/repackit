@@ -102,7 +102,7 @@ def _should_notify(
     return True, savings
 
 
-async def _process_product_price_check(product: dict, current_prices: dict) -> dict | None:
+def _process_product_price_check(product: dict, current_prices: dict) -> dict | None:
     """
     Process a single product for price checking.
 
@@ -249,7 +249,7 @@ async def check_and_notify() -> dict:
         price_drop_notifications = []
 
         for product in products:
-            price_drop = await _process_product_price_check(product, current_prices)
+            price_drop = _process_product_price_check(product, current_prices)
             if price_drop:
                 price_drop_notifications.append(price_drop)
 

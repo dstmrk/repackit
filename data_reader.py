@@ -322,9 +322,8 @@ if __name__ == "__main__":
     # Load environment variables
     load_dotenv()
 
-    async def main():
-        """Main function for manual testing and scraping."""
-        # Test ASIN extraction (always shown)
+    def _print_asin_extraction_test():
+        """Print ASIN extraction test results."""
         test_urls = [
             "https://www.amazon.it/dp/B08N5WRWNW",
             "https://amazon.it/gp/product/B08N5WRWNW/ref=something",
@@ -343,79 +342,86 @@ if __name__ == "__main__":
 
         print("\n" + "=" * 70)
 
+    async def _scrape_single_product(asin: str, marketplace: str):
+        """Scrape a single product by ASIN."""
+        print(f"SINGLE PRODUCT SCRAPE: {asin} (amazon.{marketplace})")
+        print("=" * 70)
+
+        price = await scrape_price(asin, marketplace)
+        if price:
+            print(f"✅ Price: €{price:.2f}")
+        else:
+            print("❌ Failed to scrape price")
+            print("\nPossible reasons:")
+            print(f"  - ASIN not found on amazon.{marketplace}")
+            print("  - Network error")
+            print("  - Amazon blocked the request")
+
+    async def _scrape_all_products():
+        """Scrape all products from database."""
+        print("ALL PRODUCTS SCRAPE (from database)")
+        print("=" * 70)
+
+        # Initialize database
+        await database.init_db()
+
+        # Get all active products
+        products = await database.get_all_active_products()
+
+        if not products:
+            print("❌ No active products found in database")
+            print("\nTo scrape a single product, use:")
+            print("  python data_reader.py <ASIN> [marketplace]")
+            print("\nExamples:")
+            print("  python data_reader.py B08N5WRWNW")
+            print("  python data_reader.py B08N5WRWNW de")
+            return
+
+        print(f"Found {len(products)} active products\n")
+
+        # Scrape all prices
+        results = await scrape_prices(products)
+
+        # Show results
+        print("\n" + "=" * 70)
+        print("SCRAPING RESULTS")
+        print("=" * 70)
+
+        for product in products:
+            product_id = product["id"]
+            asin = product["asin"]
+            product_name = product.get("product_name") or f"ASIN {asin}"
+
+            price = results.get(product_id)
+            if price:
+                print(f"\n✅ {product_name} ({asin})")
+                print(f"   Price: €{price:.2f}")
+            else:
+                print(f"\n❌ {product_name} ({asin})")
+                print("   Failed to scrape")
+
+        # Calculate success rate
+        success_count = sum(1 for p in results.values() if p is not None)
+        total_count = len(products)
+        success_rate = (success_count / total_count * 100) if total_count > 0 else 0
+
+        print("\n" + "=" * 70)
+        print(f"Success Rate: {success_count}/{total_count} ({success_rate:.1f}%)")
+        print("=" * 70)
+
+    async def main():
+        """Main function for manual testing and scraping."""
+        # Always show ASIN extraction test
+        _print_asin_extraction_test()
+
         # Mode 1: Scrape single ASIN from command line
         if len(sys.argv) > 1:
             asin = sys.argv[1]
             marketplace = sys.argv[2] if len(sys.argv) > 2 else "it"
-
-            print(f"SINGLE PRODUCT SCRAPE: {asin} (amazon.{marketplace})")
-            print("=" * 70)
-
-            price = await scrape_price(asin, marketplace)
-            if price:
-                print(f"✅ Price: €{price:.2f}")
-            else:
-                print("❌ Failed to scrape price")
-                print("\nPossible reasons:")
-                print("  - ASIN not found on amazon.{marketplace}")
-                print("  - Network error")
-                print("  - Amazon blocked the request")
-
+            await _scrape_single_product(asin, marketplace)
         # Mode 2: Scrape all products from database
         else:
-            print("ALL PRODUCTS SCRAPE (from database)")
-            print("=" * 70)
-
-            # Initialize database
-            await database.init_db()
-
-            # Get all active products
-            products = await database.get_all_active_products()
-
-            if not products:
-                print("❌ No active products found in database")
-                print("\nTo scrape a single product, use:")
-                print("  python data_reader.py <ASIN> [marketplace]")
-                print("\nExamples:")
-                print("  python data_reader.py B08N5WRWNW")
-                print("  python data_reader.py B08N5WRWNW de")
-                return
-
-            print(f"Found {len(products)} active products\n")
-
-            # Scrape all prices
-            results = await scrape_prices(products)
-
-            # Show results
-            print("\n" + "=" * 70)
-            print("SCRAPING RESULTS")
-            print("=" * 70)
-
-            for product in products:
-                product_id = product["id"]
-                asin = product["asin"]
-                marketplace = product.get("marketplace", "it")
-                product_name = product.get("product_name") or f"ASIN {asin}"
-
-                price = results.get(product_id)
-
-                if price:
-                    print(f"\n✅ {product_name}")
-                    print(f"   ASIN: {asin} (amazon.{marketplace})")
-                    print(f"   Price: €{price:.2f}")
-                else:
-                    print(f"\n❌ {product_name}")
-                    print(f"   ASIN: {asin} (amazon.{marketplace})")
-                    print("   Failed to scrape")
-
-            # Summary
-            success_count = len(results)
-            total_count = len(products)
-            success_rate = (success_count / total_count * 100) if total_count > 0 else 0
-
-            print("\n" + "=" * 70)
-            print(f"Successfully scraped: {success_count}/{total_count} ({success_rate:.1f}%)")
-            print("=" * 70)
+            await _scrape_all_products()
 
     # Run async main
     asyncio.run(main())
