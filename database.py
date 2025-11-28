@@ -12,6 +12,10 @@ logger = logging.getLogger(__name__)
 # Get database path from environment
 DATABASE_PATH = os.getenv("DATABASE_PATH", "./data/users.db")
 
+# Product limit configuration
+DEFAULT_MAX_PRODUCTS = int(os.getenv("DEFAULT_MAX_PRODUCTS", "21"))
+INITIAL_MAX_PRODUCTS = int(os.getenv("INITIAL_MAX_PRODUCTS", "5"))
+
 
 async def init_db() -> None:
     """
@@ -33,6 +37,7 @@ async def init_db() -> None:
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
                 language_code TEXT,
+                max_products INTEGER DEFAULT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """
@@ -146,6 +151,50 @@ async def get_all_users() -> list[dict]:
         async with db.execute("SELECT * FROM users") as cursor:
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
+
+
+async def get_user_product_limit(user_id: int) -> int:
+    """
+    Get product limit for a specific user.
+
+    Args:
+        user_id: Telegram user ID
+
+    Returns:
+        Product limit for this user.
+        - If max_products is NULL: returns DEFAULT_MAX_PRODUCTS (21, for admin/special users)
+        - If max_products is set: returns that value (personalized limit)
+        - If user doesn't exist: returns INITIAL_MAX_PRODUCTS (5, for new users)
+    """
+    user = await get_user(user_id)
+    if not user:
+        return INITIAL_MAX_PRODUCTS
+
+    # NULL means admin/special user with max limit
+    if user["max_products"] is None:
+        return DEFAULT_MAX_PRODUCTS
+
+    return user["max_products"]
+
+
+async def set_user_max_products(user_id: int, limit: int) -> None:
+    """
+    Set product limit for a specific user.
+
+    Args:
+        user_id: Telegram user ID
+        limit: New product limit (capped at DEFAULT_MAX_PRODUCTS)
+    """
+    # Cap at DEFAULT_MAX_PRODUCTS
+    limit = min(limit, DEFAULT_MAX_PRODUCTS)
+
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        await db.execute(
+            "UPDATE users SET max_products = ? WHERE user_id = ?",
+            (limit, user_id),
+        )
+        await db.commit()
+        logger.info(f"User {user_id} max_products set to {limit}")
 
 
 # ============================================================================

@@ -139,7 +139,8 @@ async def test_list_handler_multiple_products(test_db):
     assert "€50.00" in message
     assert "€75.00" in message
     assert "€10.00" in message
-    assert "2/20 prodotti" in message
+    # User has no max_products set (NULL), so gets DEFAULT_MAX_PRODUCTS (21)
+    assert "2/21 prodotti" in message
 
 
 @pytest.mark.asyncio
