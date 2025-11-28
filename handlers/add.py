@@ -2,7 +2,7 @@
 
 import logging
 import re
-from datetime import date, timedelta
+from datetime import date
 
 from telegram import Update
 from telegram.ext import (
@@ -15,6 +15,7 @@ from telegram.ext import (
 
 import database
 from data_reader import extract_asin
+from handlers import validators
 
 logger = logging.getLogger(__name__)
 
@@ -46,25 +47,13 @@ async def handle_product_name(update: Update, context: ContextTypes.DEFAULT_TYPE
     Step 2: Store product name, then ask for URL.
     """
     user_id = update.effective_user.id
-    product_name = update.message.text.strip()
+    product_name_input = update.message.text
 
-    # Validate length (between 3 and 100 characters)
-    if len(product_name) < 3:
-        await update.message.reply_text(
-            "❌ *Nome troppo corto*\n\n"
-            "Il nome del prodotto deve contenere almeno 3 caratteri.\n\n"
-            "Riprova oppure /cancel per annullare.",
-            parse_mode="Markdown",
-        )
-        return WAITING_PRODUCT_NAME
+    # Validate product name using shared validator
+    is_valid, product_name, error_msg = validators.validate_product_name(product_name_input)
 
-    if len(product_name) > 100:
-        await update.message.reply_text(
-            "❌ *Nome troppo lungo*\n\n"
-            "Il nome del prodotto può contenere al massimo 100 caratteri.\n\n"
-            "Riprova oppure /cancel per annullare.",
-            parse_mode="Markdown",
-        )
+    if not is_valid:
+        await update.message.reply_text(error_msg, parse_mode="Markdown")
         return WAITING_PRODUCT_NAME
 
     # Store product name
@@ -153,44 +142,13 @@ async def handle_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     Step 4: Validate price (number, max 16 digits total), then ask for deadline.
     """
     user_id = update.effective_user.id
-    price_str = update.message.text.strip()
+    price_input = update.message.text
 
-    # Parse price
-    try:
-        # Allow both comma and dot as decimal separator
-        price_paid = float(price_str.replace(",", "."))
+    # Validate price using shared validator
+    is_valid, price_paid, error_msg = validators.validate_price(price_input, max_digits=16)
 
-        # Validate price is positive
-        if price_paid <= 0:
-            await update.message.reply_text(
-                "❌ *Prezzo non valido*\n\n"
-                "Il prezzo deve essere un numero positivo.\n\n"
-                "Esempio: `59.90` oppure `59,90`\n\n"
-                "Riprova oppure /cancel per annullare.",
-                parse_mode="Markdown",
-            )
-            return WAITING_PRICE
-
-        # Validate max 16 digits total (including decimals)
-        # Remove dots/commas and count digits
-        digits_only = re.sub(r"[,.]", "", price_str)
-        if len(digits_only) > 16:
-            await update.message.reply_text(
-                "❌ *Prezzo troppo lungo*\n\n"
-                "Il prezzo può contenere al massimo 16 cifre in totale.\n\n"
-                "Riprova oppure /cancel per annullare.",
-                parse_mode="Markdown",
-            )
-            return WAITING_PRICE
-
-    except ValueError:
-        await update.message.reply_text(
-            "❌ *Prezzo non valido*\n\n"
-            f"Non riesco a interpretare `{price_str}` come un numero.\n\n"
-            "Esempio: `59.90` oppure `59,90`\n\n"
-            "Riprova oppure /cancel per annullare.",
-            parse_mode="Markdown",
-        )
+    if not is_valid:
+        await update.message.reply_text(error_msg, parse_mode="Markdown")
         return WAITING_PRICE
 
     # Store price in user_data
@@ -221,11 +179,11 @@ async def handle_deadline(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     Step 5: Validate deadline (days 1-365 or date gg-mm-aaaa), then ask for min savings.
     """
     user_id = update.effective_user.id
-    deadline_str = update.message.text.strip()
+    deadline_input = update.message.text
 
-    # Parse deadline
+    # Parse deadline using shared validator
     try:
-        return_deadline = parse_deadline(deadline_str)
+        return_deadline = validators.parse_deadline(deadline_input)
     except ValueError as e:
         await update.message.reply_text(
             f"❌ *Scadenza non valida*\n\n"
@@ -233,17 +191,6 @@ async def handle_deadline(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             "Invia:\n"
             "• Un numero di giorni (da 1 a 365), es. `30`\n"
             "• Una data nel formato gg-mm-aaaa, es. `09-05-2025`\n\n"
-            "Riprova oppure /cancel per annullare.",
-            parse_mode="Markdown",
-        )
-        return WAITING_DEADLINE
-
-    # Check deadline is in the future
-    if return_deadline < date.today():
-        await update.message.reply_text(
-            "❌ *La scadenza deve essere nel futuro!*\n\n"
-            f"Data specificata: {return_deadline.strftime('%d/%m/%Y')}\n"
-            f"Data odierna: {date.today().strftime('%d/%m/%Y')}\n\n"
             "Riprova oppure /cancel per annullare.",
             parse_mode="Markdown",
         )
@@ -275,44 +222,18 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
     Step 6: Validate min savings, then save to database.
     """
     user_id = update.effective_user.id
-    savings_str = update.message.text.strip()
+    threshold_input = update.message.text
 
-    # Parse min savings
-    try:
-        # Allow both comma and dot as decimal separator
-        min_savings = float(savings_str.replace(",", "."))
+    # Get price_paid from context for validation
+    price_paid = context.user_data["product_price"]
 
-        # Validate non-negative
-        if min_savings < 0:
-            await update.message.reply_text(
-                "❌ *Valore non valido*\n\n"
-                "Il risparmio minimo deve essere un numero non negativo.\n\n"
-                "Esempio: `5` oppure `0` per qualsiasi risparmio\n\n"
-                "Riprova oppure /cancel per annullare.",
-                parse_mode="Markdown",
-            )
-            return WAITING_MIN_SAVINGS
+    # Validate threshold using shared validator
+    is_valid, min_savings, error_msg = validators.validate_threshold(
+        threshold_input, max_value=price_paid
+    )
 
-        # Validate it's not greater than price paid
-        price_paid = context.user_data["product_price"]
-        if min_savings >= price_paid:
-            await update.message.reply_text(
-                "❌ *Valore troppo alto*\n\n"
-                f"Il risparmio minimo (€{min_savings:.2f}) deve essere inferiore "
-                f"al prezzo pagato (€{price_paid:.2f}).\n\n"
-                "Riprova oppure /cancel per annullare.",
-                parse_mode="Markdown",
-            )
-            return WAITING_MIN_SAVINGS
-
-    except ValueError:
-        await update.message.reply_text(
-            "❌ *Valore non valido*\n\n"
-            f"Non riesco a interpretare `{savings_str}` come un numero.\n\n"
-            "Esempio: `5` oppure `0` per qualsiasi risparmio\n\n"
-            "Riprova oppure /cancel per annullare.",
-            parse_mode="Markdown",
-        )
+    if not is_valid:
+        await update.message.reply_text(error_msg, parse_mode="Markdown")
         return WAITING_MIN_SAVINGS
 
     logger.info(f"User {user_id} provided min savings: €{min_savings:.2f}")
@@ -405,64 +326,6 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Clear user_data
     context.user_data.clear()
     return ConversationHandler.END
-
-
-def parse_deadline(deadline_input: str) -> date:
-    """
-    Parse return deadline from user input.
-
-    Supports three formats:
-    - Number of days (1-365): "30" -> 30 days from today
-    - Date format gg-mm-aaaa: "09-05-2025" -> specific date
-    - Date format yyyy-mm-dd (ISO): "2025-05-09" -> specific date (for /update compatibility)
-
-    Args:
-        deadline_input: User input string
-
-    Returns:
-        Return deadline as date object
-
-    Raises:
-        ValueError: If input format is invalid
-    """
-    # Try parsing as number of days
-    try:
-        days = int(deadline_input)
-
-        # Validate range 1-365
-        if days < 1 or days > 365:
-            raise ValueError("Il numero di giorni deve essere tra 1 e 365")
-
-        return date.today() + timedelta(days=days)
-
-    except ValueError as e:
-        # If it's our custom error, re-raise it
-        if "giorni deve essere" in str(e):
-            raise
-        # Otherwise, continue to try date parsing
-
-    # Try parsing as date in format gg-mm-aaaa or yyyy-mm-dd
-    try:
-        parts = deadline_input.split("-")
-        if len(parts) != 3:
-            raise ValueError("Invalid date format")
-
-        # Determine format by checking which part is the year (4 digits)
-        if len(parts[0]) == 4:
-            # Format: yyyy-mm-dd (ISO format)
-            year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
-        elif len(parts[2]) == 4:
-            # Format: gg-mm-aaaa
-            day, month, year = int(parts[0]), int(parts[1]), int(parts[2])
-        else:
-            raise ValueError("Year must be 4 digits")
-
-        return date(year, month, day)
-
-    except (ValueError, AttributeError):
-        raise ValueError(
-            "Formato non valido. Usa giorni (es. `30`) o data gg-mm-aaaa (es. `09-05-2025`)"
-        ) from None
 
 
 # Create the ConversationHandler
