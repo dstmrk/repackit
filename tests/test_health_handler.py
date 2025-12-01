@@ -193,14 +193,15 @@ async def test_health_status_stale_task(test_db):
 
 
 @pytest.mark.asyncio
-async def test_health_status_never_run(test_db):
-    """Test health status when task has never run."""
+async def test_health_status_never_run_no_startup_time(test_db):
+    """Test health status when task has never run and no bot startup time recorded."""
     now = datetime.now()
     one_day_ago = (now - timedelta(days=1)).isoformat()
 
     # Only some tasks have run
     await database.update_system_status("last_scraper_run", one_day_ago)
     # checker and cleanup have never run
+    # No bot_startup_time set
 
     health = await health_handler.get_health_status()
 
@@ -208,6 +209,53 @@ async def test_health_status_never_run(test_db):
     assert health["tasks"]["scraper"]["status"] == "ok"
     assert health["tasks"]["checker"]["status"] == "never_run"
     assert health["tasks"]["cleanup"]["status"] == "never_run"
+
+
+@pytest.mark.asyncio
+async def test_health_status_never_run_with_recent_startup(test_db):
+    """Test health status when task has never run but bot started recently (grace period)."""
+    now = datetime.now()
+    one_day_ago = (now - timedelta(days=1)).isoformat()
+
+    # Bot started 1 day ago (within grace period)
+    await database.update_system_status("bot_startup_time", one_day_ago)
+
+    # Only some tasks have run
+    await database.update_system_status("last_scraper_run", one_day_ago)
+    # checker and cleanup have never run, but within grace period
+
+    health = await health_handler.get_health_status()
+
+    # Should be healthy because bot started recently
+    assert health["status"] == "healthy"
+    assert health["tasks"]["scraper"]["status"] == "ok"
+    assert health["tasks"]["checker"]["status"] == "never_run"
+    assert health["tasks"]["cleanup"]["status"] == "never_run"
+    assert "bot_startup_time" in health
+
+
+@pytest.mark.asyncio
+async def test_health_status_never_run_with_old_startup(test_db):
+    """Test health status when task has never run and bot started >2 days ago."""
+    now = datetime.now()
+    one_day_ago = (now - timedelta(days=1)).isoformat()
+    three_days_ago = (now - timedelta(days=3)).isoformat()
+
+    # Bot started 3 days ago (beyond grace period)
+    await database.update_system_status("bot_startup_time", three_days_ago)
+
+    # Only some tasks have run
+    await database.update_system_status("last_scraper_run", one_day_ago)
+    # checker and cleanup have never run, beyond grace period
+
+    health = await health_handler.get_health_status()
+
+    # Should be unhealthy because bot started >2 days ago
+    assert health["status"] == "unhealthy"
+    assert health["tasks"]["scraper"]["status"] == "ok"
+    assert health["tasks"]["checker"]["status"] == "never_run"
+    assert health["tasks"]["cleanup"]["status"] == "never_run"
+    assert "bot_startup_time" in health
 
 
 @pytest.mark.asyncio
@@ -314,8 +362,10 @@ async def test_check_task_health_invalid_timestamp(test_db):
     system_status = await database.get_all_system_status()
     threshold = datetime.now()
 
-    # Call _check_task_health
-    task_status, is_healthy = health_handler._check_task_health("scraper", system_status, threshold)
+    # Call _check_task_health (bot_startup_time not relevant for error case)
+    task_status, is_healthy = health_handler._check_task_health(
+        "scraper", system_status, threshold, bot_startup_time=None
+    )
 
     # Verify error status
     assert task_status["status"] == "error"

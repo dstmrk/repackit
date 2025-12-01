@@ -5,7 +5,6 @@ import logging
 import os
 import signal
 from datetime import UTC, datetime, timedelta
-from logging.handlers import TimedRotatingFileHandler
 
 from dotenv import load_dotenv
 from telegram.ext import Application, CommandHandler
@@ -22,6 +21,7 @@ from handlers.list import list_handler
 from handlers.start import start_handler
 from handlers.update import update_conversation_handler
 from health_handler import HEALTH_PORT, start_health_server
+from utils.logging_config import setup_rotating_file_handler
 
 # Load environment variables
 load_dotenv()
@@ -29,17 +29,8 @@ load_dotenv()
 # Configure logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
-# Create data directory if it doesn't exist
-os.makedirs("data", exist_ok=True)
-
-# Setup rotating file handler (daily rotation, keep 2 backups + today = 3 days total)
-file_handler = TimedRotatingFileHandler(
-    filename="data/repackit.log",
-    when="midnight",
-    interval=1,
-    backupCount=2,
-)
-file_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+# Setup rotating file handler using shared utility
+file_handler = setup_rotating_file_handler("data/repackit.log")
 
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL.upper()),
@@ -247,9 +238,14 @@ def main() -> None:  # pragma: no cover
         )
         return
 
-    # Initialize database (synchronously)
+    # Initialize database and record startup time (synchronously)
     logger.info("Initializing database...")
     asyncio.run(database.init_db())
+
+    # Record bot startup time for health check grace period
+    startup_time = datetime.now(UTC).isoformat()
+    asyncio.run(database.update_system_status("bot_startup_time", startup_time))
+    logger.info(f"Bot startup time recorded: {startup_time}")
 
     # Create bot application with post_init callback
     logger.info("Creating bot application...")

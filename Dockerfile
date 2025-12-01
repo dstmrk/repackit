@@ -58,6 +58,7 @@ COPY --from=builder --chown=root:root --chmod=555 /opt/venv /opt/venv
 COPY --chown=root:root --chmod=555 pyproject.toml ./
 COPY --chown=root:root --chmod=555 *.py ./
 COPY --chown=root:root --chmod=555 handlers/ ./handlers/
+COPY --chown=root:root --chmod=555 utils/ ./utils/
 
 # Install gosu and create entrypoint script in a single layer
 # This reduces image size and satisfies SonarCloud S7031
