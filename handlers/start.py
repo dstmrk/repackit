@@ -1,6 +1,7 @@
 """Handler for /start command."""
 
 import logging
+import os
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -55,5 +56,10 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "/feedback - Invia un feedback\n\n"
         "Usa /help per maggiori informazioni!"
     )
+
+    # Add channel reference if configured
+    telegram_channel = os.getenv("TELEGRAM_CHANNEL", "").strip()
+    if telegram_channel:
+        welcome_message += f"\n\n📢 Seguici su {telegram_channel} per aggiornamenti e novità!"
 
     await update.message.reply_text(welcome_message, parse_mode="Markdown")
