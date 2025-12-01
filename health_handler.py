@@ -1,6 +1,7 @@
 """Health check HTTP server for monitoring using aiohttp."""
 
 import asyncio
+import json
 import logging
 import os
 from datetime import UTC, datetime, timedelta
@@ -34,7 +35,10 @@ def _format_datetime(dt: datetime) -> str:
 
 
 def _check_task_health(
-    task_name: str, system_status: dict, threshold: datetime
+    task_name: str,
+    system_status: dict,
+    threshold: datetime,
+    bot_startup_time: datetime | None,
 ) -> tuple[dict, bool]:
     """
     Check health status of a single task.
@@ -42,16 +46,29 @@ def _check_task_health(
     Args:
         task_name: Name of the task (scraper, checker, cleanup)
         system_status: Dict of all system status entries
-        threshold: Datetime threshold for considering task stale
+        threshold: Datetime threshold for considering task stale (2 days ago)
+        bot_startup_time: Bot startup time for grace period calculation
 
     Returns:
         Tuple of (task_status_dict, is_healthy)
+
+    Health Logic:
+        - If task never_run AND bot started <2 days ago: healthy (grace period)
+        - If task never_run AND bot started ≥2 days ago: unhealthy (should have run)
+        - If task has last_run >= threshold: healthy (recent execution)
+        - If task has last_run < threshold: unhealthy (stale)
     """
     key = f"last_{task_name}_run"
     task_info = system_status.get(key)
 
     if task_info is None:
-        return {"status": "never_run", "last_run": None}, False
+        # Task has never run - check if we're in grace period
+        if bot_startup_time and bot_startup_time >= threshold:
+            # Bot started within last 2 days, grace period is active
+            return {"status": "never_run", "last_run": None}, True
+        else:
+            # Bot started >2 days ago, task should have run by now
+            return {"status": "never_run", "last_run": None}, False
 
     last_run_str = task_info["value"]
     try:
@@ -82,6 +99,7 @@ async def get_health_status() -> dict:
         - timestamp: Current ISO timestamp
         - stats: User and product counts
         - tasks: Status of scheduled tasks (scraper, checker, cleanup)
+        - bot_startup_time: When the bot started (for grace period tracking)
     """
     now = datetime.now(UTC)
     threshold = now - timedelta(days=MAX_DAYS_SINCE_LAST_RUN)
@@ -90,16 +108,29 @@ async def get_health_status() -> dict:
     stats = await database.get_stats()
     system_status = await database.get_all_system_status()
 
+    # Get bot startup time for grace period calculation
+    bot_startup_info = system_status.get("bot_startup_time")
+    bot_startup_time = None
+    if bot_startup_info:
+        try:
+            bot_startup_time = datetime.fromisoformat(bot_startup_info["value"])
+            if bot_startup_time.tzinfo is None:
+                bot_startup_time = bot_startup_time.replace(tzinfo=UTC)
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid bot_startup_time: {bot_startup_info['value']}")
+
     # Check each task's health status
     tasks = {}
     all_healthy = True
 
     for task_name in ["scraper", "checker", "cleanup"]:
-        task_status, is_healthy = _check_task_health(task_name, system_status, threshold)
+        task_status, is_healthy = _check_task_health(
+            task_name, system_status, threshold, bot_startup_time
+        )
         tasks[task_name] = task_status
         all_healthy = all_healthy and is_healthy
 
-    return {
+    result = {
         "status": "healthy" if all_healthy else "unhealthy",
         "timestamp": _format_datetime(now),
         "stats": {
@@ -112,6 +143,12 @@ async def get_health_status() -> dict:
         "tasks": tasks,
     }
 
+    # Add bot_startup_time if available
+    if bot_startup_time:
+        result["bot_startup_time"] = _format_datetime(bot_startup_time)
+
+    return result
+
 
 async def health_check_handler(request: web.Request) -> web.Response:
     """
@@ -121,14 +158,27 @@ async def health_check_handler(request: web.Request) -> web.Response:
         request: aiohttp Request object
 
     Returns:
-        JSON response with health status
+        Pretty-printed JSON response with health status (indent=2 for browser readability)
     """
     try:
         health_data = await get_health_status()
-        return web.json_response(health_data)
+        # Use json.dumps with indent for pretty-printed output
+        json_str = json.dumps(health_data, indent=2, ensure_ascii=False)
+        return web.Response(
+            text=json_str,
+            content_type="application/json",
+            charset="utf-8",
+        )
     except Exception as e:
         logger.error(f"Health check error: {e}", exc_info=True)
-        return web.json_response({"status": "error", "message": str(e)}, status=500)
+        error_data = {"status": "error", "message": str(e)}
+        json_str = json.dumps(error_data, indent=2, ensure_ascii=False)
+        return web.Response(
+            text=json_str,
+            content_type="application/json",
+            charset="utf-8",
+            status=500,
+        )
 
 
 async def start_health_server():
