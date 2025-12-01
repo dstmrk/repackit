@@ -6,8 +6,6 @@ import tempfile
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
-import pytest
-
 from utils.logging_config import setup_rotating_file_handler
 
 
