@@ -233,9 +233,8 @@ async def run_scraper_test(
 
             # Save debug files if requested
             if save_debug:
-                # Use secure temporary directory instead of /tmp
-                # Create debug_output directory in current working directory
-                output_dir = Path.cwd() / "debug_output"
+                # Save to data/ directory instead of debug_output/
+                output_dir = Path.cwd() / "data"
                 output_dir.mkdir(exist_ok=True)
                 html_path, screenshot_path = await save_debug_files(
                     browser, asin, marketplace, output_dir
@@ -372,7 +371,7 @@ Examples:
         "--save-debug",
         "-d",
         action="store_true",
-        help="Save HTML and screenshot to /tmp for debugging",
+        help="Save HTML and screenshot to ./data for debugging",
     )
 
     parser.add_argument(
@@ -440,7 +439,7 @@ async def main() -> int:
     print_info(f"Expected price: €{args.expected_price:.2f}")
 
     if args.save_debug:
-        print_info("Debug files will be saved to ./debug_output")
+        print_info("Debug files will be saved to ./data")
 
     results = await run_scraper_test(
         asin=args.asin,
