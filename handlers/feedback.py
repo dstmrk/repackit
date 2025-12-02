@@ -51,7 +51,9 @@ async def start_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 hours_remaining = FEEDBACK_RATE_LIMIT_HOURS - hours_since_last
 
                 if hours_remaining >= 1:
-                    time_str = f"{int(hours_remaining)} or{'e' if int(hours_remaining) == 1 else 'e'}"
+                    time_str = (
+                        f"{int(hours_remaining)} or{'a' if int(hours_remaining) == 1 else 'e'}"
+                    )
                 else:
                     minutes_remaining = int(hours_remaining * 60)
                     time_str = f"{minutes_remaining} minut{'o' if minutes_remaining == 1 else 'i'}"
