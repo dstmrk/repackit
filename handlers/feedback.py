@@ -1,7 +1,7 @@
 """Handler for /feedback command with conversational flow."""
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (

@@ -11,7 +11,6 @@ from telegram.ext import ConversationHandler
 
 import database
 from handlers.feedback import (
-    FEEDBACK_RATE_LIMIT_HOURS,
     MAX_FEEDBACK_LENGTH,
     MIN_FEEDBACK_LENGTH,
     WAITING_FEEDBACK_MESSAGE,
