@@ -124,6 +124,7 @@ CREATE TABLE system_status (
 - `last_notified_price` follows OctoTracker pattern: only notify if new price is **lower** than last notification.
 - `return_deadline` is stored as DATE, supporting both "30 giorni" and "2024-12-25" input formats.
 - `system_status` tracks scheduled task execution for health checks (see `health_handler.py`).
+- `feedback.created_at` is used for rate limiting: users can submit one feedback every 24 hours (see `/feedback` handler).
 
 ---
 
@@ -671,6 +672,16 @@ The `/feedback` command uses a conversational flow to collect user feedback with
 - **Max length**: 1000 characters (prevents abuse)
 - **Whitespace**: Leading/trailing spaces automatically stripped
 - **Characters**: Supports emojis and special characters
+
+**Rate Limiting** (Anti-Spam):
+- Users can submit **one feedback every 24 hours**
+- If user tries to submit again within 24 hours, bot shows:
+  - Time remaining until next feedback allowed (in hours or minutes)
+  - Friendly message explaining the rate limit
+- Rate limit resets exactly 24 hours after last submission
+- Implementation: `FEEDBACK_RATE_LIMIT_HOURS = 24` in `handlers/feedback.py`
+- Database function: `database.get_last_feedback_time(user_id)` checks `created_at` timestamp
+- **Fail-open design**: If timestamp parsing fails, allow feedback (prevents blocking legitimate users)
 
 **Preview Features**:
 - Shows first 200 characters for long feedback

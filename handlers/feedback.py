@@ -1,6 +1,7 @@
 """Handler for /feedback command with conversational flow."""
 
 import logging
+from datetime import datetime, timedelta
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 # Constants
 MIN_FEEDBACK_LENGTH = 10
 MAX_FEEDBACK_LENGTH = 1000
+FEEDBACK_RATE_LIMIT_HOURS = 24  # Allow one feedback every 24 hours
 
 # Conversation state
 WAITING_FEEDBACK_MESSAGE = 0
@@ -28,16 +30,54 @@ async def start_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     """
     Start the /feedback conversation flow.
 
-    Step 1: Ask for feedback message.
+    Step 1: Check rate limit, then ask for feedback message.
     """
     user_id = update.effective_user.id
 
     logger.info(f"User {user_id} started /feedback command")
 
+    # Check rate limit (24 hours)
+    last_feedback_time = await database.get_last_feedback_time(user_id)
+
+    if last_feedback_time:
+        try:
+            # Parse the timestamp (SQLite returns ISO format)
+            last_time = datetime.fromisoformat(last_feedback_time)
+            time_since_last = datetime.now() - last_time
+            hours_since_last = time_since_last.total_seconds() / 3600
+
+            if hours_since_last < FEEDBACK_RATE_LIMIT_HOURS:
+                # Calculate remaining time
+                hours_remaining = FEEDBACK_RATE_LIMIT_HOURS - hours_since_last
+
+                if hours_remaining >= 1:
+                    time_str = f"{int(hours_remaining)} or{'e' if int(hours_remaining) == 1 else 'e'}"
+                else:
+                    minutes_remaining = int(hours_remaining * 60)
+                    time_str = f"{minutes_remaining} minut{'o' if minutes_remaining == 1 else 'i'}"
+
+                logger.info(
+                    f"User {user_id} rate limited: {hours_since_last:.1f}h since last feedback"
+                )
+
+                await update.message.reply_text(
+                    f"⏳ <b>Limite raggiunto</b>\n\n"
+                    f"Puoi inviare un nuovo feedback tra circa <b>{time_str}</b>.\n\n"
+                    "Questo limite aiuta a prevenire lo spam e garantisce "
+                    "che ogni feedback riceva la giusta attenzione. 🙏",
+                    parse_mode="HTML",
+                )
+                return ConversationHandler.END
+
+        except (ValueError, TypeError) as e:
+            # If timestamp parsing fails, allow feedback (fail open)
+            logger.warning(f"Error parsing last_feedback_time for user {user_id}: {e}")
+
+    # Rate limit passed, proceed with feedback flow
     await update.message.reply_text(
         "💬 <b>Invia il tuo feedback</b>\n\n"
         "Scrivi il tuo feedback, suggerimento o segnalazione di bug.\n\n"
-        f"_Minimo {MIN_FEEDBACK_LENGTH} caratteri, massimo {MAX_FEEDBACK_LENGTH} caratteri._\n\n"
+        f"<i>Minimo {MIN_FEEDBACK_LENGTH} caratteri, massimo {MAX_FEEDBACK_LENGTH} caratteri.</i>\n\n"
         "Oppure scrivi /cancel per annullare.",
         parse_mode="HTML",
     )
