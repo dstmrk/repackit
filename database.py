@@ -412,6 +412,25 @@ async def delete_expired_products() -> int:
 # ============================================================================
 
 
+async def get_last_feedback_time(user_id: int) -> str | None:
+    """
+    Get timestamp of user's last feedback submission.
+
+    Args:
+        user_id: Telegram user ID
+
+    Returns:
+        ISO timestamp string of last feedback, or None if user never submitted feedback
+    """
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        async with db.execute(
+            "SELECT created_at FROM feedback WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+            (user_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else None
+
+
 async def add_feedback(user_id: int, message: str) -> int:
     """
     Add user feedback to database.
