@@ -213,10 +213,6 @@ async def post_init(application: Application) -> None:  # pragma: no cover
     application.bot_data["checker_task"] = checker_task
     application.bot_data["cleanup_task"] = cleanup_task
 
-    logger.info(f"Scraper scheduled for {calculate_next_run(SCRAPER_HOUR)}")
-    logger.info(f"Checker scheduled for {calculate_next_run(CHECKER_HOUR)}")
-    logger.info(f"Cleanup scheduled for {calculate_next_run(CLEANUP_HOUR)}")
-
     # Start health check server (async background task)
     health_task = asyncio.create_task(start_health_server())
     application.bot_data["health_task"] = health_task
