@@ -117,7 +117,6 @@ async def test_start_handler_no_language_code(test_db):
     update.message.reply_text.assert_called_once()
 
 
-
 @pytest.mark.asyncio
 async def test_start_handler_with_valid_referral(test_db):
     """Test /start handler with valid referral code."""
@@ -265,4 +264,3 @@ async def test_start_handler_existing_user_ignores_referral(test_db):
     # Verify slots weren't changed
     limit = await database.get_user_product_limit(12345)
     assert limit == 10
-
