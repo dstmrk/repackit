@@ -25,7 +25,7 @@ warnings.filterwarnings("ignore", category=PTBUserWarning)
 logger = logging.getLogger(__name__)
 
 # Constants
-CANCEL_MESSAGE = "❌ *Operazione annullata*\n\nNessuna modifica è stata effettuata."
+CANCEL_MESSAGE = "❌ <b>Operazione annullata</b>\n\nNessuna modifica è stata effettuata."
 
 # Conversation states
 WAITING_PRODUCT_SELECTION, WAITING_FIELD_SELECTION, WAITING_VALUE_INPUT = range(3)
@@ -46,8 +46,8 @@ async def start_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
     if not products:
         await update.message.reply_text(
-            "📭 *Non hai prodotti da aggiornare*\n\nUsa /add per aggiungere un prodotto!",
-            parse_mode="Markdown",
+            "📭 <b>Non hai prodotti da aggiornare</b>\n\nUsa /add per aggiungere un prodotto!",
+            parse_mode="HTML",
         )
         return ConversationHandler.END
 
@@ -68,8 +68,8 @@ async def start_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        "🔄 *Aggiorna un prodotto*\n\nSeleziona il prodotto che vuoi modificare:",
-        parse_mode="Markdown",
+        "🔄 <b>Aggiorna un prodotto</b>\n\nSeleziona il prodotto che vuoi modificare:",
+        parse_mode="HTML",
         reply_markup=reply_markup,
     )
 
@@ -93,7 +93,7 @@ async def handle_product_selection(update: Update, context: ContextTypes.DEFAULT
     if callback_data == "update_cancel":
         await query.edit_message_text(
             CANCEL_MESSAGE,
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
         return ConversationHandler.END
 
@@ -129,8 +129,8 @@ async def handle_product_selection(update: Update, context: ContextTypes.DEFAULT
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
-        f"📦 *Prodotto selezionato:* {product_display}\n\n" "Cosa vuoi modificare?",
-        parse_mode="Markdown",
+        f"📦 <b>Prodotto selezionato:</b> {product_display}\n\n" "Cosa vuoi modificare?",
+        parse_mode="HTML",
         reply_markup=reply_markup,
     )
 
@@ -151,38 +151,38 @@ def _get_field_update_message(field: str, context_data: dict) -> str:
     if field == "nome":
         current_name = context_data["update_product_name"]
         return (
-            "📦 *Aggiorna nome prodotto*\n\n"
-            f"Nome attuale: *{current_name}*\n\n"
+            "📦 <b>Aggiorna nome prodotto</b>\n\n"
+            f"Nome attuale: <b>{current_name}</b>\n\n"
             "Inviami il nuovo nome (tra 3 e 100 caratteri).\n\n"
-            "Esempio: `iPhone 15 Pro` oppure `Cuffie Sony`\n\n"
+            "Esempio: <code>iPhone 15 Pro</code> oppure <code>Cuffie Sony</code>\n\n"
             "Oppure scrivi /cancel per annullare."
         )
     elif field == "soglia":
         current_price = context_data["update_product_price_paid"]
         return (
-            "🎯 *Aggiorna soglia risparmio*\n\n"
+            "🎯 <b>Aggiorna soglia risparmio</b>\n\n"
             "Inviami la nuova soglia minima di risparmio in euro.\n\n"
             f"Deve essere minore del prezzo pagato (€{current_price:.2f})\n\n"
-            "Esempio: `5.00` oppure `5,00`\n\n"
+            "Esempio: <code>5.00</code> oppure <code>5,00</code>\n\n"
             "Oppure scrivi /cancel per annullare."
         )
 
     # Static messages for prezzo and scadenza
     messages = {
         "prezzo": (
-            "💰 *Aggiorna prezzo pagato*\n\n"
+            "💰 <b>Aggiorna prezzo pagato</b>\n\n"
             "Inviami il nuovo prezzo in euro.\n\n"
-            "Esempio: `59.90` oppure `59,90`\n\n"
+            "Esempio: <code>59.90</code> oppure <code>59,90</code>\n\n"
             "Oppure scrivi /cancel per annullare."
         ),
         "scadenza": (
-            "📅 *Aggiorna scadenza reso*\n\n"
+            "📅 <b>Aggiorna scadenza reso</b>\n\n"
             "Inviami la nuova scadenza.\n\n"
             "Puoi inviarmi:\n"
             "• Un numero di giorni (da 1 a 365)\n"
-            "  Esempio: `30`\n\n"
+            "  Esempio: <code>30</code>\n\n"
             "• Una data nel formato gg-mm-aaaa\n"
-            "  Esempio: `09-05-2025`\n\n"
+            "  Esempio: <code>09-05-2025</code>\n\n"
             "Oppure scrivi /cancel per annullare."
         ),
     }
@@ -206,7 +206,7 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
     if callback_data == "update_cancel":
         await query.edit_message_text(
             CANCEL_MESSAGE,
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
         context.user_data.clear()
         return ConversationHandler.END
@@ -220,7 +220,7 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
     # Get message for selected field using dictionary dispatch
     message = _get_field_update_message(field, context.user_data)
 
-    await query.edit_message_text(message, parse_mode="Markdown")
+    await query.edit_message_text(message, parse_mode="HTML")
 
     return WAITING_VALUE_INPUT
 
@@ -274,7 +274,7 @@ async def handle_value_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancel the conversation."""
-    await update.message.reply_text(CANCEL_MESSAGE, parse_mode="Markdown")
+    await update.message.reply_text(CANCEL_MESSAGE, parse_mode="HTML")
     context.user_data.clear()
     return ConversationHandler.END
 
@@ -285,13 +285,13 @@ async def _update_name(product_id: int, value_str: str, user_id: int, message) -
     is_valid, new_name, error_msg = validators.validate_product_name(value_str)
 
     if not is_valid:
-        await message.reply_text(error_msg, parse_mode="Markdown")
+        await message.reply_text(error_msg, parse_mode="HTML")
         return False
 
     await database.update_product(product_id, product_name=new_name)
     await message.reply_text(
-        "✅ *Nome aggiornato con successo!*\n\n" f"📦 Nuovo nome: *{new_name}*",
-        parse_mode="Markdown",
+        "✅ <b>Nome aggiornato con successo!</b>\n\n" f"📦 Nuovo nome: <b>{new_name}</b>",
+        parse_mode="HTML",
     )
     logger.info(
         f"Product name updated for user {user_id}: product_id={product_id}, new_name={new_name}"
@@ -305,15 +305,15 @@ async def _update_price(product_id: int, asin: str, value_str: str, user_id: int
     is_valid, new_price, error_msg = validators.validate_price(value_str, max_digits=16)
 
     if not is_valid:
-        await message.reply_text(error_msg, parse_mode="Markdown")
+        await message.reply_text(error_msg, parse_mode="HTML")
         return False
 
     await database.update_product(product_id, price_paid=new_price)
     await message.reply_text(
-        "✅ *Prezzo aggiornato con successo!*\n\n"
-        f"📦 ASIN: `{asin}`\n"
+        "✅ <b>Prezzo aggiornato con successo!</b>\n\n"
+        f"📦 ASIN: <code>{asin}</code>\n"
         f"💰 Nuovo prezzo: €{new_price:.2f}",
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
     logger.info(f"Price updated for user {user_id}: product_id={product_id}, new_price={new_price}")
     return True
@@ -338,10 +338,10 @@ async def _update_deadline(
 
     days_remaining = (new_deadline - date.today()).days
     await message.reply_text(
-        "✅ *Scadenza aggiornata con successo!*\n\n"
-        f"📦 ASIN: `{asin}`\n"
+        "✅ <b>Scadenza aggiornata con successo!</b>\n\n"
+        f"📦 ASIN: <code>{asin}</code>\n"
         f"📅 Nuova scadenza: {new_deadline.strftime('%d/%m/%Y')} (tra {days_remaining} giorni)",
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
     logger.info(
         f"Deadline updated for user {user_id}: product_id={product_id}, new_deadline={new_deadline}"
@@ -359,15 +359,15 @@ async def _update_threshold(
     )
 
     if not is_valid:
-        await message.reply_text(error_msg, parse_mode="Markdown")
+        await message.reply_text(error_msg, parse_mode="HTML")
         return False
 
     await database.update_product(product_id, min_savings_threshold=new_threshold)
     await message.reply_text(
-        "✅ *Soglia aggiornata con successo!*\n\n"
-        f"📦 ASIN: `{asin}`\n"
+        "✅ <b>Soglia aggiornata con successo!</b>\n\n"
+        f"📦 ASIN: <code>{asin}</code>\n"
         f"🎯 Nuova soglia risparmio: €{new_threshold:.2f}",
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
     logger.info(
         f"Threshold updated for user {user_id}: product_id={product_id}, new_threshold={new_threshold}"

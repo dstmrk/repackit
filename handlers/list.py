@@ -32,14 +32,14 @@ async def list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         if not products:
             await update.message.reply_text(
-                "📭 *Nessun prodotto monitorato*\n\n"
+                "📭 <b>Nessun prodotto monitorato</b>\n\n"
                 "Usa /add per aggiungere il tuo primo prodotto!",
-                parse_mode="Markdown",
+                parse_mode="HTML",
             )
             return
 
         # Build product list message
-        message_parts = ["📦 *I tuoi prodotti monitorati:*\n"]
+        message_parts = ["📦 <b>I tuoi prodotti monitorati:</b>\n"]
 
         today = date.today()
 
@@ -59,16 +59,16 @@ async def list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             if days_remaining > 0:
                 deadline_info = f"{deadline_str} (tra {days_remaining} giorni)"
             elif days_remaining == 0:
-                deadline_info = f"{deadline_str} (*oggi!*)"
+                deadline_info = f"{deadline_str} (<b>oggi!</b>)"
             else:
-                deadline_info = f"{deadline_str} (*scaduto*)"
+                deadline_info = f"{deadline_str} (<b>scaduto</b>)"
 
             # Build product URL
             product_url = build_affiliate_url(asin, marketplace)
 
             # Add product info
             product_info = (
-                f"\n*{idx}.* [{product_name}]({product_url})\n"
+                f"\n<b>{idx}.</b> <a href='{product_url}'>{product_name}</a>\n"
                 f"   💰 Prezzo pagato: €{price_paid:.2f}\n"
                 f"   📅 Scadenza reso: {deadline_info}\n"
             )
@@ -83,12 +83,12 @@ async def list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         # Add footer with dynamic limit
         user_limit = await database.get_user_product_limit(user_id)
         message += (
-            f"\n_Hai {len(products)}/{user_limit} prodotti monitorati._\n"
+            f"\n<i>Hai {len(products)}/{user_limit} prodotti monitorati.</i>\n"
             f"Usa /delete per rimuoverne uno, /update per modificarne uno."
         )
 
         await update.message.reply_text(
-            message, parse_mode="Markdown", disable_web_page_preview=True
+            message, parse_mode="HTML", disable_web_page_preview=True
         )
 
     except Exception as e:
