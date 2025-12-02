@@ -30,12 +30,12 @@ async def start_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     Step 1: Ask for product name.
     """
     await update.message.reply_text(
-        "📦 *Aggiungi un nuovo prodotto*\n\n"
+        "📦 <b>Aggiungi un nuovo prodotto</b>\n\n"
         "Come vuoi chiamare questo prodotto?\n\n"
-        "Esempio: `iPhone 15 Pro` oppure `Cuffie Sony`\n\n"
+        "Esempio: <code>iPhone 15 Pro</code> oppure <code>Cuffie Sony</code>\n\n"
         "Questo nome ti aiuterà a riconoscere il prodotto nella lista.\n\n"
         "Oppure scrivi /cancel per annullare.",
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
     return WAITING_PRODUCT_NAME
 
@@ -53,7 +53,7 @@ async def handle_product_name(update: Update, context: ContextTypes.DEFAULT_TYPE
     is_valid, product_name, error_msg = validators.validate_product_name(product_name_input)
 
     if not is_valid:
-        await update.message.reply_text(error_msg, parse_mode="Markdown")
+        await update.message.reply_text(error_msg, parse_mode="HTML")
         return WAITING_PRODUCT_NAME
 
     # Store product name
@@ -63,12 +63,12 @@ async def handle_product_name(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # Ask for URL
     await update.message.reply_text(
-        "✅ *Nome salvato!*\n\n"
+        "✅ <b>Nome salvato!</b>\n\n"
         f"📦 {product_name}\n\n"
-        "Ora inviami il *link del prodotto Amazon.it* che hai acquistato.\n\n"
-        "Esempio: `https://amazon.it/dp/B08N5WRWNW`\n\n"
+        "Ora inviami il <b>link del prodotto Amazon.it</b> che hai acquistato.\n\n"
+        "Esempio: <code>https://amazon.it/dp/B08N5WRWNW</code>\n\n"
         "Oppure scrivi /cancel per annullare.",
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
     return WAITING_URL
 
@@ -85,10 +85,10 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Validate it's an Amazon.it URL
     if not re.search(r"amazon\.it", url, re.IGNORECASE):
         await update.message.reply_text(
-            "❌ *URL non valido*\n\n"
+            "❌ <b>URL non valido</b>\n\n"
             "Il link deve essere di Amazon.it (non .com, .de, ecc.)\n\n"
             "Invia un link valido oppure /cancel per annullare.",
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
         return WAITING_URL
 
@@ -99,20 +99,20 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         # Double check marketplace is "it"
         if marketplace != "it":
             await update.message.reply_text(
-                "❌ *Marketplace non supportato*\n\n"
+                "❌ <b>Marketplace non supportato</b>\n\n"
                 "Al momento supportiamo solo Amazon.it\n\n"
                 "Invia un link Amazon.it oppure /cancel per annullare.",
-                parse_mode="Markdown",
+                parse_mode="HTML",
             )
             return WAITING_URL
 
     except ValueError as e:
         await update.message.reply_text(
-            f"❌ *URL Amazon non valido*\n\n"
+            f"❌ <b>URL Amazon non valido</b>\n\n"
             f"{e}\n\n"
             "Assicurati di usare un link Amazon corretto.\n\n"
             "Invia un link valido oppure /cancel per annullare.",
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
         return WAITING_URL
 
@@ -125,12 +125,12 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     # Ask for price
     await update.message.reply_text(
-        "✅ *Prodotto riconosciuto!*\n\n"
-        f"📦 ASIN: `{asin}`\n\n"
-        "Ora inviami il *prezzo che hai pagato* in euro.\n\n"
-        "Esempio: `59.90` oppure `59,90`\n\n"
+        "✅ <b>Prodotto riconosciuto!</b>\n\n"
+        f"📦 ASIN: <code>{asin}</code>\n\n"
+        "Ora inviami il <b>prezzo che hai pagato</b> in euro.\n\n"
+        "Esempio: <code>59.90</code> oppure <code>59,90</code>\n\n"
         "Oppure scrivi /cancel per annullare.",
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
     return WAITING_PRICE
 
@@ -148,7 +148,7 @@ async def handle_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     is_valid, price_paid, error_msg = validators.validate_price(price_input, max_digits=16)
 
     if not is_valid:
-        await update.message.reply_text(error_msg, parse_mode="Markdown")
+        await update.message.reply_text(error_msg, parse_mode="HTML")
         return WAITING_PRICE
 
     # Store price in user_data
@@ -158,16 +158,16 @@ async def handle_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
     # Ask for deadline
     await update.message.reply_text(
-        "✅ *Prezzo salvato!*\n\n"
+        "✅ <b>Prezzo salvato!</b>\n\n"
         f"💰 Prezzo: €{price_paid:.2f}\n\n"
-        "Ora inviami la *scadenza del reso*.\n\n"
+        "Ora inviami la <b>scadenza del reso</b>.\n\n"
         "Puoi inviarmi:\n"
         "• Un numero di giorni (da 1 a 365)\n"
-        "  Esempio: `30`\n\n"
+        "  Esempio: <code>30</code>\n\n"
         "• Una data nel formato gg-mm-aaaa\n"
-        "  Esempio: `09-05-2025`\n\n"
+        "  Esempio: <code>09-05-2025</code>\n\n"
         "Oppure scrivi /cancel per annullare.",
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
     return WAITING_DEADLINE
 
@@ -186,13 +186,13 @@ async def handle_deadline(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return_deadline = validators.parse_deadline(deadline_input)
     except ValueError as e:
         await update.message.reply_text(
-            f"❌ *Scadenza non valida*\n\n"
+            f"❌ <b>Scadenza non valida</b>\n\n"
             f"{e}\n\n"
             "Invia:\n"
-            "• Un numero di giorni (da 1 a 365), es. `30`\n"
-            "• Una data nel formato gg-mm-aaaa, es. `09-05-2025`\n\n"
+            "• Un numero di giorni (da 1 a 365), es. <code>30</code>\n"
+            "• Una data nel formato gg-mm-aaaa, es. <code>09-05-2025</code>\n\n"
             "Riprova oppure /cancel per annullare.",
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
         return WAITING_DEADLINE
 
@@ -204,13 +204,13 @@ async def handle_deadline(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Ask for minimum savings threshold
     price_paid = context.user_data["product_price"]
     await update.message.reply_text(
-        "✅ *Scadenza salvata!*\n\n"
+        "✅ <b>Scadenza salvata!</b>\n\n"
         f"📅 Scadenza: {return_deadline.strftime('%d/%m/%Y')}\n\n"
-        "Infine, qual è il *risparmio minimo* per cui vuoi essere notificato?\n\n"
-        "Invia un numero in euro (ad esempio `5` per essere avvisato solo se risparmi almeno €5).\n\n"
-        f"Scrivi `0` per essere notificato di *qualunque* prezzo migliore di €{price_paid:.2f}.\n\n"
+        "Infine, qual è il <b>risparmio minimo</b> per cui vuoi essere notificato?\n\n"
+        "Invia un numero in euro (ad esempio <code>5</code> per essere avvisato solo se risparmi almeno €5).\n\n"
+        f"Scrivi <code>0</code> per essere notificato di <b>qualunque</b> prezzo migliore di €{price_paid:.2f}.\n\n"
         "Oppure scrivi /cancel per annullare.",
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
     return WAITING_MIN_SAVINGS
 
@@ -233,7 +233,7 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
     if not is_valid:
-        await update.message.reply_text(error_msg, parse_mode="Markdown")
+        await update.message.reply_text(error_msg, parse_mode="HTML")
         return WAITING_MIN_SAVINGS
 
     logger.info(f"User {user_id} provided min savings: €{min_savings:.2f}")
@@ -255,10 +255,10 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         if len(user_products) >= user_limit:
             await update.message.reply_text(
-                "❌ *Limite prodotti raggiunto!*\n\n"
-                f"Puoi monitorare al massimo *{user_limit} prodotti* contemporaneamente.\n\n"
+                "❌ <b>Limite prodotti raggiunto!</b>\n\n"
+                f"Puoi monitorare al massimo <b>{user_limit} prodotti</b> contemporaneamente.\n\n"
                 "Usa /delete per rimuovere un prodotto e fare spazio.",
-                parse_mode="Markdown",
+                parse_mode="HTML",
             )
             logger.info(f"User {user_id} reached product limit ({user_limit} products)")
             # Clear user_data and end conversation
@@ -282,9 +282,9 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # Build success message
         days_remaining = (return_deadline - date.today()).days
         message = (
-            "✅ *Prodotto aggiunto con successo!*\n\n"
-            f"📦 *{product_name}*\n"
-            f"🔖 ASIN: `{asin}`\n"
+            "✅ <b>Prodotto aggiunto con successo!</b>\n\n"
+            f"📦 <b>{product_name}</b>\n"
+            f"🔖 ASIN: <code>{asin}</code>\n"
             f"💰 Prezzo pagato: €{price_paid:.2f}\n"
             f"📅 Scadenza reso: {return_deadline.strftime('%d/%m/%Y')} (tra {days_remaining} giorni)\n"
         )
@@ -295,11 +295,11 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
             message += "🎯 Notifica per qualsiasi risparmio\n"
 
         message += (
-            "\n_Monitorerò il prezzo ogni giorno e ti avviserò se scende!_\n\n"
+            "\n<i>Monitorerò il prezzo ogni giorno e ti avviserò se scende!</i>\n\n"
             "Usa /list per vedere tutti i tuoi prodotti."
         )
 
-        await update.message.reply_text(message, parse_mode="Markdown")
+        await update.message.reply_text(message, parse_mode="HTML")
 
         logger.info(
             f"Product added for user {user_id}: name={product_name}, ASIN={asin}, "
@@ -320,10 +320,10 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     Cancel the conversation.
     """
     await update.message.reply_text(
-        "❌ *Operazione annullata*\n\n"
+        "❌ <b>Operazione annullata</b>\n\n"
         "Nessun prodotto è stato aggiunto.\n\n"
         "Usa /add per iniziare di nuovo.",
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
 
     # Clear user_data

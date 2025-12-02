@@ -42,13 +42,13 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     # Send welcome message
     welcome_message = (
-        "👋 *Benvenuto su RepackIt!*\n\n"
+        "👋 <b>Benvenuto su RepackIt!</b>\n\n"
         "Ti aiuto a risparmiare monitorando i prezzi Amazon durante il periodo di reso.\n\n"
-        "*Come funziona:*\n"
+        "<b>Come funziona:</b>\n"
         "1️⃣ Aggiungi un prodotto che hai già acquistato\n"
         "2️⃣ Controllo il prezzo ogni giorno\n"
         "3️⃣ Ti avviso se scende, così puoi fare un nuovo ordine e restituire il precedente!\n\n"
-        "*Comandi disponibili:*\n"
+        "<b>Comandi disponibili:</b>\n"
         "/add - Aggiungi un prodotto da monitorare\n"
         "/list - Visualizza i tuoi prodotti\n"
         "/delete - Rimuovi un prodotto\n"
@@ -62,4 +62,4 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if telegram_channel:
         welcome_message += f"\n\n📢 Seguici su {telegram_channel} per aggiornamenti e novità!"
 
-    await update.message.reply_text(welcome_message, parse_mode="Markdown")
+    await update.message.reply_text(welcome_message, parse_mode="HTML")

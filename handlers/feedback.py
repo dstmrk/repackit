@@ -35,11 +35,11 @@ async def start_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     logger.info(f"User {user_id} started /feedback command")
 
     await update.message.reply_text(
-        "💬 *Invia il tuo feedback*\n\n"
+        "💬 <b>Invia il tuo feedback</b>\n\n"
         "Scrivi il tuo feedback, suggerimento o segnalazione di bug.\n\n"
         f"_Minimo {MIN_FEEDBACK_LENGTH} caratteri, massimo {MAX_FEEDBACK_LENGTH} caratteri._\n\n"
         "Oppure scrivi /cancel per annullare.",
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
 
     return WAITING_FEEDBACK_MESSAGE
@@ -57,21 +57,21 @@ async def handle_feedback_message(update: Update, context: ContextTypes.DEFAULT_
     # Validate length
     if len(feedback_message) < MIN_FEEDBACK_LENGTH:
         await update.message.reply_text(
-            f"❌ *Feedback troppo breve!*\n\n"
-            f"Il feedback deve contenere almeno *{MIN_FEEDBACK_LENGTH} caratteri*.\n"
+            f"❌ <b>Feedback troppo breve!</b>\n\n"
+            f"Il feedback deve contenere almeno <b>{MIN_FEEDBACK_LENGTH} caratteri</b>.\n"
             f"Attualmente: {len(feedback_message)} caratteri.\n\n"
             "Riprova oppure /cancel per annullare.",
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
         return WAITING_FEEDBACK_MESSAGE
 
     if len(feedback_message) > MAX_FEEDBACK_LENGTH:
         await update.message.reply_text(
-            f"❌ *Feedback troppo lungo!*\n\n"
-            f"Il feedback non può superare *{MAX_FEEDBACK_LENGTH} caratteri*.\n"
+            f"❌ <b>Feedback troppo lungo!</b>\n\n"
+            f"Il feedback non può superare <b>{MAX_FEEDBACK_LENGTH} caratteri</b>.\n"
             f"Attualmente: {len(feedback_message)} caratteri.\n\n"
             "Riprova con un messaggio più breve oppure /cancel per annullare.",
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
         return WAITING_FEEDBACK_MESSAGE
 
@@ -93,10 +93,10 @@ async def handle_feedback_message(update: Update, context: ContextTypes.DEFAULT_
     preview = feedback_message if len(feedback_message) <= 200 else feedback_message[:200] + "..."
 
     await update.message.reply_text(
-        f"📝 *Anteprima del tuo feedback:*\n\n_{preview}_\n\n"
+        f"📝 <b>Anteprima del tuo feedback:</b>\n\n<i>{preview}</i>\n\n"
         f"Lunghezza: {len(feedback_message)} caratteri\n\n"
         "Vuoi inviare questo feedback?",
-        parse_mode="Markdown",
+        parse_mode="HTML",
         reply_markup=reply_markup,
     )
 
@@ -118,8 +118,8 @@ async def handle_feedback_confirmation(update: Update, context: ContextTypes.DEF
 
     if callback_data == "feedback_cancel":
         await query.edit_message_text(
-            "❌ *Feedback annullato*\n\nNessun messaggio è stato inviato.",
-            parse_mode="Markdown",
+            "❌ <b>Feedback annullato</b>\n\nNessun messaggio è stato inviato.",
+            parse_mode="HTML",
         )
         context.user_data.clear()
         logger.info(f"User {user_id} cancelled feedback")
@@ -140,10 +140,10 @@ async def handle_feedback_confirmation(update: Update, context: ContextTypes.DEF
             feedback_id = await database.add_feedback(user_id, feedback_message)
 
             await query.edit_message_text(
-                "✅ *Feedback inviato con successo!*\n\n"
+                "✅ <b>Feedback inviato con successo!</b>\n\n"
                 "Grazie per il tuo feedback! Lo esamineremo al più presto per migliorare il servizio.\n\n"
                 "Il tuo contributo è molto importante per noi! 🙏",
-                parse_mode="Markdown",
+                parse_mode="HTML",
             )
 
             logger.info(
@@ -160,8 +160,8 @@ async def handle_feedback_confirmation(update: Update, context: ContextTypes.DEF
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancel the conversation."""
     await update.message.reply_text(
-        "❌ *Feedback annullato*\n\nNessun messaggio è stato inviato.",
-        parse_mode="Markdown",
+        "❌ <b>Feedback annullato</b>\n\nNessun messaggio è stato inviato.",
+        parse_mode="HTML",
     )
     context.user_data.clear()
     return ConversationHandler.END

@@ -31,8 +31,8 @@ async def start_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         if not products:
             await update.message.reply_text(
-                "📭 *Non hai prodotti da eliminare*\n\nUsa /add per aggiungere un prodotto!",
-                parse_mode="Markdown",
+                "📭 <b>Non hai prodotti da eliminare</b>\n\nUsa /add per aggiungere un prodotto!",
+                parse_mode="HTML",
             )
             return
 
@@ -55,11 +55,11 @@ async def start_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         message = (
-            "🗑️ *Elimina un prodotto*\n\n"
+            "🗑️ <b>Elimina un prodotto</b>\n\n"
             "Seleziona il prodotto che vuoi rimuovere dal monitoraggio:"
         )
 
-        await update.message.reply_text(message, parse_mode="Markdown", reply_markup=reply_markup)
+        await update.message.reply_text(message, parse_mode="HTML", reply_markup=reply_markup)
 
     except Exception as e:
         logger.error(f"Error in start_delete for user {user_id}: {e}", exc_info=True)
@@ -126,9 +126,9 @@ async def delete_callback_handler(update: Update, context: ContextTypes.DEFAULT_
 
             # Show confirmation message with product details
             confirmation_message = (
-                "⚠️ *Sei sicuro di voler eliminare questo prodotto?*\n\n"
-                f"📦 *{product_name}*\n"
-                f"🔖 ASIN: `{asin}`\n"
+                "⚠️ <b>Sei sicuro di voler eliminare questo prodotto?</b>\n\n"
+                f"📦 <b>{product_name}</b>\n"
+                f"🔖 ASIN: <code>{asin}</code>\n"
                 f"💰 Prezzo pagato: €{price_paid:.2f}\n"
                 f"📅 Scadenza reso: {deadline_str}\n"
             )
@@ -136,10 +136,10 @@ async def delete_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             if min_savings > 0:
                 confirmation_message += f"🎯 Risparmio minimo: €{min_savings:.2f}\n"
 
-            confirmation_message += "\n_Il prodotto non sarà più monitorato._"
+            confirmation_message += "\n<i>Il prodotto non sarà più monitorato.</i>"
 
             await query.edit_message_text(
-                confirmation_message, parse_mode="Markdown", reply_markup=reply_markup
+                confirmation_message, parse_mode="HTML", reply_markup=reply_markup
             )
 
         # Handle confirmation
@@ -165,13 +165,13 @@ async def delete_callback_handler(update: Update, context: ContextTypes.DEFAULT_
 
             # Edit message to show success
             success_message = (
-                "✅ *Prodotto eliminato con successo!*\n\n"
-                f"📦 *{product_name}*\n\n"
+                "✅ <b>Prodotto eliminato con successo!</b>\n\n"
+                f"📦 <b>{product_name}</b>\n\n"
                 "Il prodotto non sarà più monitorato.\n"
                 "Usa /list per vedere i tuoi prodotti rimanenti."
             )
 
-            await query.edit_message_text(success_message, parse_mode="Markdown")
+            await query.edit_message_text(success_message, parse_mode="HTML")
 
             logger.info(f"Product deleted for user {user_id}: id={product_id}, name={product_name}")
 
@@ -181,8 +181,8 @@ async def delete_callback_handler(update: Update, context: ContextTypes.DEFAULT_
 
             # Edit message to show cancellation
             await query.edit_message_text(
-                "❌ *Operazione annullata*\n\nNessun prodotto è stato eliminato.",
-                parse_mode="Markdown",
+                "❌ <b>Operazione annullata</b>\n\nNessun prodotto è stato eliminato.",
+                parse_mode="HTML",
             )
 
     except Exception as e:
