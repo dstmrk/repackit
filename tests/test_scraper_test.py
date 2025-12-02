@@ -254,8 +254,8 @@ class TestPrintFunctions:
         """Test debug files section when files are present."""
         results = {
             "debug_files": {
-                "html": "./debug_output/test.html",
-                "screenshot": "./debug_output/test.png",
+                "html": "./data/test.html",
+                "screenshot": "./data/test.png",
             }
         }
         _print_debug_files(results)

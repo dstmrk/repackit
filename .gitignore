@@ -212,4 +212,3 @@ data/
 *.db-shm
 *.db-wal
 .playwright/
-debug_output/
