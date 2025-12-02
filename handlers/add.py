@@ -279,6 +279,51 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # Increment promotional metric: total products registered
         await database.increment_metric("products_total_count")
 
+        # Check if this is the first product → give referral bonus to inviter
+        user_products = await database.get_user_products(user_id)
+        if len(user_products) == 1:  # First product!
+            user = await database.get_user(user_id)
+            if user and user["referred_by"] and not user["referral_bonus_given"]:
+                referrer_id = user["referred_by"]
+
+                # Verify referrer still exists
+                referrer = await database.get_user(referrer_id)
+                if referrer:
+                    current_limit = await database.get_user_product_limit(referrer_id)
+
+                    # Only give bonus if referrer is not already at cap
+                    if current_limit < database.DEFAULT_MAX_PRODUCTS:
+                        new_limit = await database.increment_user_product_limit(
+                            referrer_id, database.PRODUCTS_PER_REFERRAL
+                        )
+
+                        # Mark bonus as given
+                        await database.mark_referral_bonus_given(user_id)
+
+                        # Notify referrer
+                        try:
+                            await context.bot.send_message(
+                                chat_id=referrer_id,
+                                text=(
+                                    "🎉 <b>Un amico che hai invitato ha aggiunto il suo primo prodotto!</b>\n\n"
+                                    f"💎 Hai ricevuto +3 slot (ora ne hai {new_limit}/{database.DEFAULT_MAX_PRODUCTS})"
+                                ),
+                                parse_mode="HTML",
+                            )
+                            logger.info(
+                                f"Referral bonus given: user {user_id} → referrer {referrer_id} "
+                                f"(+{database.PRODUCTS_PER_REFERRAL} slots, now {new_limit})"
+                            )
+                        except Exception as e:
+                            logger.warning(f"Could not notify referrer {referrer_id}: {e}")
+                    else:
+                        # Referrer already at cap, mark bonus as given anyway
+                        await database.mark_referral_bonus_given(user_id)
+                        logger.info(
+                            f"User {user_id} first product added but referrer {referrer_id} "
+                            "already at max limit"
+                        )
+
         # Build success message
         days_remaining = (return_deadline - date.today()).days
         message = (
