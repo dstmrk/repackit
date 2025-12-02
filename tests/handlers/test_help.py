@@ -36,8 +36,8 @@ async def test_help_handler():
     assert "Come funziona" in message
     assert "monitoraggio" in message.lower()
 
-    # Verify Markdown formatting
-    assert call_args[1]["parse_mode"] == "Markdown"
+    # Verify HTML formatting
+    assert call_args[1]["parse_mode"] == "HTML"
 
 
 @pytest.mark.asyncio

@@ -1077,6 +1077,38 @@ except Exception as e:
     raise
 ```
 
+### Telegram Message Formatting
+
+**IMPORTANT**: All bot messages use **HTML formatting** (`parse_mode="HTML"`), not Markdown.
+
+HTML is more robust and prevents parsing errors with special characters like underscores (`_`), asterisks (`*`), and brackets that may appear in user input or channel references (e.g., `@channel_name`).
+
+**HTML Tags**:
+- **Bold**: `<b>text</b>` (not `*text*`)
+- **Italic**: `<i>text</i>` (not `_text_`)
+- **Code**: `<code>text</code>` (not `` `text` ``)
+- **Links**: `<a href="url">text</a>` (not `[text](url)`)
+
+**Example**:
+```python
+await update.message.reply_text(
+    "✅ <b>Prodotto aggiunto!</b>\n\n"
+    f"📦 <b>{product_name}</b>\n"
+    f"🔖 ASIN: <code>{asin}</code>\n"
+    f"💰 Prezzo: €{price:.2f}\n\n"
+    "<i>Monitorerò il prezzo ogni giorno!</i>",
+    parse_mode="HTML"
+)
+```
+
+**Why HTML over Markdown**:
+- Markdown fails when URLs contain underscores (e.g., `@repackit_updates`)
+- HTML is more predictable with special characters in user input
+- Easier to escape when needed (use `&lt;`, `&gt;`, `&amp;`)
+- More consistent with Telegram's internal formatting
+
+**Tests**: All test assertions check for `parse_mode="HTML"`, not `"Markdown"`.
+
 ---
 
 ## Dependency Management (pyproject.toml)

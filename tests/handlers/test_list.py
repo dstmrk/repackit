@@ -52,7 +52,7 @@ async def test_list_handler_no_products(test_db):
     message = call_args[0][0]
     assert "Nessun prodotto" in message
     assert "/add" in message
-    assert call_args[1]["parse_mode"] == "Markdown"
+    assert call_args[1]["parse_mode"] == "HTML"
 
 
 @pytest.mark.asyncio
@@ -90,7 +90,7 @@ async def test_list_handler_single_product(test_db):
     assert "€5.00" in message
     assert "tra 5 giorni" in message
     assert "B08N5WRWNW" in message
-    assert call_args[1]["parse_mode"] == "Markdown"
+    assert call_args[1]["parse_mode"] == "HTML"
     assert call_args[1]["disable_web_page_preview"] is True
 
 
