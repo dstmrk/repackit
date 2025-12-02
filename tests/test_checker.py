@@ -260,7 +260,7 @@ async def test_send_price_drop_notification_message_format():
     assert "€13.91" in message
     assert "15 giorni" in message
     assert "https://amazon.it/dp/TEST?tag=test" in message
-    assert call_args.kwargs["parse_mode"] == "Markdown"
+    assert call_args.kwargs["parse_mode"] == "HTML"
     assert call_args.kwargs["chat_id"] == 123
 
 
@@ -286,7 +286,7 @@ async def test_send_price_drop_notification_deadline_today():
         )
 
     message = mock_bot.send_message.call_args.kwargs["text"]
-    assert "*oggi*" in message
+    assert "<b>oggi</b>" in message
 
 
 @pytest.mark.asyncio
@@ -311,7 +311,7 @@ async def test_send_price_drop_notification_deadline_passed():
         )
 
     message = mock_bot.send_message.call_args.kwargs["text"]
-    assert "*scaduto*" in message
+    assert "<b>scaduto</b>" in message
 
 
 @pytest.mark.asyncio

@@ -4,8 +4,9 @@ import asyncio
 import logging
 import os
 from datetime import UTC, date, datetime
+from urllib.parse import quote_plus
 
-from telegram import Bot
+from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
 
 import database
@@ -318,13 +319,13 @@ async def send_price_drop_notification(
     # Display product name or fallback
     product_display = product_name or f"ASIN {asin}"
 
-    # Build message
+    # Build message (HTML format)
     message = (
-        "🎉 *Prezzo in calo su Amazon!*\n\n"
-        f"📦 *{product_display}*\n\n"
-        f"Prezzo attuale: *€{current_price:.2f}*\n"
+        "🎉 <b>Prezzo in calo su Amazon!</b>\n\n"
+        f"📦 <b>{product_display}</b>\n\n"
+        f"Prezzo attuale: <b>€{current_price:.2f}</b>\n"
         f"Prezzo pagato: €{price_paid:.2f}\n"
-        f"💰 Risparmio: *€{savings:.2f}*\n\n"
+        f"💰 Risparmio: <b>€{savings:.2f}</b>\n\n"
         f"📅 Scadenza reso: {deadline_str}"
     )
 
@@ -332,19 +333,31 @@ async def send_price_drop_notification(
     if days_remaining > 0:
         message += f" (tra {days_remaining} giorni)"
     elif days_remaining == 0:
-        message += " (*oggi*)"
+        message += " (<b>oggi</b>)"
     else:
-        message += " (*scaduto*)"
+        message += " (<b>scaduto</b>)"
 
-    message += f"\n\n🔗 [Vai al prodotto]({product_url})"
+    message += f'\n\n🔗 <a href="{product_url}">Vai al prodotto</a>'
+
+    # Build share button ("Momento di Gloria" - share when user is happiest)
+    share_text = (
+        f"🎉 Ho appena risparmiato €{savings:.2f} su Amazon grazie a @repackit_bot! "
+        "Monitora i tuoi acquisti e ti avvisa se il prezzo scende. Provalo!"
+    )
+    share_url = (
+        f"https://t.me/share/url?url=https://t.me/repackit_bot&text={quote_plus(share_text)}"
+    )
+
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("📢 Dillo a un amico", url=share_url)]])
 
     # Send message
     try:
         await bot.send_message(
             chat_id=user_id,
             text=message,
-            parse_mode="Markdown",
+            parse_mode="HTML",
             disable_web_page_preview=False,
+            reply_markup=keyboard,
         )
     except TelegramError as e:
         logger.error(f"Failed to send message to user {user_id}: {e}")

@@ -253,17 +253,21 @@ if current_price < price_paid:
             update_last_notified_price(product_id, current_price)
 ```
 
-**Message Format**:
+**Message Format** (HTML):
 ```
 🎉 Prezzo in calo su Amazon!
 
-Il prodotto che stai monitorando è sceso a €45.99
+📦 iPhone 15 Pro
+
+Prezzo attuale: €45.99
 Prezzo pagato: €59.90
-Risparmio: €13.91
+💰 Risparmio: €13.91
 
-Scadenza reso: 15/12/2024 (tra 12 giorni)
+📅 Scadenza reso: 15/12/2024 (tra 12 giorni)
 
-🔗 [Vai al prodotto](https://amazon.it/dp/B08N5WRWNW?tag=yourtag-21)
+🔗 Vai al prodotto
+
+[📢 Dillo a un amico]  ← Inline button
 ```
 
 **Affiliate URL Construction**:
@@ -272,6 +276,41 @@ All product URLs sent to users include the `AMAZON_AFFILIATE_TAG` for monetizati
 # Format: https://amazon.it/dp/{ASIN}?tag={AFFILIATE_TAG}
 url = f"https://amazon.it/dp/{asin}?tag={AMAZON_AFFILIATE_TAG}"
 ```
+
+**Viral Growth Strategy: "Momento di Gloria"**:
+
+The notification includes a share button that leverages the user's peak satisfaction moment. When users receive a price drop alert, they're most motivated to share the bot with friends.
+
+**Implementation**:
+- **Share Button**: Inline keyboard button "📢 Dillo a un amico" below notification
+- **Pre-filled Message**: Uses Telegram's native share API with personalized text:
+  ```
+  🎉 Ho appena risparmiato €13.91 su Amazon grazie a @repackit_bot!
+  Monitora i tuoi acquisti e ti avvisa se il prezzo scende. Provalo!
+  ```
+- **Timing**: Appears only on price drop notifications (when user is happiest)
+- **Non-intrusive**: Optional button, doesn't interrupt the main message
+
+**Technical Details**:
+```python
+# Build share URL with pre-filled message
+share_text = (
+    f"🎉 Ho appena risparmiato €{savings:.2f} su Amazon grazie a @repackit_bot! "
+    "Monitora i tuoi acquisti e ti avvisa se il prezzo scende. Provalo!"
+)
+share_url = f"https://t.me/share/url?url=https://t.me/repackit_bot&text={quote_plus(share_text)}"
+
+# Add inline button to notification
+keyboard = InlineKeyboardMarkup([
+    [InlineKeyboardButton("📢 Dillo a un amico", url=share_url)]
+])
+```
+
+**Why This Works**:
+- **Emotional Timing**: Users feel smart/successful when they save money
+- **Social Proof**: Real savings amount creates credibility ("€13.91 saved!")
+- **Low Friction**: One tap to share via any Telegram chat
+- **Natural Word-of-Mouth**: Users genuinely want to help friends save money
 
 **Can Run Standalone**:
 ```bash
@@ -982,12 +1021,14 @@ browser = await p.chromium.launch(
 - [x] Daily scraping + notifications
 - [x] User commands (add, list, delete, update)
 - [x] Cleanup of expired products
+- [x] Viral growth strategy ("Momento di Gloria" share button)
 
 ### Phase 2 (Planned)
 - [ ] Multi-marketplace support (.com, .de, .fr, .es, .uk)
 - [ ] Amazon Affiliate API integration (avoid scraping)
 - [ ] Price history graphs (optional, requires storage)
 - [ ] User preferences (notification time, language)
+- [ ] Advanced referral system with slot rewards (Dropbox-style gamification)
 
 ### Phase 3 (Ideas)
 - [ ] Multi-language support (EN, DE, FR, ES)
@@ -1118,7 +1159,7 @@ await update.message.reply_text(
 - Easier to escape when needed (use `&lt;`, `&gt;`, `&amp;`)
 - More consistent with Telegram's internal formatting
 
-**Tests**: All test assertions check for `parse_mode="HTML"`, not `"Markdown"`.
+**Consistency**: All bot messages (handlers, notifications, broadcasts) use `parse_mode="HTML"` exclusively.
 
 ---
 
