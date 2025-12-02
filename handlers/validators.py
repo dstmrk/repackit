@@ -202,8 +202,7 @@ def parse_deadline(deadline_input: str) -> date:
         # If it's our specific error about days range, re-raise it
         if "giorni deve essere" in str(e):
             raise
-        # Otherwise, it's not a number, try date format
-        pass
+        # Otherwise, it's not a number, fall through to try date format
 
     # Try parsing as date (gg-mm-aaaa or gg/mm/aaaa)
     # Split by '-' or '/'
