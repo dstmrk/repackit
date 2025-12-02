@@ -26,6 +26,24 @@ FEEDBACK_RATE_LIMIT_HOURS = 24  # Allow one feedback every 24 hours
 WAITING_FEEDBACK_MESSAGE = 0
 
 
+def _format_time_remaining(hours_remaining: float) -> str:
+    """
+    Format remaining time as human-readable string.
+
+    Args:
+        hours_remaining: Hours remaining until next feedback allowed
+
+    Returns:
+        Formatted string like "22 ore" or "30 minuti"
+    """
+    if hours_remaining >= 1:
+        hour_count = int(hours_remaining)
+        return f"{hour_count} or{'a' if hour_count == 1 else 'e'}"
+
+    minutes_remaining = int(hours_remaining * 60)
+    return f"{minutes_remaining} minut{'o' if minutes_remaining == 1 else 'i'}"
+
+
 async def start_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Start the /feedback conversation flow.
@@ -47,16 +65,9 @@ async def start_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             hours_since_last = time_since_last.total_seconds() / 3600
 
             if hours_since_last < FEEDBACK_RATE_LIMIT_HOURS:
-                # Calculate remaining time
+                # Calculate and format remaining time
                 hours_remaining = FEEDBACK_RATE_LIMIT_HOURS - hours_since_last
-
-                if hours_remaining >= 1:
-                    time_str = (
-                        f"{int(hours_remaining)} or{'a' if int(hours_remaining) == 1 else 'e'}"
-                    )
-                else:
-                    minutes_remaining = int(hours_remaining * 60)
-                    time_str = f"{minutes_remaining} minut{'o' if minutes_remaining == 1 else 'i'}"
+                time_str = _format_time_remaining(hours_remaining)
 
                 logger.info(
                     f"User {user_id} rate limited: {hours_since_last:.1f}h since last feedback"

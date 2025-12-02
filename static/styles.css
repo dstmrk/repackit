@@ -9,6 +9,14 @@
   border-width: 0;
   border-style: solid;
   border-color: currentColor;
+  /* Transform defaults */
+  --tw-translate-x: 0;
+  --tw-translate-y: 0;
+  --tw-rotate: 0;
+  --tw-skew-x: 0;
+  --tw-skew-y: 0;
+  --tw-scale-x: 1;
+  --tw-scale-y: 1;
 }
 
 html {
@@ -198,8 +206,6 @@ button { cursor: pointer; }
 .duration-200 { transition-duration: 200ms; }
 
 .transform { transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y)); }
-/* Defaults for transform */
-*, ::before, ::after { --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0; --tw-scale-x: 1; --tw-scale-y: 1; }
 
 .rotate-1 { --tw-rotate: 1deg; transform: rotate(1deg); }
 .-rotate-1 { --tw-rotate: -1deg; transform: rotate(-1deg); }
