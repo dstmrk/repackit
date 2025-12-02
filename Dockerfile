@@ -65,8 +65,8 @@ COPY --chown=root:root --chmod=555 utils/ ./utils/
 RUN apt-get update && apt-get install -y --no-install-recommends gosu && rm -rf /var/lib/apt/lists/* && \
     echo '#!/bin/bash\n\
 set -e\n\
-# Create data/logs directory with correct ownership (runs as root)\n\
-mkdir -p /app/data/logs\n\
+# Create data directory with correct ownership (runs as root)\n\
+mkdir -p /app/data\n\
 chown -R 1000:1000 /app/data 2>/dev/null || true\n\
 # Drop privileges and execute main command as repackit user\n\
 exec gosu 1000:1000 "$@"' > /entrypoint.sh && \

@@ -261,7 +261,8 @@ repackit/
 │   └── handlers/          # Handler tests
 ├── data/                   # Persistent data (gitignored)
 │   ├── repackit.db        # SQLite database
-│   └── logs/              # Rotating logs (3 days)
+│   ├── repackit.log       # Main bot log (rotating, 3 days)
+│   └── broadcast.log      # Broadcast script log
 ├── Dockerfile              # Multi-stage build
 ├── docker-compose.yml      # Production orchestration
 ├── .github/workflows/      # CI/CD pipelines

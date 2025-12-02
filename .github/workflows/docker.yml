@@ -89,7 +89,7 @@ jobs:
           EOF
 
           # Create data directory with correct permissions for repackit user (uid 1000)
-          mkdir -p data/logs
+          mkdir -p data
           chmod -R 777 data  # Allow container user to write logs
 
           # Start container without --rm to preserve logs even after exit
@@ -151,7 +151,7 @@ jobs:
           EOF
 
       - name: Create data directory
-        run: mkdir -p data/logs
+        run: mkdir -p data
 
       - name: Test docker-compose configuration
         run: |
