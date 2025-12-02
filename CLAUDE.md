@@ -285,7 +285,7 @@ The notification includes a share button that leverages the user's peak satisfac
 - **Share Button**: Inline keyboard button "📢 Dillo a un amico" below notification
 - **Pre-filled Message**: Uses Telegram's native share API with personalized text:
   ```
-  🎉 Appena risparmiato €13.91 su Amazon grazie a @repackit_bot!
+  🎉 Ho appena risparmiato €13.91 su Amazon grazie a @repackit_bot!
   Monitora i tuoi acquisti e ti avvisa se il prezzo scende. Provalo!
   ```
 - **Timing**: Appears only on price drop notifications (when user is happiest)
@@ -295,7 +295,7 @@ The notification includes a share button that leverages the user's peak satisfac
 ```python
 # Build share URL with pre-filled message
 share_text = (
-    f"🎉 Appena risparmiato €{savings:.2f} su Amazon grazie a @repackit_bot! "
+    f"🎉 Ho appena risparmiato €{savings:.2f} su Amazon grazie a @repackit_bot! "
     "Monitora i tuoi acquisti e ti avvisa se il prezzo scende. Provalo!"
 )
 share_url = f"https://t.me/share/url?url=https://t.me/repackit_bot&text={quote_plus(share_text)}"

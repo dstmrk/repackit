@@ -341,14 +341,14 @@ async def send_price_drop_notification(
 
     # Build share button ("Momento di Gloria" - share when user is happiest)
     share_text = (
-        f"🎉 Appena risparmiato €{savings:.2f} su Amazon grazie a @repackit_bot! "
+        f"🎉 Ho appena risparmiato €{savings:.2f} su Amazon grazie a @repackit_bot! "
         "Monitora i tuoi acquisti e ti avvisa se il prezzo scende. Provalo!"
     )
-    share_url = f"https://t.me/share/url?url=https://t.me/repackit_bot&text={quote_plus(share_text)}"
+    share_url = (
+        f"https://t.me/share/url?url=https://t.me/repackit_bot&text={quote_plus(share_text)}"
+    )
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📢 Dillo a un amico", url=share_url)]
-    ])
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("📢 Dillo a un amico", url=share_url)]])
 
     # Send message
     try:
