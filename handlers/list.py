@@ -87,9 +87,7 @@ async def list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             f"Usa /delete per rimuoverne uno, /update per modificarne uno."
         )
 
-        await update.message.reply_text(
-            message, parse_mode="HTML", disable_web_page_preview=True
-        )
+        await update.message.reply_text(message, parse_mode="HTML", disable_web_page_preview=True)
 
     except Exception as e:
         logger.error(f"Error in list_handler for user {user_id}: {e}", exc_info=True)
