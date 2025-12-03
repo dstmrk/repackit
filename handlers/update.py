@@ -2,7 +2,7 @@
 
 import logging
 import warnings
-from datetime import date
+from datetime import UTC, datetime
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
@@ -336,7 +336,7 @@ async def _update_deadline(
 
     await database.update_product(product_id, return_deadline=new_deadline)
 
-    days_remaining = (new_deadline - date.today()).days
+    days_remaining = (new_deadline - datetime.now(UTC).date()).days
     await message.reply_text(
         "✅ <b>Scadenza aggiornata con successo!</b>\n\n"
         f"📦 ASIN: <code>{asin}</code>\n"

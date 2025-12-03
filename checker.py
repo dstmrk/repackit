@@ -306,8 +306,8 @@ async def send_price_drop_notification(
     Raises:
         TelegramError: If notification fails to send
     """
-    # Calculate days remaining
-    today = date.today()
+    # Calculate days remaining (using UTC)
+    today = datetime.now(UTC).date()
     days_remaining = (return_deadline - today).days
 
     # Build affiliate URL

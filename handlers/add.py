@@ -2,7 +2,7 @@
 
 import logging
 import re
-from datetime import date
+from datetime import UTC, date, datetime
 
 from telegram import Update
 from telegram.ext import (
@@ -294,7 +294,7 @@ def _build_product_success_message(
     Returns:
         Formatted success message (HTML)
     """
-    days_remaining = (return_deadline - date.today()).days
+    days_remaining = (return_deadline - datetime.now(UTC).date()).days
     message = (
         "✅ <b>Prodotto aggiunto con successo!</b>\n\n"
         f"📦 <b>{product_name}</b>\n"

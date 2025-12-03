@@ -1,7 +1,7 @@
 """Handler for /list command."""
 
 import logging
-from datetime import date
+from datetime import UTC, date, datetime
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -41,7 +41,7 @@ async def list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         # Build product list message
         message_parts = ["📦 <b>I tuoi prodotti monitorati:</b>\n"]
 
-        today = date.today()
+        today = datetime.now(UTC).date()
 
         for idx, product in enumerate(products, start=1):
             product_name = product.get("product_name") or "Prodotto senza nome"
