@@ -346,8 +346,12 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # Build and send success message
         days_remaining = (return_deadline - datetime.now(UTC).date()).days
         message = messages.product_added_success(
-            html.escape(product_name), asin, price_paid,
-            return_deadline.strftime('%d/%m/%Y'), days_remaining, min_savings
+            html.escape(product_name),
+            asin,
+            price_paid,
+            return_deadline.strftime("%d/%m/%Y"),
+            days_remaining,
+            min_savings,
         )
         await update.message.reply_text(message, parse_mode="HTML")
 

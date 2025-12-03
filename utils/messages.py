@@ -118,7 +118,12 @@ def referral_bonus_notification(new_limit: int) -> str:
 
 
 def product_added_success(
-    product_name: str, asin: str, price: float, deadline_str: str, days_remaining: int, threshold: float
+    product_name: str,
+    asin: str,
+    price: float,
+    deadline_str: str,
+    days_remaining: int,
+    threshold: float,
 ) -> str:
     """
     Success message after adding a product.
@@ -235,8 +240,7 @@ def no_products_found() -> str:
     Used in: /list, /delete, /update
     """
     return (
-        "📭 <b>Nessun prodotto monitorato</b>\n\n"
-        "Usa /add per aggiungere il tuo primo prodotto!"
+        "📭 <b>Nessun prodotto monitorato</b>\n\n" "Usa /add per aggiungere il tuo primo prodotto!"
     )
 
 

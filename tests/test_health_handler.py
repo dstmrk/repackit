@@ -415,6 +415,7 @@ def test_health_bind_address_from_env():
 
         # Reset config and reload module to pick up new value
         from config import reset_config
+
         reset_config()
         importlib.reload(health_handler)
 
@@ -427,6 +428,7 @@ def test_health_bind_address_from_env():
             if "HEALTH_BIND_ADDRESS" in os.environ:
                 del os.environ["HEALTH_BIND_ADDRESS"]
         from config import reset_config
+
         reset_config()
         importlib.reload(health_handler)
 

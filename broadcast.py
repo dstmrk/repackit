@@ -46,7 +46,6 @@ logger = logging.getLogger(__name__)
 # Environment variables
 
 
-
 # Rate limiting configuration
 MESSAGES_PER_SECOND = 30  # Telegram limit is 30 messages/second
 BATCH_SIZE = 25  # Send in batches to avoid hitting limits
