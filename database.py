@@ -96,6 +96,16 @@ async def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_return_deadline ON products(return_deadline)"
         )
 
+        # Composite indexes for common query patterns
+        # Scraper queries products by (asin, marketplace) - avoids full table scan
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_asin_marketplace ON products(asin, marketplace)"
+        )
+        # Cleanup and filtered queries use (user_id, return_deadline)
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user_deadline ON products(user_id, return_deadline)"
+        )
+
         # Create trigger to enforce product limit at database level
         # This prevents race conditions where concurrent requests could bypass application-level checks
         await db.execute("DROP TRIGGER IF EXISTS check_product_limit_before_insert")
