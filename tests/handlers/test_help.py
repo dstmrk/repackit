@@ -28,6 +28,7 @@ async def test_help_handler():
     assert "/list" in message
     assert "/delete" in message
     assert "/update" in message
+    assert "/share" in message
     assert "/start" in message
     assert "/help" in message
     assert "/feedback" in message
@@ -35,6 +36,10 @@ async def test_help_handler():
     # Check it explains how the bot works
     assert "Come funziona" in message
     assert "monitoraggio" in message.lower()
+
+    # Check it mentions referral system
+    assert "Invita" in message or "invita" in message
+    assert "slot" in message
 
     # Verify HTML formatting
     assert call_args[1]["parse_mode"] == "HTML"
