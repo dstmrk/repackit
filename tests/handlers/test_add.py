@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiosqlite
 import pytest
 from telegram.ext import ConversationHandler
 
@@ -811,6 +812,83 @@ async def test_handle_min_savings_database_error(test_db):
 
         # Verify conversation ended
         assert result == ConversationHandler.END
+
+
+@pytest.mark.asyncio
+async def test_handle_min_savings_product_limit_trigger(test_db):
+    """Test handling product limit exceeded error from database trigger."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.effective_user.language_code = "it"
+    update.message.text = "5.00"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {
+        "product_name": "Test Product",
+        "product_asin": "B08N5WRWNW",
+        "product_marketplace": "it",
+        "product_price": 59.90,
+        "product_deadline": date.today() + timedelta(days=30),
+    }
+
+    # Mock database functions
+    with patch("handlers.add.database.add_user", new_callable=AsyncMock):
+        with patch("handlers.add.database.get_user_products", return_value=[]):
+            with patch("handlers.add.database.get_user_product_limit", return_value=3):
+                # Mock add_product_atomic to raise IntegrityError with trigger message
+                with patch(
+                    "handlers.add.database.add_product_atomic",
+                    side_effect=aiosqlite.IntegrityError("Product limit exceeded"),
+                ):
+                    result = await handle_min_savings(update, context)
+
+                    # Verify user-friendly error message was sent
+                    call_args = update.message.reply_text.call_args
+                    message = call_args[0][0]
+                    assert "Limite prodotti raggiunto" in message
+                    assert "parse_mode" in call_args[1]
+                    assert call_args[1]["parse_mode"] == "HTML"
+
+                    # Verify conversation ended
+                    assert result == ConversationHandler.END
+
+
+@pytest.mark.asyncio
+async def test_handle_min_savings_other_integrity_error(test_db):
+    """Test handling other IntegrityError (not product limit)."""
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.effective_user.language_code = "it"
+    update.message.text = "5.00"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.user_data = {
+        "product_name": "Test Product",
+        "product_asin": "B08N5WRWNW",
+        "product_marketplace": "it",
+        "product_price": 59.90,
+        "product_deadline": date.today() + timedelta(days=30),
+    }
+
+    # Mock database functions
+    with patch("handlers.add.database.add_user", new_callable=AsyncMock):
+        with patch("handlers.add.database.get_user_products", return_value=[]):
+            with patch("handlers.add.database.get_user_product_limit", return_value=3):
+                # Mock add_product_atomic to raise IntegrityError with different message
+                with patch(
+                    "handlers.add.database.add_product_atomic",
+                    side_effect=aiosqlite.IntegrityError("FOREIGN KEY constraint failed"),
+                ):
+                    result = await handle_min_savings(update, context)
+
+                    # Verify generic error message was sent
+                    call_args = update.message.reply_text.call_args
+                    message = call_args[0][0]
+                    assert "Errore" in message
+                    assert "Riprova più tardi" in message
+
+                    # Verify conversation ended
+                    assert result == ConversationHandler.END
 
 
 @pytest.mark.asyncio
