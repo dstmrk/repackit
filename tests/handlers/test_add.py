@@ -1058,3 +1058,178 @@ async def test_handle_min_savings_second_product_no_bonus(test_db):
 
     # Verify NO notification was sent
     context.bot.send_message.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_handle_min_savings_shows_share_hint_when_low_on_slots(test_db):
+    """Test /add shows /share hint when user has <3 slots available after adding."""
+    user_id = 123
+    tomorrow = date.today() + timedelta(days=1)
+
+    # Create user with 6 slots and 4 existing products
+    await database.add_user(user_id, "it")
+    await database.set_user_max_products(user_id, 6)
+
+    # Add 4 products
+    for i in range(4):
+        await database.add_product(
+            user_id=user_id,
+            product_name=f"Product {i+1}",
+            asin=f"ASIN0000{i+1}",
+            marketplace="it",
+            price_paid=50.0,
+            return_deadline=tomorrow,
+        )
+
+    # Mock update and context for 5th product (will leave only 1 slot)
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.effective_user.language_code = "it"
+    update.message.text = "0"
+    update.message.reply_text = AsyncMock()
+
+    context = MagicMock()
+    context.user_data = {
+        "product_name": "Fifth Product",
+        "product_asin": "B08N5WRWN5",
+        "product_marketplace": "it",
+        "product_price": 60.00,
+        "product_deadline": tomorrow,
+    }
+
+    # Add 5th product
+    result = await handle_min_savings(update, context)
+
+    # Verify product was added
+    assert result == ConversationHandler.END
+    products = await database.get_user_products(user_id)
+    assert len(products) == 5
+
+    # Verify TWO messages were sent: success + hint
+    assert update.message.reply_text.call_count == 2
+
+    # Verify first message is success
+    first_call = update.message.reply_text.call_args_list[0]
+    first_message = first_call[0][0]
+    assert "✅" in first_message
+    assert "Fifth Product" in first_message
+
+    # Verify second message is hint
+    second_call = update.message.reply_text.call_args_list[1]
+    second_message = second_call[0][0]
+    assert "5/6 prodotti" in second_message
+    assert "/share" in second_message
+    assert "Stai esaurendo gli slot" in second_message
+
+
+@pytest.mark.asyncio
+async def test_handle_min_savings_no_share_hint_when_enough_slots(test_db):
+    """Test /add doesn't show /share hint when user has ≥3 slots available."""
+    user_id = 123
+    tomorrow = date.today() + timedelta(days=1)
+
+    # Create user with 6 slots and 1 existing product
+    await database.add_user(user_id, "it")
+    await database.set_user_max_products(user_id, 6)
+
+    # Add 1 product
+    await database.add_product(
+        user_id=user_id,
+        product_name="Product 1",
+        asin="ASIN00001",
+        marketplace="it",
+        price_paid=50.0,
+        return_deadline=tomorrow,
+    )
+
+    # Mock update and context for 2nd product (will leave 4 slots)
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.effective_user.language_code = "it"
+    update.message.text = "0"
+    update.message.reply_text = AsyncMock()
+
+    context = MagicMock()
+    context.user_data = {
+        "product_name": "Second Product",
+        "product_asin": "B08N5WRWN2",
+        "product_marketplace": "it",
+        "product_price": 60.00,
+        "product_deadline": tomorrow,
+    }
+
+    # Add 2nd product
+    result = await handle_min_savings(update, context)
+
+    # Verify product was added
+    assert result == ConversationHandler.END
+    products = await database.get_user_products(user_id)
+    assert len(products) == 2
+
+    # Verify only ONE message was sent (success, no hint)
+    assert update.message.reply_text.call_count == 1
+
+    # Verify it's the success message
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "✅" in message
+    assert "Second Product" in message
+    assert "/share" not in message
+    assert "Stai esaurendo" not in message
+
+
+@pytest.mark.asyncio
+async def test_handle_min_savings_no_share_hint_when_at_max_slots(test_db):
+    """Test /add doesn't show /share hint when user is at max (21 slots)."""
+    user_id = 123
+    tomorrow = date.today() + timedelta(days=1)
+
+    # Create user at max slots (21) with 19 existing products
+    await database.add_user(user_id, "it")
+    await database.set_user_max_products(user_id, 21)
+
+    # Add 19 products
+    for i in range(19):
+        await database.add_product(
+            user_id=user_id,
+            product_name=f"Product {i+1}",
+            asin=f"ASIN000{i+1:02d}",
+            marketplace="it",
+            price_paid=50.0,
+            return_deadline=tomorrow,
+        )
+
+    # Mock update and context for 20th product (will leave only 1 slot, but at max)
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.effective_user.language_code = "it"
+    update.message.text = "0"
+    update.message.reply_text = AsyncMock()
+
+    context = MagicMock()
+    context.user_data = {
+        "product_name": "Twentieth Product",
+        "product_asin": "B08N5WRWN0",
+        "product_marketplace": "it",
+        "product_price": 60.00,
+        "product_deadline": tomorrow,
+    }
+
+    # Add 20th product
+    result = await handle_min_savings(update, context)
+
+    # Verify product was added
+    assert result == ConversationHandler.END
+    products = await database.get_user_products(user_id)
+    assert len(products) == 20
+
+    # Verify only ONE message was sent (success, no hint because at max)
+    assert update.message.reply_text.call_count == 1
+
+    # Verify it's the success message
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "✅" in message
+    assert "Twentieth Product" in message
+    assert "/share" not in message
+    assert "Stai esaurendo" not in message
