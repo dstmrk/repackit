@@ -12,7 +12,8 @@ Example:
 
 import asyncio
 import logging
-import os
+from config import get_config
+
 import sys
 from datetime import UTC, datetime
 
@@ -26,6 +27,7 @@ from utils.logging_config import setup_rotating_file_handler
 load_dotenv()
 
 # Configure logging with shared utility
+cfg = get_config()
 file_handler = setup_rotating_file_handler(
     "data/broadcast.log",
     format_string="%(asctime)s - %(levelname)s - %(message)s",
@@ -42,8 +44,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Environment variables
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-ADMIN_USER_ID = os.getenv("ADMIN_USER_ID")
+
+
 
 # Rate limiting configuration
 MESSAGES_PER_SECOND = 30  # Telegram limit is 30 messages/second
@@ -62,7 +64,7 @@ async def send_message_to_user(user_id: int, message: str) -> bool:
     Returns:
         True if message was sent successfully, False otherwise
     """
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot{cfg.telegram_token}/sendMessage"
     payload = {
         "chat_id": user_id,
         "text": message,
@@ -140,14 +142,14 @@ async def broadcast_message(message: str) -> tuple[int, int]:
 
 async def main():  # pragma: no cover
     """Main function."""
-    # Check if TELEGRAM_TOKEN is set
-    if not TELEGRAM_TOKEN:
-        logger.error("TELEGRAM_TOKEN not found in environment variables")
+    # Check if cfg.telegram_token is set
+    if not cfg.telegram_token:
+        logger.error("cfg.telegram_token not found in environment variables")
         sys.exit(1)
 
-    # Check if ADMIN_USER_ID is set
-    if not ADMIN_USER_ID:
-        logger.error("ADMIN_USER_ID not found in environment variables")
+    # Check if cfg.admin_user_id is set
+    if not cfg.admin_user_id:
+        logger.error("cfg.admin_user_id not found in environment variables")
         sys.exit(1)
 
     # Check command line arguments
@@ -166,7 +168,7 @@ async def main():  # pragma: no cover
     # Log broadcast initiation
     logger.info("=" * 80)
     logger.info(f"Broadcast initiated at {datetime.now(UTC).isoformat()}")
-    logger.info(f"Admin user ID: {ADMIN_USER_ID}")
+    logger.info(f"Admin user ID: {cfg.admin_user_id}")
     logger.info("=" * 80)
 
     # Initialize database

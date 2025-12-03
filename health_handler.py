@@ -3,19 +3,22 @@
 import asyncio
 import json
 import logging
-import os
 from datetime import UTC, datetime, timedelta
 
 from aiohttp import web
 
 import database
+from config import get_config
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Get health check configuration from environment
-HEALTH_PORT = int(os.getenv("HEALTH_PORT", "8444"))
-HEALTH_BIND_ADDRESS = os.getenv("HEALTH_BIND_ADDRESS", "0.0.0.0")
+# Load configuration
+cfg = get_config()
+
+# Module-level constant for backward compatibility with tests
+HEALTH_PORT = cfg.health_port
+HEALTH_BIND_ADDRESS = cfg.health_bind_address
 
 # Health check thresholds
 MAX_DAYS_SINCE_LAST_RUN = 2  # Consider stale if task hasn't run in 2 days
@@ -197,13 +200,13 @@ async def start_health_server():
     platforms (Kubernetes, Docker Swarm) within a secured network.
 
     For enhanced security in production:
-    - Set HEALTH_BIND_ADDRESS=127.0.0.1 to restrict access to localhost only
+    - Set cfg.health_bind_address=127.0.0.1 to restrict access to localhost only
     - Use firewall rules to limit access to monitoring services
     - Place behind a reverse proxy that handles HTTPS termination
 
     Configuration:
-    - HEALTH_PORT: Port to listen on (default: 8444)
-    - HEALTH_BIND_ADDRESS: Address to bind to (default: 0.0.0.0)
+    - cfg.health_port: Port to listen on (default: 8444)
+    - cfg.health_bind_address: Address to bind to (default: 0.0.0.0)
         - 0.0.0.0 = All interfaces (required for Docker/Kubernetes)
         - 127.0.0.1 = Localhost only (for reverse proxy setups)
     """
@@ -215,11 +218,11 @@ async def start_health_server():
     runner = web.AppRunner(app)
     await runner.setup()
 
-    site = web.TCPSite(runner, HEALTH_BIND_ADDRESS, HEALTH_PORT)
+    site = web.TCPSite(runner, cfg.health_bind_address, cfg.health_port)
     await site.start()
 
     logger.info(
-        f"Health check server running on {HEALTH_BIND_ADDRESS}:{HEALTH_PORT} "
+        f"Health check server running on {cfg.health_bind_address}:{cfg.health_port} "
         f"(HTTP - HTTPS should be handled by reverse proxy)"
     )
 

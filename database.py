@@ -6,17 +6,20 @@ from datetime import UTC, date, datetime
 
 import aiosqlite
 
+from config import get_config
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Get database path from environment
-DATABASE_PATH = os.getenv("DATABASE_PATH", "./data/repackit.db")
+# Load configuration
+cfg = get_config()
 
-# Product limit configuration
-DEFAULT_MAX_PRODUCTS = int(os.getenv("DEFAULT_MAX_PRODUCTS", "21"))
-INITIAL_MAX_PRODUCTS = int(os.getenv("INITIAL_MAX_PRODUCTS", "3"))
-PRODUCTS_PER_REFERRAL = int(os.getenv("PRODUCTS_PER_REFERRAL", "3"))
-INVITED_USER_BONUS = int(os.getenv("INVITED_USER_BONUS", "3"))
+# Database path and product limits (module-level constants for backward compatibility)
+DATABASE_PATH = cfg.database_path
+DEFAULT_MAX_PRODUCTS = cfg.default_max_products
+INITIAL_MAX_PRODUCTS = cfg.initial_max_products
+PRODUCTS_PER_REFERRAL = cfg.products_per_referral
+INVITED_USER_BONUS = cfg.invited_user_bonus
 
 
 async def init_db() -> None:

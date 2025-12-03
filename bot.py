@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import os
 import signal
 from datetime import UTC, datetime, timedelta
 
@@ -12,6 +11,7 @@ from telegram.ext import Application, CommandHandler
 import checker
 import database
 import product_cleanup
+from config import get_config
 from data_reader import scrape_prices
 from handlers.add import add_conversation_handler
 from handlers.delete import delete_callback_query_handler, delete_command_handler
@@ -21,20 +21,30 @@ from handlers.list import list_handler
 from handlers.share import share_handler
 from handlers.start import start_handler
 from handlers.update import update_conversation_handler
-from health_handler import HEALTH_PORT, start_health_server
+from health_handler import start_health_server
 from utils.logging_config import setup_rotating_file_handler
 
 # Load environment variables
 load_dotenv()
 
-# Configure logging
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+# Load configuration
+cfg = get_config()
 
+# Module-level constants for backward compatibility with tests
+TELEGRAM_TOKEN = cfg.telegram_token
+WEBHOOK_URL = cfg.webhook_url
+WEBHOOK_SECRET = cfg.webhook_secret
+BOT_PORT = cfg.bot_port
+SCRAPER_HOUR = cfg.scraper_hour
+CHECKER_HOUR = cfg.checker_hour
+CLEANUP_HOUR = cfg.cleanup_hour
+
+# Configure logging
 # Setup rotating file handler using shared utility
 file_handler = setup_rotating_file_handler("data/repackit.log")
 
 logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL.upper()),
+    level=getattr(logging, cfg.log_level.upper()),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(),
@@ -42,17 +52,6 @@ logging.basicConfig(
     ],
 )
 logger = logging.getLogger(__name__)
-
-# Environment variables
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
-BOT_PORT = int(os.getenv("BOT_PORT", "8443"))
-
-# Scheduler configuration
-SCRAPER_HOUR = int(os.getenv("SCRAPER_HOUR", "9"))
-CHECKER_HOUR = int(os.getenv("CHECKER_HOUR", "10"))
-CLEANUP_HOUR = int(os.getenv("CLEANUP_HOUR", "2"))
 
 # Global event for graceful shutdown
 shutdown_event = asyncio.Event()
@@ -154,17 +153,17 @@ async def schedule_task(task_name: str, hour: int, task_func) -> None:  # pragma
 
 async def schedule_scraper() -> None:  # pragma: no cover
     """Schedule daily scraper runs."""
-    await schedule_task("Scraper", SCRAPER_HOUR, run_scraper)
+    await schedule_task("Scraper", cfg.scraper_hour, run_scraper)
 
 
 async def schedule_checker() -> None:  # pragma: no cover
     """Schedule daily checker runs."""
-    await schedule_task("Checker", CHECKER_HOUR, run_checker)
+    await schedule_task("Checker", cfg.checker_hour, run_checker)
 
 
 async def schedule_cleanup() -> None:  # pragma: no cover
     """Schedule daily cleanup runs."""
-    await schedule_task("Cleanup", CLEANUP_HOUR, run_cleanup)
+    await schedule_task("Cleanup", cfg.cleanup_hour, run_cleanup)
 
 
 # ============================================================================
@@ -248,7 +247,7 @@ def main() -> None:  # pragma: no cover
     logger.info("Creating bot application...")
     application = (
         Application.builder()
-        .token(TELEGRAM_TOKEN)
+        .token(cfg.telegram_token)
         .post_init(post_init)
         .connect_timeout(10.0)
         .read_timeout(30.0)
@@ -270,18 +269,18 @@ def main() -> None:  # pragma: no cover
     application.add_handler(feedback_callback_handler)
 
     logger.info("✅ Bot configured!")
-    logger.info(f"🌐 Webhook URL: {WEBHOOK_URL}")
-    logger.info(f"🔌 Webhook port: {BOT_PORT}")
-    logger.info(f"🏥 Health check port: {HEALTH_PORT}")
+    logger.info(f"🌐 Webhook URL: {cfg.webhook_url}")
+    logger.info(f"🔌 Webhook port: {cfg.bot_port}")
+    logger.info(f"🏥 Health check port: {cfg.health_port}")
     logger.info("🚀 Starting webhook server...")
 
     # Start webhook server (synchronous call, manages its own event loop)
     application.run_webhook(
         listen="0.0.0.0",
-        port=BOT_PORT,
-        url_path=TELEGRAM_TOKEN,
-        secret_token=WEBHOOK_SECRET,
-        webhook_url=f"{WEBHOOK_URL}/{TELEGRAM_TOKEN}",
+        port=cfg.bot_port,
+        url_path=cfg.telegram_token,
+        secret_token=cfg.webhook_secret,
+        webhook_url=f"{cfg.webhook_url}/{cfg.telegram_token}",
         allowed_updates=["message", "callback_query"],
         drop_pending_updates=True,
         bootstrap_retries=3,

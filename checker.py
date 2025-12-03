@@ -3,7 +3,6 @@
 import asyncio
 import html
 import logging
-import os
 from datetime import UTC, date, datetime
 from urllib.parse import quote_plus
 
@@ -11,13 +10,17 @@ from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
 
 import database
+from config import get_config
 from data_reader import build_affiliate_url, scrape_prices
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Get bot token from environment
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
+# Load configuration
+cfg = get_config()
+
+# Module-level constant for backward compatibility with tests
+TELEGRAM_TOKEN = cfg.telegram_token
 
 # Rate limiting configuration (to avoid Telegram bans)
 NOTIFICATION_BATCH_SIZE = 10  # Send max 10 notifications at once
@@ -242,12 +245,12 @@ async def check_and_notify() -> dict:
         logger.info(f"Successfully scraped {len(current_prices)}/{len(products)} prices")
 
         # Check if Telegram token is set
-        if not TELEGRAM_TOKEN:
-            logger.error("TELEGRAM_TOKEN not set, cannot send notifications")
+        if not cfg.telegram_token:
+            logger.error("cfg.telegram_token not set, cannot send notifications")
             stats["errors"] += 1
             return stats
 
-        bot = Bot(token=TELEGRAM_TOKEN)
+        bot = Bot(token=cfg.telegram_token)
 
         # Process each product and collect price drop notifications
         price_drop_notifications = []

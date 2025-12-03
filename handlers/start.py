@@ -1,12 +1,12 @@
 """Handler for /start command."""
 
 import logging
-import os
 
 from telegram import Update
 from telegram.ext import ContextTypes
 
 import database
+from config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -130,9 +130,9 @@ def _build_welcome_message(
     )
 
     # Add channel reference if configured
-    telegram_channel = os.getenv("TELEGRAM_CHANNEL", "").strip()
-    if telegram_channel:
-        message += f"\n\n📢 Seguici su {telegram_channel} per aggiornamenti e novità!"
+    cfg = get_config()
+    if cfg.telegram_channel:
+        message += f"\n\n📢 Seguici su {cfg.telegram_channel} per aggiornamenti e novità!"
 
     return message
 

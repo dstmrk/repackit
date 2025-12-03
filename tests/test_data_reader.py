@@ -77,7 +77,9 @@ def test_build_affiliate_url_with_tag():
     with patch.dict(os.environ, {"AMAZON_AFFILIATE_TAG": "mytag-21"}):
         # Reload module to pick up new env var
         import importlib
+        from config import reset_config
 
+        reset_config()  # Reset config to reload from new env
         importlib.reload(data_reader)
 
         url = data_reader.build_affiliate_url("B08N5WRWNW", "it")
@@ -88,7 +90,9 @@ def test_build_affiliate_url_without_tag():
     """Test affiliate URL building without tag."""
     with patch.dict(os.environ, {"AMAZON_AFFILIATE_TAG": ""}):
         import importlib
+        from config import reset_config
 
+        reset_config()  # Reset config to reload from new env
         importlib.reload(data_reader)
 
         url = data_reader.build_affiliate_url("B08N5WRWNW", "it")
@@ -99,7 +103,9 @@ def test_build_affiliate_url_different_marketplaces():
     """Test affiliate URL building for different marketplaces."""
     with patch.dict(os.environ, {"AMAZON_AFFILIATE_TAG": "mytag-21"}):
         import importlib
+        from config import reset_config
 
+        reset_config()  # Reset config to reload from new env
         importlib.reload(data_reader)
 
         test_cases = [
