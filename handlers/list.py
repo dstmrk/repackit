@@ -87,6 +87,15 @@ async def list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             f"Usa /delete per rimuoverne uno, /update per modificarne uno."
         )
 
+        # Show /share hint if user is running low on slots
+        slots_available = user_limit - len(products)
+        max_slots = database.DEFAULT_MAX_PRODUCTS
+        if user_limit < max_slots and slots_available < 3:
+            message += (
+                "\n\n💡 <b>Suggerimento:</b> Stai esaurendo gli slot! "
+                "Usa /share per invitare amici e guadagnare più spazio."
+            )
+
         await update.message.reply_text(message, parse_mode="HTML", disable_web_page_preview=True)
 
     except Exception as e:
