@@ -365,6 +365,85 @@ async def test_add_product_atomic_concurrent_safety(test_db):
 
 
 @pytest.mark.asyncio
+async def test_product_limit_trigger_enforcement(test_db):
+    """Test database trigger enforces product limit and prevents race conditions."""
+    import aiosqlite
+
+    # Create user with limit of 3 products
+    await database.add_user(123456, "it")
+    await database.set_user_max_products(123456, 3)
+
+    deadline = date.today() + timedelta(days=30)
+
+    # Add 3 products successfully (within limit)
+    for i in range(3):
+        await database.add_product_atomic(
+            user_id=123456,
+            product_name=f"Product {i+1}",
+            asin=f"ASIN0000{i+1}",
+            marketplace="it",
+            price_paid=50.0 + i * 10,
+            return_deadline=deadline,
+            min_savings_threshold=5.0,
+        )
+
+    # Verify 3 products exist
+    products = await database.get_user_products(123456)
+    assert len(products) == 3
+
+    # Attempt to add 4th product should fail due to trigger
+    with pytest.raises(aiosqlite.IntegrityError) as exc_info:
+        await database.add_product_atomic(
+            user_id=123456,
+            product_name="Product 4 (should fail)",
+            asin="ASIN00004",
+            marketplace="it",
+            price_paid=80.0,
+            return_deadline=deadline,
+            min_savings_threshold=5.0,
+        )
+
+    # Verify error message from trigger
+    assert "Product limit exceeded" in str(exc_info.value)
+
+    # Verify still only 3 products (4th was rejected)
+    products = await database.get_user_products(123456)
+    assert len(products) == 3
+
+    # Test concurrent attempts cannot bypass limit
+    # Both should fail since we're already at limit
+    results = await asyncio.gather(
+        database.add_product_atomic(
+            user_id=123456,
+            product_name="Concurrent Product A",
+            asin="ASINCONC1",
+            marketplace="it",
+            price_paid=90.0,
+            return_deadline=deadline,
+            min_savings_threshold=0,
+        ),
+        database.add_product_atomic(
+            user_id=123456,
+            product_name="Concurrent Product B",
+            asin="ASINCONC2",
+            marketplace="it",
+            price_paid=100.0,
+            return_deadline=deadline,
+            min_savings_threshold=0,
+        ),
+        return_exceptions=True,  # Capture exceptions instead of raising
+    )
+
+    # Both should fail with IntegrityError
+    assert all(isinstance(result, aiosqlite.IntegrityError) for result in results)
+    assert all("Product limit exceeded" in str(result) for result in results)
+
+    # Verify still only 3 products (neither concurrent request succeeded)
+    products = await database.get_user_products(123456)
+    assert len(products) == 3
+
+
+@pytest.mark.asyncio
 async def test_get_user_products_empty(test_db):
     """Test getting products for user with no products."""
     await database.add_user(123456, "it")

@@ -4,6 +4,7 @@ import logging
 import re
 from datetime import UTC, date, datetime
 
+import aiosqlite
 from telegram import Update
 from telegram.ext import (
     CommandHandler,
@@ -411,6 +412,24 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"price={price_paid}, deadline={return_deadline}, min_savings={min_savings}"
         )
 
+    except aiosqlite.IntegrityError as e:
+        # Database trigger enforces product limit
+        if "Product limit exceeded" in str(e):
+            await update.message.reply_text(
+                "❌ <b>Limite prodotti raggiunto!</b>\n\n"
+                f"Puoi monitorare al massimo <b>{user_limit} prodotti</b> contemporaneamente.\n\n"
+                "Usa /delete per rimuovere un prodotto e fare spazio.",
+                parse_mode="HTML",
+            )
+            logger.info(
+                f"User {user_id} hit product limit (database trigger): {user_limit} products"
+            )
+        else:
+            # Other integrity errors
+            logger.error(f"Database integrity error for user {user_id}: {e}", exc_info=True)
+            await update.message.reply_text(
+                "❌ Errore nell'aggiungere il prodotto. Riprova più tardi."
+            )
     except Exception as e:
         logger.error(f"Error in handle_min_savings for user {user_id}: {e}", exc_info=True)
         await update.message.reply_text("❌ Errore nell'aggiungere il prodotto. Riprova più tardi.")

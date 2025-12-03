@@ -96,6 +96,28 @@ async def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_return_deadline ON products(return_deadline)"
         )
 
+        # Create trigger to enforce product limit at database level
+        # This prevents race conditions where concurrent requests could bypass application-level checks
+        await db.execute("DROP TRIGGER IF EXISTS check_product_limit_before_insert")
+        await db.execute(
+            f"""
+            CREATE TRIGGER check_product_limit_before_insert
+            BEFORE INSERT ON products
+            FOR EACH ROW
+            BEGIN
+                SELECT CASE
+                    WHEN (
+                        SELECT COUNT(*) FROM products WHERE user_id = NEW.user_id
+                    ) >= (
+                        SELECT COALESCE(max_products, {DEFAULT_MAX_PRODUCTS})
+                        FROM users WHERE user_id = NEW.user_id
+                    )
+                    THEN RAISE(ABORT, 'Product limit exceeded')
+                END;
+            END
+            """
+        )
+
         await db.commit()
         logger.info(f"Database initialized at {DATABASE_PATH}")
 
