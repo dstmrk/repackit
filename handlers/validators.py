@@ -6,7 +6,7 @@ to avoid duplication and improve testability.
 """
 
 import re
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 
 def validate_product_name(name: str) -> tuple[bool, str | None, str | None]:
@@ -200,7 +200,7 @@ def parse_deadline(deadline_input: str) -> date:
                 "Il numero di giorni deve essere tra 1 e 365. "
                 "Il bot ha bisogno di almeno 1 giorno per monitorare il prezzo!"
             )
-        return date.today() + timedelta(days=days)
+        return datetime.now(UTC).date() + timedelta(days=days)
     except ValueError as e:
         # If it's our specific error about days range, re-raise it
         if "giorni deve essere" in str(e):
@@ -229,8 +229,8 @@ def parse_deadline(deadline_input: str) -> date:
 
         deadline = date(year, month, day)
 
-        # Validate it's in the future (must be at least tomorrow)
-        today = date.today()
+        # Validate it's in the future (must be at least tomorrow, using UTC)
+        today = datetime.now(UTC).date()
         if deadline <= today:
             if deadline == today:
                 raise ValueError(

@@ -2,7 +2,7 @@
 
 import logging
 import os
-from datetime import date
+from datetime import UTC, date, datetime
 
 import aiosqlite
 
@@ -424,9 +424,9 @@ async def get_all_active_products() -> list[dict]:
     Get all products that haven't expired yet.
 
     Returns:
-        List of product dicts where return_deadline >= today
+        List of product dicts where return_deadline >= today (UTC)
     """
-    today = date.today().isoformat()
+    today = datetime.now(UTC).date().isoformat()
     async with aiosqlite.connect(DATABASE_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
@@ -533,12 +533,12 @@ async def delete_product(product_id: int) -> bool:
 
 async def delete_expired_products() -> int:
     """
-    Delete all products where return_deadline < today.
+    Delete all products where return_deadline < today (UTC).
 
     Returns:
         Number of products deleted
     """
-    today = date.today().isoformat()
+    today = datetime.now(UTC).date().isoformat()
     async with aiosqlite.connect(DATABASE_PATH) as db:
         cursor = await db.execute("DELETE FROM products WHERE return_deadline < ?", (today,))
         await db.commit()
