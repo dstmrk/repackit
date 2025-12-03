@@ -302,6 +302,99 @@ async def add_product(
         return product_id
 
 
+async def add_product_atomic(
+    user_id: int,
+    product_name: str | None,
+    asin: str,
+    marketplace: str,
+    price_paid: float,
+    return_deadline: date,
+    min_savings_threshold: float = 0,
+) -> tuple[int, bool]:
+    """
+    Add a new product to monitor with atomic first-product check.
+
+    This function uses a database transaction to atomically:
+    1. Count existing products for the user
+    2. Insert the new product
+    3. Return both the product ID and whether this was the first product
+
+    This prevents race conditions where multiple concurrent requests could
+    both think they're adding the "first product" and trigger duplicate
+    referral bonuses.
+
+    Args:
+        user_id: Telegram user ID
+        product_name: User-defined product name for easy identification
+        asin: Amazon Standard Identification Number
+        marketplace: Amazon marketplace (it, com, de, fr, etc.)
+        price_paid: Price user paid for the product (€)
+        return_deadline: Last day to return the product
+        min_savings_threshold: Minimum € savings to notify (optional)
+
+    Returns:
+        Tuple of (product_id, is_first_product)
+        - product_id: Database auto-increment ID
+        - is_first_product: True if this was the user's first product, False otherwise
+
+    Example:
+        >>> product_id, is_first = await add_product_atomic(123, "iPhone", ...)
+        >>> if is_first:
+        >>>     await give_referral_bonus(...)
+    """
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        # Start IMMEDIATE transaction to lock the database for writing
+        await db.execute("BEGIN IMMEDIATE")
+
+        try:
+            # Step 1: Count existing products (inside transaction)
+            cursor = await db.execute(
+                "SELECT COUNT(*) FROM products WHERE user_id = ?",
+                (user_id,),
+            )
+            product_count_before = (await cursor.fetchone())[0]
+            is_first_product = product_count_before == 0
+
+            # Step 2: Insert new product (inside same transaction)
+            cursor = await db.execute(
+                """
+                INSERT INTO products (
+                    user_id, product_name, asin, marketplace, price_paid,
+                    return_deadline, min_savings_threshold
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    product_name,
+                    asin,
+                    marketplace,
+                    price_paid,
+                    return_deadline.isoformat(),
+                    min_savings_threshold,
+                ),
+            )
+
+            # Step 3: Commit transaction atomically
+            await db.commit()
+
+            product_id = cursor.lastrowid
+            product_display = product_name or f"ASIN {asin}"
+
+            logger.info(
+                f"Product '{product_display}' from amazon.{marketplace} added for user {user_id} "
+                f"(ID: {product_id}, first_product: {is_first_product})"
+            )
+
+            return product_id, is_first_product
+
+        except Exception as e:
+            # Rollback on any error
+            await db.rollback()
+            logger.error(f"Error in add_product_atomic for user {user_id}: {e}", exc_info=True)
+            raise
+
+
 async def get_user_products(user_id: int) -> list[dict]:
     """
     Get all products monitored by a user.

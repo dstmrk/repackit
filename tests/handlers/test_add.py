@@ -800,8 +800,8 @@ async def test_handle_min_savings_database_error(test_db):
         "product_deadline": date.today() + timedelta(days=30),
     }
 
-    # Mock database.add_product to raise an exception
-    with patch("handlers.add.database.add_product", side_effect=Exception("DB Error")):
+    # Mock database.add_product_atomic to raise an exception
+    with patch("handlers.add.database.add_product_atomic", side_effect=Exception("DB Error")):
         result = await handle_min_savings(update, context)
 
         # Verify error message was sent
