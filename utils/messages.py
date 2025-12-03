@@ -233,8 +233,7 @@ def no_products_found() -> str:
     Used in: /list, /delete, /update
     """
     return (
-        "📭 <b>Nessun prodotto monitorato</b>\n\n"
-        "Usa /add per aggiungere il tuo primo prodotto!"
+        "📭 <b>Nessun prodotto monitorato</b>\n\n" "Usa /add per aggiungere il tuo primo prodotto!"
     )
 
 
