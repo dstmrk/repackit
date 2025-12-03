@@ -391,6 +391,17 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         await update.message.reply_text(message, parse_mode="HTML")
 
+        # Show /share hint if user is running low on slots (same logic as /list)
+        slots_available = user_limit - len(user_products)
+        max_slots = database.DEFAULT_MAX_PRODUCTS
+        if user_limit < max_slots and slots_available < 3:
+            hint_message = (
+                f"<i>Hai {len(user_products)}/{user_limit} prodotti monitorati.</i>\n\n"
+                "💡 <b>Suggerimento:</b> Stai esaurendo gli slot! "
+                "Usa /share per invitare amici e guadagnare più spazio."
+            )
+            await update.message.reply_text(hint_message, parse_mode="HTML")
+
         logger.info(
             f"Product added for user {user_id}: name={product_name}, ASIN={asin}, "
             f"price={price_paid}, deadline={return_deadline}, min_savings={min_savings}"
