@@ -345,3 +345,42 @@ async def test_list_handler_no_share_hint_when_at_max_slots(test_db):
     assert "20/21 prodotti" in message
     assert "/share" not in message
     assert "Stai esaurendo" not in message
+
+
+@pytest.mark.asyncio
+async def test_list_handler_escapes_html_characters(test_db):
+    """Test that product names with HTML characters are properly escaped."""
+    await database.add_user(user_id=123, language_code="it")
+
+    # Add product with HTML special characters in name
+    tomorrow = date.today() + timedelta(days=1)
+    await database.add_product(
+        user_id=123,
+        product_name="Test <script>alert('xss')</script> & Co.",
+        asin="B08N5WRWNW",
+        marketplace="it",
+        price_paid=59.90,
+        return_deadline=tomorrow,
+    )
+
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+
+    await list_handler(update, context)
+
+    # Verify HTML characters are escaped
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+
+    # Should contain escaped version
+    assert "&lt;script&gt;" in message
+    assert "&amp;" in message
+
+    # Should NOT contain unescaped version (potential XSS)
+    assert "<script>" not in message
+    assert (
+        "alert('xss')" not in message
+        or "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;" in message
+    )

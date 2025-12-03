@@ -1,5 +1,6 @@
 """Handler for /add command with conversational flow."""
 
+import html
 import logging
 import re
 from datetime import UTC, date, datetime
@@ -298,7 +299,7 @@ def _build_product_success_message(
     days_remaining = (return_deadline - datetime.now(UTC).date()).days
     message = (
         "✅ <b>Prodotto aggiunto con successo!</b>\n\n"
-        f"📦 <b>{product_name}</b>\n"
+        f"📦 <b>{html.escape(product_name)}</b>\n"
         f"🔖 ASIN: <code>{asin}</code>\n"
         f"💰 Prezzo pagato: €{price_paid:.2f}\n"
         f"📅 Scadenza reso: {return_deadline.strftime('%d/%m/%Y')} (tra {days_remaining} giorni)\n"

@@ -1,5 +1,6 @@
 """Handler for /list command."""
 
+import html
 import logging
 from datetime import UTC, date, datetime
 
@@ -68,7 +69,7 @@ async def list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
             # Add product info
             product_info = (
-                f"\n<b>{idx}.</b> <a href='{product_url}'>{product_name}</a>\n"
+                f"\n<b>{idx}.</b> <a href='{product_url}'>{html.escape(product_name)}</a>\n"
                 f"   💰 Prezzo pagato: €{price_paid:.2f}\n"
                 f"   📅 Scadenza reso: {deadline_info}\n"
             )

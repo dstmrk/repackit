@@ -1,5 +1,6 @@
 """Handler for /update command with conversational flow."""
 
+import html
 import logging
 import warnings
 from datetime import UTC, datetime
@@ -57,7 +58,7 @@ async def start_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         product_name = product.get("product_name") or f"Prodotto #{idx}"
         price_paid = product["price_paid"]
 
-        button_text = f"{idx}. {product_name} - €{price_paid:.2f}"
+        button_text = f"{idx}. {html.escape(product_name)} - €{price_paid:.2f}"
         callback_data = f"update_product_{product['id']}"
 
         keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
@@ -129,7 +130,8 @@ async def handle_product_selection(update: Update, context: ContextTypes.DEFAULT
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
-        f"📦 <b>Prodotto selezionato:</b> {product_display}\n\n" "Cosa vuoi modificare?",
+        f"📦 <b>Prodotto selezionato:</b> {html.escape(product_display)}\n\n"
+        "Cosa vuoi modificare?",
         parse_mode="HTML",
         reply_markup=reply_markup,
     )
@@ -290,7 +292,8 @@ async def _update_name(product_id: int, value_str: str, user_id: int, message) -
 
     await database.update_product(product_id, product_name=new_name)
     await message.reply_text(
-        "✅ <b>Nome aggiornato con successo!</b>\n\n" f"📦 Nuovo nome: <b>{new_name}</b>",
+        "✅ <b>Nome aggiornato con successo!</b>\n\n"
+        f"📦 Nuovo nome: <b>{html.escape(new_name)}</b>",
         parse_mode="HTML",
     )
     logger.info(
