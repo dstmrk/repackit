@@ -29,7 +29,7 @@ def validate_product_name(name: str) -> tuple[bool, str | None, str | None]:
             False,
             None,
             (
-                "❌ *Nome troppo corto*\n\n"
+                "❌ <b>Nome troppo corto</b>\n\n"
                 "Il nome del prodotto deve contenere almeno 3 caratteri.\n\n"
                 "Riprova oppure /cancel per annullare."
             ),
@@ -40,7 +40,7 @@ def validate_product_name(name: str) -> tuple[bool, str | None, str | None]:
             False,
             None,
             (
-                "❌ *Nome troppo lungo*\n\n"
+                "❌ <b>Nome troppo lungo</b>\n\n"
                 "Il nome del prodotto può contenere al massimo 100 caratteri.\n\n"
                 "Riprova oppure /cancel per annullare."
             ),
@@ -75,9 +75,9 @@ def validate_price(price_str: str, max_digits: int = 16) -> tuple[bool, float | 
                 False,
                 None,
                 (
-                    "❌ *Prezzo non valido*\n\n"
+                    "❌ <b>Prezzo non valido</b>\n\n"
                     "Il prezzo deve essere un numero positivo.\n\n"
-                    "Esempio: `59.90` oppure `59,90`\n\n"
+                    "Esempio: <code>59.90</code> oppure <code>59,90</code>\n\n"
                     "Riprova oppure /cancel per annullare."
                 ),
             )
@@ -89,7 +89,7 @@ def validate_price(price_str: str, max_digits: int = 16) -> tuple[bool, float | 
                 False,
                 None,
                 (
-                    f"❌ *Prezzo troppo lungo*\n\n"
+                    f"❌ <b>Prezzo troppo lungo</b>\n\n"
                     f"Il prezzo può contenere al massimo {max_digits} cifre in totale.\n\n"
                     "Riprova oppure /cancel per annullare."
                 ),
@@ -102,9 +102,9 @@ def validate_price(price_str: str, max_digits: int = 16) -> tuple[bool, float | 
             False,
             None,
             (
-                "❌ *Prezzo non valido*\n\n"
-                f"Non riesco a interpretare `{price_str}` come un numero.\n\n"
-                "Esempio: `59.90` oppure `59,90`\n\n"
+                "❌ <b>Prezzo non valido</b>\n\n"
+                f"Non riesco a interpretare <code>{price_str}</code> come un numero.\n\n"
+                "Esempio: <code>59.90</code> oppure <code>59,90</code>\n\n"
                 "Riprova oppure /cancel per annullare."
             ),
         )
@@ -138,9 +138,9 @@ def validate_threshold(
                 False,
                 None,
                 (
-                    "❌ *Valore non valido*\n\n"
+                    "❌ <b>Valore non valido</b>\n\n"
                     "Il risparmio minimo deve essere un numero non negativo.\n\n"
-                    "Esempio: `5` oppure `0` per qualsiasi risparmio\n\n"
+                    "Esempio: <code>5</code> oppure <code>0</code> per qualsiasi risparmio\n\n"
                     "Riprova oppure /cancel per annullare."
                 ),
             )
@@ -151,7 +151,7 @@ def validate_threshold(
                 False,
                 None,
                 (
-                    "❌ *Valore troppo alto*\n\n"
+                    "❌ <b>Valore troppo alto</b>\n\n"
                     f"Il risparmio minimo (€{threshold:.2f}) deve essere inferiore "
                     f"al prezzo pagato (€{max_value:.2f}).\n\n"
                     "Riprova oppure /cancel per annullare."
@@ -165,9 +165,9 @@ def validate_threshold(
             False,
             None,
             (
-                "❌ *Valore non valido*\n\n"
-                f"Non riesco a interpretare `{threshold_str}` come un numero.\n\n"
-                "Esempio: `5` oppure `0` per qualsiasi risparmio\n\n"
+                "❌ <b>Valore non valido</b>\n\n"
+                f"Non riesco a interpretare <code>{threshold_str}</code> come un numero.\n\n"
+                "Esempio: <code>5</code> oppure <code>0</code> per qualsiasi risparmio\n\n"
                 "Riprova oppure /cancel per annullare."
             ),
         )
