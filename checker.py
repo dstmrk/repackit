@@ -1,6 +1,7 @@
 """Price checker and notification sender."""
 
 import asyncio
+import html
 import logging
 import os
 from datetime import UTC, date, datetime
@@ -322,7 +323,7 @@ async def send_price_drop_notification(
     # Build message (HTML format)
     message = (
         "🎉 <b>Prezzo in calo su Amazon!</b>\n\n"
-        f"📦 <b>{product_display}</b>\n\n"
+        f"📦 <b>{html.escape(product_display)}</b>\n\n"
         f"Prezzo attuale: <b>€{current_price:.2f}</b>\n"
         f"Prezzo pagato: €{price_paid:.2f}\n"
         f"💰 Risparmio: <b>€{savings:.2f}</b>\n\n"

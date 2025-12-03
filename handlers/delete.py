@@ -1,5 +1,6 @@
 """Handler for /delete command with button-based product selection."""
 
+import html
 import logging
 from datetime import date
 
@@ -127,7 +128,7 @@ async def delete_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             # Show confirmation message with product details
             confirmation_message = (
                 "⚠️ <b>Sei sicuro di voler eliminare questo prodotto?</b>\n\n"
-                f"📦 <b>{product_name}</b>\n"
+                f"📦 <b>{html.escape(product_name)}</b>\n"
                 f"🔖 ASIN: <code>{asin}</code>\n"
                 f"💰 Prezzo pagato: €{price_paid:.2f}\n"
                 f"📅 Scadenza reso: {deadline_str}\n"
@@ -166,7 +167,7 @@ async def delete_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             # Edit message to show success
             success_message = (
                 "✅ <b>Prodotto eliminato con successo!</b>\n\n"
-                f"📦 <b>{product_name}</b>\n\n"
+                f"📦 <b>{html.escape(product_name)}</b>\n\n"
                 "Il prodotto non sarà più monitorato.\n"
                 "Usa /list per vedere i tuoi prodotti rimanenti."
             )
