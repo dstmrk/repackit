@@ -57,7 +57,7 @@ async def send_message_to_user(user_id: int, message: str) -> bool:
 
     Args:
         user_id: Telegram user ID
-        message: Message text to send
+        message: Message text to send (HTML format - use <b>, <i>, <code> tags)
 
     Returns:
         True if message was sent successfully, False otherwise
@@ -66,7 +66,7 @@ async def send_message_to_user(user_id: int, message: str) -> bool:
     payload = {
         "chat_id": user_id,
         "text": message,
-        "parse_mode": "Markdown",
+        "parse_mode": "HTML",
     }
 
     try:
@@ -89,7 +89,7 @@ async def broadcast_message(message: str) -> tuple[int, int]:
     Broadcast a message to all registered users.
 
     Args:
-        message: Message text to broadcast
+        message: Message text to broadcast (HTML format - use <b>, <i>, <code> tags)
 
     Returns:
         Tuple of (sent_count, failed_count)
