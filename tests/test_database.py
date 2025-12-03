@@ -1,5 +1,6 @@
 """Tests for database operations."""
 
+import asyncio
 import os
 import tempfile
 from datetime import date, timedelta
@@ -273,6 +274,94 @@ async def test_add_product(test_db):
     assert products[0]["marketplace"] == "it"
     assert products[0]["price_paid"] == 59.90
     assert products[0]["min_savings_threshold"] == 5.0
+
+
+@pytest.mark.asyncio
+async def test_add_product_atomic_first_product(test_db):
+    """Test add_product_atomic correctly identifies first product."""
+    await database.add_user(123456, "it")
+
+    deadline = date.today() + timedelta(days=30)
+
+    # First product should return is_first_product=True
+    product_id_1, is_first_1 = await database.add_product_atomic(
+        user_id=123456,
+        product_name="First Product",
+        asin="B08N5WRWNW",
+        marketplace="it",
+        price_paid=59.90,
+        return_deadline=deadline,
+        min_savings_threshold=5.0,
+    )
+
+    assert product_id_1 > 0
+    assert is_first_1 is True, "First product should be flagged as first"
+
+    # Second product should return is_first_product=False
+    product_id_2, is_first_2 = await database.add_product_atomic(
+        user_id=123456,
+        product_name="Second Product",
+        asin="B09ABC123",
+        marketplace="it",
+        price_paid=29.90,
+        return_deadline=deadline,
+        min_savings_threshold=0,
+    )
+
+    assert product_id_2 > 0
+    assert product_id_2 != product_id_1
+    assert is_first_2 is False, "Second product should NOT be flagged as first"
+
+    # Verify both products exist
+    products = await database.get_user_products(123456)
+    assert len(products) == 2
+
+
+@pytest.mark.asyncio
+async def test_add_product_atomic_concurrent_safety(test_db):
+    """Test add_product_atomic prevents race conditions with concurrent inserts."""
+    await database.add_user(123456, "it")
+
+    deadline = date.today() + timedelta(days=30)
+
+    # Simulate concurrent requests by calling add_product_atomic multiple times
+    # In a real race condition, both might see count=0 and think they're first
+    # But with atomic transaction, only the first should get is_first=True
+
+    # Due to SQLite's IMMEDIATE transaction locking, these will be serialized
+    # The first to acquire the lock will see count=0, second will see count=1
+    results = await asyncio.gather(
+        database.add_product_atomic(
+            user_id=123456,
+            product_name="Concurrent Product 1",
+            asin="B08N5WRWNW",
+            marketplace="it",
+            price_paid=59.90,
+            return_deadline=deadline,
+            min_savings_threshold=5.0,
+        ),
+        database.add_product_atomic(
+            user_id=123456,
+            product_name="Concurrent Product 2",
+            asin="B09ABC123",
+            marketplace="it",
+            price_paid=29.90,
+            return_deadline=deadline,
+            min_savings_threshold=0,
+        ),
+    )
+
+    product_id_1, is_first_1 = results[0]
+    product_id_2, is_first_2 = results[1]
+
+    # Exactly one should be marked as first
+    first_flags = [is_first_1, is_first_2]
+    assert sum(first_flags) == 1, "Exactly one product should be flagged as first"
+    assert product_id_1 != product_id_2, "Products should have different IDs"
+
+    # Verify both products exist
+    products = await database.get_user_products(123456)
+    assert len(products) == 2
 
 
 @pytest.mark.asyncio

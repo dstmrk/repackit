@@ -366,8 +366,10 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
             context.user_data.clear()
             return ConversationHandler.END
 
-        # Add product to database
-        await database.add_product(
+        # Add product to database with atomic first-product check
+        # This prevents race conditions where multiple concurrent requests
+        # could both trigger referral bonuses
+        product_id, is_first_product = await database.add_product_atomic(
             user_id=user_id,
             product_name=product_name,
             asin=asin,
@@ -380,9 +382,9 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # Increment promotional metric: total products registered
         await database.increment_metric("products_total_count")
 
-        # Check if this is the first product → give referral bonus to inviter
-        user_products = await database.get_user_products(user_id)
-        if len(user_products) == 1:  # First product!
+        # If this was the first product, give referral bonus to inviter
+        # The is_first_product flag comes from atomic transaction, so it's safe
+        if is_first_product:
             await _process_first_product_referral_bonus(user_id, context)
 
         # Build and send success message
@@ -392,11 +394,13 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text(message, parse_mode="HTML")
 
         # Show /share hint if user is running low on slots (same logic as /list)
-        slots_available = user_limit - len(user_products)
+        # Note: user_products was fetched before insert, so add 1 for the new product
+        current_product_count = len(user_products) + 1
+        slots_available = user_limit - current_product_count
         max_slots = database.DEFAULT_MAX_PRODUCTS
         if user_limit < max_slots and slots_available < 3:
             hint_message = (
-                f"<i>Hai {len(user_products)}/{user_limit} prodotti monitorati.</i>\n\n"
+                f"<i>Hai {current_product_count}/{user_limit} prodotti monitorati.</i>\n\n"
                 "💡 <b>Suggerimento:</b> Stai esaurendo gli slot! "
                 "Usa /share per invitare amici e guadagnare più spazio."
             )
