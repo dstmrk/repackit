@@ -361,7 +361,7 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if messages.should_show_slot_hint(current_product_count, user_limit):
             hint_message = (
                 f"<i>Hai {current_product_count}/{user_limit} prodotti monitorati.</i>\n\n"
-                + messages.slot_hint(current_product_count, user_limit)
+                + messages.slot_hint()
             )
             await update.message.reply_text(hint_message, parse_mode="HTML")
 
