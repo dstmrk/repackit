@@ -29,6 +29,8 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/list - Mostra i tuoi prodotti monitorati\n"
         "/delete - Rimuovi un prodotto dalla lista\n"
         "/update - Modifica i dati di un prodotto\n\n"
+        "<b>Invita amici:</b>\n"
+        "/share - Ottieni il tuo link di invito e guadagna più slot\n\n"
         "<b>Informazioni e supporto:</b>\n"
         "/start - Messaggio di benvenuto\n"
         "/help - Mostra questo messaggio\n"
@@ -38,6 +40,7 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "2️⃣ Il bot controllerà il prezzo ogni giorno\n"
         "3️⃣ Riceverai una notifica se il prezzo scende\n"
         "4️⃣ Potrai decidere in autonomia di riordinare il prodotto e fare il reso del precedente ordine\n\n"
+        "💡 <b>Suggerimento:</b> Invita i tuoi amici con /share per guadagnare più slot prodotto!\n\n"
         "<i>Il monitoraggio si ferma automaticamente alla scadenza del reso.</i>"
     )
 
