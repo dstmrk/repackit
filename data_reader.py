@@ -13,11 +13,6 @@ logger = logging.getLogger(__name__)
 # Get affiliate tag from environment
 AMAZON_AFFILIATE_TAG = os.getenv("AMAZON_AFFILIATE_TAG", "")
 
-# Retry configuration for scraping
-MAX_RETRIES = 3
-INITIAL_RETRY_DELAY = 2.0  # seconds
-BACKOFF_MULTIPLIER = 2.0
-
 # ASIN pattern: 10 alphanumeric characters
 # Supports: /dp/, /gp/product/, and short links /d/
 ASIN_PATTERN = re.compile(r"/dp/([A-Z0-9]{10})|/gp/product/([A-Z0-9]{10})|/d/([A-Z0-9]{10})")
