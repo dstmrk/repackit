@@ -2,11 +2,11 @@
 
 import asyncio
 import logging
-
-from config import get_config
 import re
 
 from playwright.async_api import Browser, TimeoutError, async_playwright
+
+from config import get_config
 
 # Configure logging
 logger = logging.getLogger(__name__)

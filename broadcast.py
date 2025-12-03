@@ -12,8 +12,6 @@ Example:
 
 import asyncio
 import logging
-from config import get_config
-
 import sys
 from datetime import UTC, datetime
 
@@ -21,6 +19,7 @@ import httpx
 from dotenv import load_dotenv
 
 import database
+from config import get_config
 from utils.logging_config import setup_rotating_file_handler
 
 # Load environment variables

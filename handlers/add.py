@@ -3,7 +3,7 @@
 import html
 import logging
 import re
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 
 import aiosqlite
 from telegram import Update
