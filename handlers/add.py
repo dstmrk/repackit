@@ -18,6 +18,7 @@ from telegram.ext import (
 import database
 from data_reader import extract_asin
 from handlers import validators
+from utils import messages
 
 logger = logging.getLogger(__name__)
 
@@ -256,10 +257,7 @@ async def _process_first_product_referral_bonus(
         try:
             await context.bot.send_message(
                 chat_id=referrer_id,
-                text=(
-                    "🎉 <b>Un amico che hai invitato ha aggiunto il suo primo prodotto!</b>\n\n"
-                    f"💎 Hai ricevuto +3 slot (ora ne hai {new_limit}/{database.DEFAULT_MAX_PRODUCTS})"
-                ),
+                text=messages.referral_bonus_notification(new_limit),
                 parse_mode="HTML",
             )
             logger.info(
@@ -274,48 +272,6 @@ async def _process_first_product_referral_bonus(
         logger.info(
             f"User {user_id} first product added but referrer {referrer_id} " "already at max limit"
         )
-
-
-def _build_product_success_message(
-    product_name: str,
-    asin: str,
-    price_paid: float,
-    return_deadline: date,
-    min_savings: float,
-) -> str:
-    """
-    Build success message for product addition.
-
-    Args:
-        product_name: User-defined product name
-        asin: Amazon Standard Identification Number
-        price_paid: Price user paid
-        return_deadline: Return deadline date
-        min_savings: Minimum savings threshold
-
-    Returns:
-        Formatted success message (HTML)
-    """
-    days_remaining = (return_deadline - datetime.now(UTC).date()).days
-    message = (
-        "✅ <b>Prodotto aggiunto con successo!</b>\n\n"
-        f"📦 <b>{html.escape(product_name)}</b>\n"
-        f"🔖 ASIN: <code>{asin}</code>\n"
-        f"💰 Prezzo pagato: €{price_paid:.2f}\n"
-        f"📅 Scadenza reso: {return_deadline.strftime('%d/%m/%Y')} (tra {days_remaining} giorni)\n"
-    )
-
-    if min_savings > 0:
-        message += f"🎯 Risparmio minimo: €{min_savings:.2f}\n"
-    else:
-        message += "🎯 Notifica per qualsiasi risparmio\n"
-
-    message += (
-        "\n<i>Monitorerò il prezzo ogni giorno e ti avviserò se scende!</i>\n\n"
-        "Usa /list per vedere tutti i tuoi prodotti."
-    )
-
-    return message
 
 
 async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -358,9 +314,7 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         if len(user_products) >= user_limit:
             await update.message.reply_text(
-                "❌ <b>Limite prodotti raggiunto!</b>\n\n"
-                f"Puoi monitorare al massimo <b>{user_limit} prodotti</b> contemporaneamente.\n\n"
-                "Usa /delete per rimuovere un prodotto e fare spazio.",
+                messages.product_limit_reached(len(user_products), user_limit),
                 parse_mode="HTML",
             )
             logger.info(f"User {user_id} reached product limit ({user_limit} products)")
@@ -390,21 +344,20 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await _process_first_product_referral_bonus(user_id, context)
 
         # Build and send success message
-        message = _build_product_success_message(
-            product_name, asin, price_paid, return_deadline, min_savings
+        days_remaining = (return_deadline - datetime.now(UTC).date()).days
+        message = messages.product_added_success(
+            html.escape(product_name), asin, price_paid,
+            return_deadline.strftime('%d/%m/%Y'), days_remaining, min_savings
         )
         await update.message.reply_text(message, parse_mode="HTML")
 
         # Show /share hint if user is running low on slots (same logic as /list)
         # Note: user_products was fetched before insert, so add 1 for the new product
         current_product_count = len(user_products) + 1
-        slots_available = user_limit - current_product_count
-        max_slots = database.DEFAULT_MAX_PRODUCTS
-        if user_limit < max_slots and slots_available < 3:
+        if messages.should_show_slot_hint(current_product_count, user_limit):
             hint_message = (
                 f"<i>Hai {current_product_count}/{user_limit} prodotti monitorati.</i>\n\n"
-                "💡 <b>Suggerimento:</b> Stai esaurendo gli slot! "
-                "Usa /share per invitare amici e guadagnare più spazio."
+                + messages.slot_hint(current_product_count, user_limit)
             )
             await update.message.reply_text(hint_message, parse_mode="HTML")
 
@@ -445,9 +398,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     Cancel the conversation.
     """
     await update.message.reply_text(
-        "❌ <b>Operazione annullata</b>\n\n"
-        "Nessun prodotto è stato aggiunto.\n\n"
-        "Usa /add per iniziare di nuovo.",
+        messages.cancel_operation(),
         parse_mode="HTML",
     )
 

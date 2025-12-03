@@ -118,16 +118,18 @@ def referral_bonus_notification(new_limit: int) -> str:
 
 
 def product_added_success(
-    product_name: str, price: float, deadline: str, threshold: float | None = None
+    product_name: str, asin: str, price: float, deadline_str: str, days_remaining: int, threshold: float
 ) -> str:
     """
     Success message after adding a product.
 
     Args:
-        product_name: User-defined product name
+        product_name: User-defined product name (should be pre-escaped with html.escape())
+        asin: Amazon Standard Identification Number
         price: Price paid in euros
-        deadline: Return deadline (formatted as dd/mm/yyyy)
-        threshold: Optional minimum savings threshold in euros
+        deadline_str: Return deadline formatted as dd/mm/yyyy
+        days_remaining: Days until deadline
+        threshold: Minimum savings threshold (0 = any savings)
 
     Returns:
         HTML-formatted success message
@@ -137,16 +139,19 @@ def product_added_success(
     message = (
         "✅ <b>Prodotto aggiunto con successo!</b>\n\n"
         f"📦 <b>{product_name}</b>\n"
+        f"🔖 ASIN: <code>{asin}</code>\n"
         f"💰 Prezzo pagato: €{price:.2f}\n"
-        f"📅 Scadenza reso: {deadline}\n"
+        f"📅 Scadenza reso: {deadline_str} (tra {days_remaining} giorni)\n"
     )
 
-    if threshold is not None and threshold > 0:
+    if threshold > 0:
         message += f"🎯 Risparmio minimo: €{threshold:.2f}\n"
+    else:
+        message += "🎯 Notifica per qualsiasi risparmio\n"
 
     message += (
-        "\n<i>Monitorerò il prezzo ogni giorno e ti avviserò "
-        "se scende sotto il prezzo che hai pagato!</i>"
+        "\n<i>Monitorerò il prezzo ogni giorno e ti avviserò se scende!</i>\n\n"
+        "Usa /list per vedere tutti i tuoi prodotti."
     )
 
     return message
@@ -345,9 +350,9 @@ def feedback_success() -> str:
     Used in: /feedback
     """
     return (
-        "✅ <b>Grazie per il tuo feedback!</b>\n\n"
-        "Il tuo messaggio è stato inviato con successo.\n"
-        "Ci aiuterà a migliorare RepackIt! 🚀"
+        "✅ <b>Feedback inviato con successo!</b>\n\n"
+        "Grazie per il tuo feedback! Lo esamineremo al più presto per migliorare il servizio.\n\n"
+        "Il tuo contributo è molto importante per noi! 🙏"
     )
 
 
