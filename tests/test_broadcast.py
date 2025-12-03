@@ -195,16 +195,16 @@ async def test_broadcast_message_long_message(test_db):
 
 
 @pytest.mark.asyncio
-async def test_broadcast_message_markdown_formatting(test_db):
-    """Test broadcast preserves markdown formatting."""
+async def test_broadcast_message_html_formatting(test_db):
+    """Test broadcast preserves HTML formatting."""
     await database.add_user(user_id=123, language_code="it")
 
-    markdown_message = "*Bold* _italic_ `code`"
+    html_message = "<b>Bold</b> <i>italic</i> <code>code</code>"
 
     with patch("broadcast.send_message_to_user", new_callable=AsyncMock) as mock_send:
         mock_send.return_value = True
 
-        sent, failed = await broadcast.broadcast_message(markdown_message)
+        sent, failed = await broadcast.broadcast_message(html_message)
 
         assert sent == 1
-        mock_send.assert_called_once_with(123, markdown_message)
+        mock_send.assert_called_once_with(123, html_message)
