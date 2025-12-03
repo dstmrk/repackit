@@ -369,7 +369,7 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # Add product to database with atomic first-product check
         # This prevents race conditions where multiple concurrent requests
         # could both trigger referral bonuses
-        product_id, is_first_product = await database.add_product_atomic(
+        _, is_first_product = await database.add_product_atomic(
             user_id=user_id,
             product_name=product_name,
             asin=asin,

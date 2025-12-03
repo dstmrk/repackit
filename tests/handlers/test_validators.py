@@ -329,10 +329,10 @@ def test_parse_deadline_past_date():
 
 
 def test_parse_deadline_today():
-    """Test today's date (should fail as it's not in the future)."""
+    """Test today's date (should fail - bot needs at least 1 day to monitor)."""
     today_str = date.today().strftime("%d-%m-%Y")
 
-    with pytest.raises(ValueError, match="nel passato"):
+    with pytest.raises(ValueError, match="La scadenza è oggi"):
         validators.parse_deadline(today_str)
 
 
