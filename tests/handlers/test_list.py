@@ -243,3 +243,105 @@ async def test_list_handler_database_error(test_db):
         call_args = update.message.reply_text.call_args
         message = call_args[0][0]
         assert "Errore" in message
+
+
+@pytest.mark.asyncio
+async def test_list_handler_shows_share_hint_when_low_on_slots(test_db):
+    """Test /list shows /share hint when user has <3 slots available and <21 total."""
+    # Create user with 6 slots
+    await database.add_user(user_id=123, language_code="it")
+    await database.set_user_max_products(user_id=123, limit=6)
+
+    # Add 5 products (only 1 slot remaining)
+    tomorrow = date.today() + timedelta(days=1)
+    for i in range(5):
+        await database.add_product(
+            user_id=123,
+            product_name=f"Product {i+1}",
+            asin=f"ASIN0000{i+1}",
+            marketplace="it",
+            price_paid=50.0,
+            return_deadline=tomorrow,
+        )
+
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+
+    await list_handler(update, context)
+
+    # Verify hint is shown
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "5/6 prodotti" in message
+    assert "/share" in message
+    assert "Stai esaurendo gli slot" in message
+
+
+@pytest.mark.asyncio
+async def test_list_handler_no_share_hint_when_enough_slots(test_db):
+    """Test /list doesn't show /share hint when user has ≥3 slots available."""
+    # Create user with 6 slots
+    await database.add_user(user_id=123, language_code="it")
+    await database.set_user_max_products(user_id=123, limit=6)
+
+    # Add 2 products (4 slots remaining)
+    tomorrow = date.today() + timedelta(days=1)
+    for i in range(2):
+        await database.add_product(
+            user_id=123,
+            product_name=f"Product {i+1}",
+            asin=f"ASIN0000{i+1}",
+            marketplace="it",
+            price_paid=50.0,
+            return_deadline=tomorrow,
+        )
+
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+
+    await list_handler(update, context)
+
+    # Verify hint is NOT shown
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "2/6 prodotti" in message
+    assert "/share" not in message
+    assert "Stai esaurendo" not in message
+
+
+@pytest.mark.asyncio
+async def test_list_handler_no_share_hint_when_at_max_slots(test_db):
+    """Test /list doesn't show /share hint when user is already at max (21 slots)."""
+    # Create user at max slots (21)
+    await database.add_user(user_id=123, language_code="it")
+    await database.set_user_max_products(user_id=123, limit=21)
+
+    # Add 20 products (only 1 slot remaining, but at max)
+    tomorrow = date.today() + timedelta(days=1)
+    for i in range(20):
+        await database.add_product(
+            user_id=123,
+            product_name=f"Product {i+1}",
+            asin=f"ASIN000{i+1:02d}",
+            marketplace="it",
+            price_paid=50.0,
+            return_deadline=tomorrow,
+        )
+
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+
+    await list_handler(update, context)
+
+    # Verify hint is NOT shown (user is already at max)
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "20/21 prodotti" in message
+    assert "/share" not in message
+    assert "Stai esaurendo" not in message
