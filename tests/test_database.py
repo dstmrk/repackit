@@ -71,15 +71,25 @@ async def test_init_db_creates_indexes(test_db):
     import aiosqlite
 
     async with aiosqlite.connect(test_db) as db:
-        # Check idx_user_products exists
+        # Check simple indexes exist
         async with db.execute(
             "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_user_products'"
         ) as cursor:
             assert await cursor.fetchone() is not None
 
-        # Check idx_return_deadline exists
         async with db.execute(
             "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_return_deadline'"
+        ) as cursor:
+            assert await cursor.fetchone() is not None
+
+        # Check composite indexes exist (PERF #1)
+        async with db.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_asin_marketplace'"
+        ) as cursor:
+            assert await cursor.fetchone() is not None
+
+        async with db.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_user_deadline'"
         ) as cursor:
             assert await cursor.fetchone() is not None
 
