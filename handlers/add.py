@@ -427,7 +427,9 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
         else:
             # Other integrity errors
             logger.error(f"Database integrity error for user {user_id}: {e}", exc_info=True)
-            await update.message.reply_text("❌ Errore nell'aggiungere il prodotto. Riprova più tardi.")
+            await update.message.reply_text(
+                "❌ Errore nell'aggiungere il prodotto. Riprova più tardi."
+            )
     except Exception as e:
         logger.error(f"Error in handle_min_savings for user {user_id}: {e}", exc_info=True)
         await update.message.reply_text("❌ Errore nell'aggiungere il prodotto. Riprova più tardi.")
