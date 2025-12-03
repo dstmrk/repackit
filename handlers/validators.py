@@ -196,7 +196,10 @@ def parse_deadline(deadline_input: str) -> date:
     try:
         days = int(deadline_input)
         if days < 1 or days > 365:
-            raise ValueError("Il numero di giorni deve essere tra 1 e 365")
+            raise ValueError(
+                "Il numero di giorni deve essere tra 1 e 365. "
+                "Il bot ha bisogno di almeno 1 giorno per monitorare il prezzo!"
+            )
         return date.today() + timedelta(days=days)
     except ValueError as e:
         # If it's our specific error about days range, re-raise it
@@ -226,9 +229,19 @@ def parse_deadline(deadline_input: str) -> date:
 
         deadline = date(year, month, day)
 
-        # Validate it's in the future (must be strictly greater than today)
-        if deadline <= date.today():
-            raise ValueError(f"La data specificata ({deadline.strftime('%d/%m/%Y')}) è nel passato")
+        # Validate it's in the future (must be at least tomorrow)
+        today = date.today()
+        if deadline <= today:
+            if deadline == today:
+                raise ValueError(
+                    "La scadenza è oggi. Il bot ha bisogno di almeno 1 giorno "
+                    "per monitorare il prezzo. Inserisci una data da domani in poi!"
+                )
+            else:
+                raise ValueError(
+                    f"La data specificata ({deadline.strftime('%d/%m/%Y')}) è nel passato. "
+                    "Inserisci una data futura!"
+                )
 
         return deadline
 
@@ -240,6 +253,7 @@ def parse_deadline(deadline_input: str) -> date:
                 phrase in error_msg
                 for phrase in [
                     "La data specificata",
+                    "La scadenza è oggi",
                     "Anno deve essere",
                 ]
             ):
