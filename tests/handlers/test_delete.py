@@ -48,7 +48,7 @@ async def test_start_delete_no_products(test_db):
     update.message.reply_text.assert_called_once()
     call_args = update.message.reply_text.call_args
     message = call_args[0][0]
-    assert "Non hai prodotti" in message
+    assert "Nessun prodotto monitorato" in message
     assert "Usa /add" in message
 
 
@@ -251,7 +251,7 @@ async def test_delete_callback_cancel(test_db):
     call_args = update.callback_query.edit_message_text.call_args
     message = call_args[0][0]
     assert "annullata" in message
-    assert "Nessun prodotto è stato eliminato" in message
+    assert "Nessuna modifica è stata effettuata" in message
 
     # Verify product was NOT deleted
     products_after = await database.get_user_products(123)

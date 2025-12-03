@@ -9,6 +9,7 @@ from telegram.ext import ContextTypes
 
 import database
 from data_reader import build_affiliate_url
+from utils import messages
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +34,7 @@ async def list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         if not products:
             await update.message.reply_text(
-                "📭 <b>Nessun prodotto monitorato</b>\n\n"
-                "Usa /add per aggiungere il tuo primo prodotto!",
+                messages.no_products_found(),
                 parse_mode="HTML",
             )
             return
@@ -89,13 +89,8 @@ async def list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
 
         # Show /share hint if user is running low on slots
-        slots_available = user_limit - len(products)
-        max_slots = database.DEFAULT_MAX_PRODUCTS
-        if user_limit < max_slots and slots_available < 3:
-            message += (
-                "\n\n💡 <b>Suggerimento:</b> Stai esaurendo gli slot! "
-                "Usa /share per invitare amici e guadagnare più spazio."
-            )
+        if messages.should_show_slot_hint(len(products), user_limit):
+            message += "\n\n" + messages.slot_hint(len(products), user_limit)
 
         await update.message.reply_text(message, parse_mode="HTML", disable_web_page_preview=True)
 
