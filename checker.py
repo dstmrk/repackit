@@ -245,12 +245,12 @@ async def check_and_notify() -> dict:
         logger.info(f"Successfully scraped {len(current_prices)}/{len(products)} prices")
 
         # Check if Telegram token is set
-        if not cfg.telegram_token:
-            logger.error("cfg.telegram_token not set, cannot send notifications")
+        if not TELEGRAM_TOKEN:
+            logger.error("TELEGRAM_TOKEN not set, cannot send notifications")
             stats["errors"] += 1
             return stats
 
-        bot = Bot(token=cfg.telegram_token)
+        bot = Bot(token=TELEGRAM_TOKEN)
 
         # Process each product and collect price drop notifications
         price_drop_notifications = []

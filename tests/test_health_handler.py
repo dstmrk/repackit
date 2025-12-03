@@ -413,7 +413,9 @@ def test_health_bind_address_from_env():
         # Set custom value
         os.environ["HEALTH_BIND_ADDRESS"] = "127.0.0.1"
 
-        # Reload module to pick up new value
+        # Reset config and reload module to pick up new value
+        from config import reset_config
+        reset_config()
         importlib.reload(health_handler)
 
         assert health_handler.HEALTH_BIND_ADDRESS == "127.0.0.1"
@@ -424,6 +426,8 @@ def test_health_bind_address_from_env():
         else:
             if "HEALTH_BIND_ADDRESS" in os.environ:
                 del os.environ["HEALTH_BIND_ADDRESS"]
+        from config import reset_config
+        reset_config()
         importlib.reload(health_handler)
 
 
