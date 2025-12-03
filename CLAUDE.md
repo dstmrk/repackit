@@ -494,14 +494,36 @@ Shows all available commands with descriptions and explains how the bot works.
 **Message includes**:
 - List of all commands organized by category:
   - Gestione prodotti: `/add`, `/list`, `/delete`, `/update`
+  - Invita amici: `/share`
   - Informazioni e supporto: `/start`, `/help`, `/feedback`
 - Brief explanation of how the bot works (4-step process)
 - Automatic monitoring reminder
+- Hint about inviting friends with `/share` to earn more product slots
 
 **Benefits**:
 - Helps new users discover all features
 - Quick reference for command syntax
 - Explains the bot's purpose and workflow
+- Promotes referral system awareness
+
+#### `/share`
+Shows user's referral link and explains the referral system for earning more product slots.
+
+**Message includes**:
+- User's current slot count (e.g., "6/21")
+- Personal referral link: `https://t.me/repackit_bot?start=USER_ID`
+- How the system works:
+  1. Share personal link
+  2. Friend receives 6 slots (instead of 3)
+  3. When friend adds first product, inviter gets +3 slots
+- Maximum cap (21 slots)
+- Inline share button with pre-filled message
+
+**Benefits**:
+- Makes referral system discoverable
+- Provides easy-to-share link
+- Explains mutual benefits clearly
+- Encourages active invitations
 
 #### `/add`
 **Conversational flow** (step-by-step):
@@ -552,9 +574,16 @@ The `/add` command uses a conversational flow that guides users through adding a
 - Users can type `/cancel` at any step to abort the conversation
 
 **Product Limit**:
-- Users can monitor up to **20 products** simultaneously (`MAX_PRODUCTS_PER_USER = 20`)
+- Users have dynamic slot limits (3-21 slots) based on referrals
 - When limit is reached, bot shows clear error message with suggestion to use `/delete`
 - Prevents abuse and ensures system scalability
+
+**Contextual /share Hint**:
+After successfully adding a product, if user has <3 slots available and <21 total:
+- Shows separate message with current slot count
+- Suggests using `/share` to invite friends and earn more slots
+- Example: "Hai 5/6 prodotti monitorati. 💡 Suggerimento: Stai esaurendo gli slot! Usa /share per invitare amici e guadagnare più spazio."
+- Perfect timing: user just consumed a slot → immediate awareness
 
 #### `/list`
 Shows user's monitored products:
@@ -576,10 +605,17 @@ Usa /delete per rimuoverne uno, /update per modificarne uno.
 
 **Features**:
 - Shows product name (user-defined) for easy identification
-- Shows product count vs. limit (e.g., "5/20 prodotti monitorati")
+- Shows product count vs. limit (e.g., "5/21 prodotti monitorati")
 - Shows minimum savings threshold only if > 0
 - Provides quick command references for delete and update actions
 - Numbers 1, 2, 3... are **not** database IDs, but list indices for easy reference
+
+**Contextual /share Hint**:
+If user has <3 slots available and <21 total:
+- Shows inline hint after product list
+- Message: "💡 Suggerimento: Stai esaurendo gli slot! Usa /share per invitare amici e guadagnare più spazio."
+- Smart targeting: only shows to users who can benefit (not at max)
+- Contextual timing: user checks products → sees problem → immediate solution
 
 #### `/delete`
 **Button-based selection with confirmation**:
@@ -1002,6 +1038,46 @@ await database.add_user(user_id, language_code, referred_by=referrer_id)
 - Permanent storage rewards drove 60% growth
 - Users with referrals had 2x retention
 - 35% of daily signups came from referrals
+
+### Viral Touchpoints
+
+The referral system is fully integrated into the UX with **5 strategic touchpoints**:
+
+1. **📢 Momento di Gloria** (Passive Viral Growth)
+   - **Where**: Price drop notifications
+   - **What**: Share button with pre-filled message
+   - **Why**: Users are happiest when saving money → natural sharing moment
+   - **Impact**: Emotional timing drives authentic word-of-mouth
+
+2. **🎁 /share Command** (Active Discovery)
+   - **Where**: Dedicated command for referrals
+   - **What**: Shows personal link + current slot count + system explanation
+   - **Why**: Makes referral system discoverable and accessible
+   - **Impact**: Users can actively invite whenever they want
+
+3. **📖 /help Command** (Organic Discovery)
+   - **Where**: Help message
+   - **What**: Mentions `/share` in "Invita amici" category + hint at bottom
+   - **Why**: New users discover referral system while learning bot
+   - **Impact**: Increases awareness without being pushy
+
+4. **📦 /list Command** (Contextual Prompt)
+   - **Where**: After product list when <3 slots available and <21 total
+   - **What**: Inline hint "Stai esaurendo gli slot! Usa /share..."
+   - **Why**: User sees problem (low slots) → immediate solution presented
+   - **Impact**: Perfect timing when user realizes space is limited
+
+5. **➕ /add Command** (Immediate Awareness)
+   - **Where**: After successfully adding product, when <3 slots available and <21 total
+   - **What**: Separate message with slot count + /share hint
+   - **Why**: User just consumed a slot → immediate awareness of impact
+   - **Impact**: Best timing - user sees consequence in real-time
+
+**Key Design Principles**:
+- **Non-intrusive**: Hints only appear when genuinely helpful (<3 slots)
+- **Consistent**: Same logic across /list and /add (DRY principle)
+- **Smart targeting**: Never shows to users at max capacity (21 slots)
+- **Progressive disclosure**: From passive (notification button) to active (dedicated command)
 
 ### Testing
 

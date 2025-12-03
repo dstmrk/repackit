@@ -26,7 +26,8 @@ Un bot Telegram che ti avvisa se il prezzo dei tuoi acquisti Amazon scende duran
 - ✅ Soglie di risparmio personalizzabili
 - ✅ **Flussi conversazionali** per tutti i comandi
 - ✅ **Validazione robusta** con inline keyboards
-- ✅ **Limite 20 prodotti** per utente
+- ✅ **Sistema referral gamificato** con slot dinamici (3-21)
+- ✅ **5 touchpoint virali** per crescita organica
 - ✅ Health check endpoint per monitoring
 - ✅ Webhook-only (production-ready)
 - ✅ Docker support con multi-stage build
