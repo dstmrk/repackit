@@ -2,7 +2,7 @@
 
 import logging
 import warnings
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
