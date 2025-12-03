@@ -14,7 +14,9 @@ DATABASE_PATH = os.getenv("DATABASE_PATH", "./data/repackit.db")
 
 # Product limit configuration
 DEFAULT_MAX_PRODUCTS = int(os.getenv("DEFAULT_MAX_PRODUCTS", "21"))
-INITIAL_MAX_PRODUCTS = int(os.getenv("INITIAL_MAX_PRODUCTS", "5"))
+INITIAL_MAX_PRODUCTS = int(os.getenv("INITIAL_MAX_PRODUCTS", "3"))
+PRODUCTS_PER_REFERRAL = int(os.getenv("PRODUCTS_PER_REFERRAL", "3"))
+INVITED_USER_BONUS = int(os.getenv("INVITED_USER_BONUS", "3"))
 
 
 async def init_db() -> None:
@@ -38,6 +40,8 @@ async def init_db() -> None:
                 user_id INTEGER PRIMARY KEY,
                 language_code TEXT,
                 max_products INTEGER DEFAULT NULL,
+                referred_by INTEGER DEFAULT NULL,
+                referral_bonus_given BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """
@@ -101,24 +105,30 @@ async def init_db() -> None:
 # ============================================================================
 
 
-async def add_user(user_id: int, language_code: str | None = None) -> None:
+async def add_user(
+    user_id: int, language_code: str | None = None, referred_by: int | None = None
+) -> None:
     """
     Add a new user to the database.
 
     Args:
         user_id: Telegram user ID
         language_code: User's language code (e.g., "it", "en")
+        referred_by: User ID of the referrer (optional)
     """
     async with aiosqlite.connect(DATABASE_PATH) as db:
         await db.execute(
             """
-            INSERT OR IGNORE INTO users (user_id, language_code)
-            VALUES (?, ?)
+            INSERT OR IGNORE INTO users (user_id, language_code, referred_by)
+            VALUES (?, ?, ?)
             """,
-            (user_id, language_code),
+            (user_id, language_code, referred_by),
         )
         await db.commit()
-        logger.info(f"User {user_id} added to database")
+        if referred_by:
+            logger.info(f"User {user_id} added to database (referred by {referred_by})")
+        else:
+            logger.info(f"User {user_id} added to database")
 
 
 async def get_user(user_id: int) -> dict | None:
@@ -164,7 +174,7 @@ async def get_user_product_limit(user_id: int) -> int:
         Product limit for this user.
         - If max_products is NULL: returns DEFAULT_MAX_PRODUCTS (21, for admin/special users)
         - If max_products is set: returns that value (personalized limit)
-        - If user doesn't exist: returns INITIAL_MAX_PRODUCTS (5, for new users)
+        - If user doesn't exist: returns INITIAL_MAX_PRODUCTS (3, for new users)
     """
     user = await get_user(user_id)
     if not user:
@@ -195,6 +205,43 @@ async def set_user_max_products(user_id: int, limit: int) -> None:
         )
         await db.commit()
         logger.info(f"User {user_id} max_products set to {limit}")
+
+
+async def increment_user_product_limit(user_id: int, amount: int) -> int:
+    """
+    Increment user's product limit by the specified amount (capped at DEFAULT_MAX_PRODUCTS).
+
+    Args:
+        user_id: Telegram user ID
+        amount: Amount to increment by (typically PRODUCTS_PER_REFERRAL = 3)
+
+    Returns:
+        New product limit after increment
+    """
+    current_limit = await get_user_product_limit(user_id)
+    new_limit = min(current_limit + amount, DEFAULT_MAX_PRODUCTS)
+
+    await set_user_max_products(user_id, new_limit)
+    logger.info(f"User {user_id} product limit incremented by {amount} (now {new_limit})")
+    return new_limit
+
+
+async def mark_referral_bonus_given(user_id: int) -> None:
+    """
+    Mark that the referral bonus has been given for this user.
+
+    This prevents giving the bonus multiple times if the user adds/removes/readds products.
+
+    Args:
+        user_id: Telegram user ID
+    """
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        await db.execute(
+            "UPDATE users SET referral_bonus_given = TRUE WHERE user_id = ?",
+            (user_id,),
+        )
+        await db.commit()
+        logger.info(f"User {user_id} marked as referral bonus given")
 
 
 # ============================================================================

@@ -215,6 +215,107 @@ async def handle_deadline(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     return WAITING_MIN_SAVINGS
 
 
+async def _process_first_product_referral_bonus(
+    user_id: int, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    """
+    Process referral bonus for user's first product addition.
+
+    If this is the user's first product and they were referred,
+    give bonus slots to the referrer.
+
+    Args:
+        user_id: User who added their first product
+        context: Telegram context (for sending notification)
+    """
+    user = await database.get_user(user_id)
+    if not user or not user["referred_by"] or user["referral_bonus_given"]:
+        return
+
+    referrer_id = user["referred_by"]
+
+    # Verify referrer still exists
+    referrer = await database.get_user(referrer_id)
+    if not referrer:
+        return
+
+    current_limit = await database.get_user_product_limit(referrer_id)
+
+    # Only give bonus if referrer is not already at cap
+    if current_limit < database.DEFAULT_MAX_PRODUCTS:
+        new_limit = await database.increment_user_product_limit(
+            referrer_id, database.PRODUCTS_PER_REFERRAL
+        )
+
+        # Mark bonus as given
+        await database.mark_referral_bonus_given(user_id)
+
+        # Notify referrer
+        try:
+            await context.bot.send_message(
+                chat_id=referrer_id,
+                text=(
+                    "🎉 <b>Un amico che hai invitato ha aggiunto il suo primo prodotto!</b>\n\n"
+                    f"💎 Hai ricevuto +3 slot (ora ne hai {new_limit}/{database.DEFAULT_MAX_PRODUCTS})"
+                ),
+                parse_mode="HTML",
+            )
+            logger.info(
+                f"Referral bonus given: user {user_id} → referrer {referrer_id} "
+                f"(+{database.PRODUCTS_PER_REFERRAL} slots, now {new_limit})"
+            )
+        except Exception as e:
+            logger.warning(f"Could not notify referrer {referrer_id}: {e}")
+    else:
+        # Referrer already at cap, mark bonus as given anyway
+        await database.mark_referral_bonus_given(user_id)
+        logger.info(
+            f"User {user_id} first product added but referrer {referrer_id} " "already at max limit"
+        )
+
+
+def _build_product_success_message(
+    product_name: str,
+    asin: str,
+    price_paid: float,
+    return_deadline: date,
+    min_savings: float,
+) -> str:
+    """
+    Build success message for product addition.
+
+    Args:
+        product_name: User-defined product name
+        asin: Amazon Standard Identification Number
+        price_paid: Price user paid
+        return_deadline: Return deadline date
+        min_savings: Minimum savings threshold
+
+    Returns:
+        Formatted success message (HTML)
+    """
+    days_remaining = (return_deadline - date.today()).days
+    message = (
+        "✅ <b>Prodotto aggiunto con successo!</b>\n\n"
+        f"📦 <b>{product_name}</b>\n"
+        f"🔖 ASIN: <code>{asin}</code>\n"
+        f"💰 Prezzo pagato: €{price_paid:.2f}\n"
+        f"📅 Scadenza reso: {return_deadline.strftime('%d/%m/%Y')} (tra {days_remaining} giorni)\n"
+    )
+
+    if min_savings > 0:
+        message += f"🎯 Risparmio minimo: €{min_savings:.2f}\n"
+    else:
+        message += "🎯 Notifica per qualsiasi risparmio\n"
+
+    message += (
+        "\n<i>Monitorerò il prezzo ogni giorno e ti avviserò se scende!</i>\n\n"
+        "Usa /list per vedere tutti i tuoi prodotti."
+    )
+
+    return message
+
+
 async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Handle minimum savings threshold input and save the product.
@@ -279,26 +380,15 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # Increment promotional metric: total products registered
         await database.increment_metric("products_total_count")
 
-        # Build success message
-        days_remaining = (return_deadline - date.today()).days
-        message = (
-            "✅ <b>Prodotto aggiunto con successo!</b>\n\n"
-            f"📦 <b>{product_name}</b>\n"
-            f"🔖 ASIN: <code>{asin}</code>\n"
-            f"💰 Prezzo pagato: €{price_paid:.2f}\n"
-            f"📅 Scadenza reso: {return_deadline.strftime('%d/%m/%Y')} (tra {days_remaining} giorni)\n"
+        # Check if this is the first product → give referral bonus to inviter
+        user_products = await database.get_user_products(user_id)
+        if len(user_products) == 1:  # First product!
+            await _process_first_product_referral_bonus(user_id, context)
+
+        # Build and send success message
+        message = _build_product_success_message(
+            product_name, asin, price_paid, return_deadline, min_savings
         )
-
-        if min_savings > 0:
-            message += f"🎯 Risparmio minimo: €{min_savings:.2f}\n"
-        else:
-            message += "🎯 Notifica per qualsiasi risparmio\n"
-
-        message += (
-            "\n<i>Monitorerò il prezzo ogni giorno e ti avviserò se scende!</i>\n\n"
-            "Usa /list per vedere tutti i tuoi prodotti."
-        )
-
         await update.message.reply_text(message, parse_mode="HTML")
 
         logger.info(

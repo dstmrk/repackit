@@ -160,8 +160,10 @@ async def test_start_handler():
     """Test /start command handler."""
     update = MagicMock()
     update.effective_user.id = 123
+    update.effective_user.language_code = "it"
     update.message.reply_text = AsyncMock()
     context = MagicMock()
+    context.args = []  # No referral code
 
     await bot.start_handler(update, context)
 

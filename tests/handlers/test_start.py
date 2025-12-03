@@ -115,3 +115,152 @@ async def test_start_handler_no_language_code(test_db):
 
     # Verify welcome message was sent
     update.message.reply_text.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_start_handler_with_valid_referral(test_db):
+    """Test /start handler with valid referral code."""
+    # Add referrer first
+    await database.add_user(user_id=99999, language_code="it")
+
+    # Create mock update and context with referral code
+    update = MagicMock()
+    update.effective_user.id = 12345
+    update.effective_user.language_code = "it"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.args = ["99999"]  # Referral code
+
+    # Call handler
+    await start_handler(update, context)
+
+    # Verify user was registered with referral
+    user = await database.get_user(12345)
+    assert user is not None
+    assert user["referred_by"] == 99999
+    assert user["referral_bonus_given"] is False or user["referral_bonus_given"] == 0
+
+    # Verify user got 6 slots (3 base + 3 bonus)
+    limit = await database.get_user_product_limit(12345)
+    assert limit == 6
+
+    # Verify welcome message includes bonus message
+    update.message.reply_text.assert_called_once()
+    message = update.message.reply_text.call_args[0][0]
+    assert "🎁" in message
+    assert "slot bonus" in message
+    assert "6 slot disponibili" in message
+
+
+@pytest.mark.asyncio
+async def test_start_handler_with_invalid_referral_code(test_db):
+    """Test /start handler with non-existent referrer."""
+    # Create mock update and context with invalid referral code
+    update = MagicMock()
+    update.effective_user.id = 12345
+    update.effective_user.language_code = "it"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.args = ["99999"]  # Non-existent referrer
+
+    # Call handler
+    await start_handler(update, context)
+
+    # Verify user was registered without referral
+    user = await database.get_user(12345)
+    assert user is not None
+    assert user["referred_by"] is None
+
+    # Verify user got normal 3 slots
+    limit = await database.get_user_product_limit(12345)
+    assert limit == 3
+
+    # Verify welcome message includes invalid code message
+    update.message.reply_text.assert_called_once()
+    message = update.message.reply_text.call_args[0][0]
+    assert "non è valido" in message or "non risulta esistente" in message
+
+
+@pytest.mark.asyncio
+async def test_start_handler_with_self_referral(test_db):
+    """Test /start handler with self-referral attempt."""
+    # Create mock update and context with self-referral
+    update = MagicMock()
+    update.effective_user.id = 12345
+    update.effective_user.language_code = "it"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.args = ["12345"]  # Same as user_id (self-referral)
+
+    # Call handler
+    await start_handler(update, context)
+
+    # Verify user was registered without referral
+    user = await database.get_user(12345)
+    assert user is not None
+    assert user["referred_by"] is None
+
+    # Verify user got normal 3 slots (no bonus)
+    limit = await database.get_user_product_limit(12345)
+    assert limit == 3
+
+    # Verify no invalid code message (silently ignored)
+    update.message.reply_text.assert_called_once()
+    message = update.message.reply_text.call_args[0][0]
+    assert "non è valido" not in message
+
+
+@pytest.mark.asyncio
+async def test_start_handler_with_malformed_referral_code(test_db):
+    """Test /start handler with malformed referral code."""
+    # Create mock update and context with non-numeric referral code
+    update = MagicMock()
+    update.effective_user.id = 12345
+    update.effective_user.language_code = "it"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.args = ["abc123"]  # Invalid format
+
+    # Call handler
+    await start_handler(update, context)
+
+    # Verify user was registered without referral
+    user = await database.get_user(12345)
+    assert user is not None
+    assert user["referred_by"] is None
+
+    # Verify user got normal 3 slots
+    limit = await database.get_user_product_limit(12345)
+    assert limit == 3
+
+    # Verify no error message (silently ignored)
+    update.message.reply_text.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_start_handler_existing_user_ignores_referral(test_db):
+    """Test that existing users don't get referral applied."""
+    # Register user first
+    await database.add_user(user_id=12345, language_code="it")
+    await database.set_user_max_products(12345, 10)
+
+    # Add a potential referrer
+    await database.add_user(user_id=99999, language_code="it")
+
+    # Try to use referral code as existing user
+    update = MagicMock()
+    update.effective_user.id = 12345
+    update.effective_user.language_code = "it"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.args = ["99999"]
+
+    await start_handler(update, context)
+
+    # Verify referral wasn't applied
+    user = await database.get_user(12345)
+    assert user["referred_by"] is None
+
+    # Verify slots weren't changed
+    limit = await database.get_user_product_limit(12345)
+    assert limit == 10

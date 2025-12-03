@@ -186,6 +186,64 @@ async def test_set_user_max_products_capped_at_default(test_db):
     assert limit == database.DEFAULT_MAX_PRODUCTS
 
 
+@pytest.mark.asyncio
+async def test_increment_user_product_limit(test_db):
+    """Test incrementing user's product limit."""
+    await database.add_user(111, "it")
+    await database.set_user_max_products(111, 6)
+
+    # Increment by 3
+    new_limit = await database.increment_user_product_limit(111, 3)
+    assert new_limit == 9
+
+    # Verify in database
+    limit = await database.get_user_product_limit(111)
+    assert limit == 9
+
+
+@pytest.mark.asyncio
+async def test_increment_user_product_limit_capped_at_default(test_db):
+    """Test that increment caps at DEFAULT_MAX_PRODUCTS."""
+    await database.add_user(111, "it")
+    await database.set_user_max_products(111, 19)
+
+    # Try to increment by 5 (should be capped to 21)
+    new_limit = await database.increment_user_product_limit(111, 5)
+    assert new_limit == database.DEFAULT_MAX_PRODUCTS
+
+
+@pytest.mark.asyncio
+async def test_mark_referral_bonus_given(test_db):
+    """Test marking referral bonus as given."""
+    await database.add_user(111, "it", referred_by=222)
+
+    # Initially False
+    user = await database.get_user(111)
+    assert user["referral_bonus_given"] is False or user["referral_bonus_given"] == 0
+
+    # Mark as given
+    await database.mark_referral_bonus_given(111)
+
+    # Now True
+    user = await database.get_user(111)
+    assert user["referral_bonus_given"] is True or user["referral_bonus_given"] == 1
+
+
+@pytest.mark.asyncio
+async def test_add_user_with_referral(test_db):
+    """Test adding user with referral."""
+    # Add referrer first
+    await database.add_user(222, "it")
+
+    # Add referred user
+    await database.add_user(111, "it", referred_by=222)
+
+    # Check referred_by is set
+    user = await database.get_user(111)
+    assert user["referred_by"] == 222
+    assert user["referral_bonus_given"] is False or user["referral_bonus_given"] == 0
+
+
 # ============================================================================
 # Product operation tests
 # ============================================================================

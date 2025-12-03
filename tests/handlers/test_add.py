@@ -811,3 +811,250 @@ async def test_handle_min_savings_database_error(test_db):
 
         # Verify conversation ended
         assert result == ConversationHandler.END
+
+
+@pytest.mark.asyncio
+async def test_handle_min_savings_first_product_gives_referral_bonus(test_db):
+    """Test that adding first product gives bonus to referrer."""
+    user_id = 12345
+    referrer_id = 99999
+
+    # Add referrer and invitee
+    await database.add_user(referrer_id, "it")
+    await database.set_user_max_products(referrer_id, 6)  # Referrer has 6 slots
+    await database.add_user(user_id, "it", referred_by=referrer_id)
+    await database.set_user_max_products(user_id, 6)
+
+    # Mock update and context
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.effective_user.language_code = "it"
+    update.message.text = "5.00"
+    update.message.reply_text = AsyncMock()
+
+    context = MagicMock()
+    context.user_data = {
+        "product_name": "Test Product",
+        "product_asin": "B08N5WRWNW",
+        "product_marketplace": "it",
+        "product_price": 59.90,
+        "product_deadline": date.today() + timedelta(days=30),
+    }
+    context.bot = MagicMock()
+    context.bot.send_message = AsyncMock()
+
+    # Add product (first one)
+    result = await handle_min_savings(update, context)
+
+    # Verify product was added
+    assert result == ConversationHandler.END
+    products = await database.get_user_products(user_id)
+    assert len(products) == 1
+
+    # Verify referrer got +3 slots (6 → 9)
+    referrer_limit = await database.get_user_product_limit(referrer_id)
+    assert referrer_limit == 9
+
+    # Verify bonus was marked as given
+    user = await database.get_user(user_id)
+    assert user["referral_bonus_given"] is True or user["referral_bonus_given"] == 1
+
+    # Verify referrer was notified
+    context.bot.send_message.assert_called_once()
+    call_args = context.bot.send_message.call_args
+    assert call_args[1]["chat_id"] == referrer_id
+    notification = call_args[1]["text"]
+    assert "primo prodotto" in notification
+    assert "+3 slot" in notification
+    assert "9/21" in notification
+
+
+@pytest.mark.asyncio
+async def test_handle_min_savings_referrer_at_cap_no_notification(test_db):
+    """Test that referrer at 21 slots doesn't get notified."""
+    user_id = 12345
+    referrer_id = 99999
+
+    # Add referrer at cap and invitee
+    await database.add_user(referrer_id, "it")
+    await database.set_user_max_products(referrer_id, 21)  # Already at cap
+    await database.add_user(user_id, "it", referred_by=referrer_id)
+    await database.set_user_max_products(user_id, 6)
+
+    # Mock update and context
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.effective_user.language_code = "it"
+    update.message.text = "0"
+    update.message.reply_text = AsyncMock()
+
+    context = MagicMock()
+    context.user_data = {
+        "product_name": "Test Product",
+        "product_asin": "B08N5WRWNW",
+        "product_marketplace": "it",
+        "product_price": 50.00,
+        "product_deadline": date.today() + timedelta(days=20),
+    }
+    context.bot = MagicMock()
+    context.bot.send_message = AsyncMock()
+
+    # Add product
+    result = await handle_min_savings(update, context)
+
+    # Verify product was added
+    assert result == ConversationHandler.END
+
+    # Verify referrer stayed at 21
+    referrer_limit = await database.get_user_product_limit(referrer_id)
+    assert referrer_limit == 21
+
+    # Verify bonus was marked as given anyway
+    user = await database.get_user(user_id)
+    assert user["referral_bonus_given"] is True or user["referral_bonus_given"] == 1
+
+    # Verify NO notification was sent
+    context.bot.send_message.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_handle_min_savings_referrer_deleted_no_crash(test_db):
+    """Test that deleted referrer doesn't crash product addition."""
+    user_id = 12345
+    referrer_id = 99999
+
+    # Add invitee with non-existent referrer
+    await database.add_user(user_id, "it", referred_by=referrer_id)  # referrer doesn't exist!
+    await database.set_user_max_products(user_id, 6)
+
+    # Mock update and context
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.effective_user.language_code = "it"
+    update.message.text = "0"
+    update.message.reply_text = AsyncMock()
+
+    context = MagicMock()
+    context.user_data = {
+        "product_name": "Test Product",
+        "product_asin": "B08N5WRWNW",
+        "product_marketplace": "it",
+        "product_price": 50.00,
+        "product_deadline": date.today() + timedelta(days=20),
+    }
+    context.bot = MagicMock()
+    context.bot.send_message = AsyncMock()
+
+    # Add product (should not crash)
+    result = await handle_min_savings(update, context)
+
+    # Verify product was added successfully despite missing referrer
+    assert result == ConversationHandler.END
+    products = await database.get_user_products(user_id)
+    assert len(products) == 1
+
+
+@pytest.mark.asyncio
+async def test_handle_min_savings_notification_failure_doesnt_block(test_db):
+    """Test that notification failure doesn't block product addition."""
+    user_id = 12345
+    referrer_id = 99999
+
+    # Add referrer and invitee
+    await database.add_user(referrer_id, "it")
+    await database.set_user_max_products(referrer_id, 6)
+    await database.add_user(user_id, "it", referred_by=referrer_id)
+    await database.set_user_max_products(user_id, 6)
+
+    # Mock update and context
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.effective_user.language_code = "it"
+    update.message.text = "0"
+    update.message.reply_text = AsyncMock()
+
+    context = MagicMock()
+    context.user_data = {
+        "product_name": "Test Product",
+        "product_asin": "B08N5WRWNW",
+        "product_marketplace": "it",
+        "product_price": 50.00,
+        "product_deadline": date.today() + timedelta(days=20),
+    }
+    context.bot = MagicMock()
+    # Mock send_message to raise exception
+    context.bot.send_message = AsyncMock(side_effect=Exception("Bot blocked"))
+
+    # Add product (should not crash despite notification failure)
+    result = await handle_min_savings(update, context)
+
+    # Verify product was added
+    assert result == ConversationHandler.END
+    products = await database.get_user_products(user_id)
+    assert len(products) == 1
+
+    # Verify referrer got bonus despite notification failure
+    referrer_limit = await database.get_user_product_limit(referrer_id)
+    assert referrer_limit == 9
+
+    # Verify bonus was marked as given
+    user = await database.get_user(user_id)
+    assert user["referral_bonus_given"] is True or user["referral_bonus_given"] == 1
+
+
+@pytest.mark.asyncio
+async def test_handle_min_savings_second_product_no_bonus(test_db):
+    """Test that second product doesn't give bonus again."""
+    user_id = 12345
+    referrer_id = 99999
+
+    # Add referrer and invitee
+    await database.add_user(referrer_id, "it")
+    await database.set_user_max_products(referrer_id, 6)
+    await database.add_user(user_id, "it", referred_by=referrer_id)
+    await database.set_user_max_products(user_id, 6)
+
+    # Add first product
+    await database.add_product(
+        user_id=user_id,
+        product_name="First Product",
+        asin="B08N5WRWN1",
+        marketplace="it",
+        price_paid=50.00,
+        return_deadline=date.today() + timedelta(days=30),
+    )
+    # Mark bonus as given
+    await database.mark_referral_bonus_given(user_id)
+
+    # Mock update and context for second product
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.effective_user.language_code = "it"
+    update.message.text = "0"
+    update.message.reply_text = AsyncMock()
+
+    context = MagicMock()
+    context.user_data = {
+        "product_name": "Second Product",
+        "product_asin": "B08N5WRWN2",
+        "product_marketplace": "it",
+        "product_price": 40.00,
+        "product_deadline": date.today() + timedelta(days=25),
+    }
+    context.bot = MagicMock()
+    context.bot.send_message = AsyncMock()
+
+    # Add second product
+    result = await handle_min_savings(update, context)
+
+    # Verify product was added
+    assert result == ConversationHandler.END
+    products = await database.get_user_products(user_id)
+    assert len(products) == 2
+
+    # Verify referrer did NOT get bonus again (still at 6)
+    referrer_limit = await database.get_user_product_limit(referrer_id)
+    assert referrer_limit == 6
+
+    # Verify NO notification was sent
+    context.bot.send_message.assert_not_called()
