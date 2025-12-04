@@ -30,8 +30,29 @@ async def start_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Start the /add conversation flow.
 
-    Step 1: Ask for product name.
+    Step 1: Check product limit before starting conversation.
+    Step 2: Ask for product name if limit allows.
     """
+    user_id = update.effective_user.id
+
+    # Register user if not exists (ensure they have a limit set)
+    await database.add_user(user_id=user_id, language_code=update.effective_user.language_code)
+
+    # Check product limit BEFORE starting conversation
+    user_products = await database.get_user_products(user_id)
+    user_limit = await database.get_user_product_limit(user_id)
+
+    if len(user_products) >= user_limit:
+        await update.message.reply_text(
+            messages.product_limit_reached(len(user_products), user_limit),
+            parse_mode="HTML",
+        )
+        logger.info(
+            f"User {user_id} blocked at /add start: {len(user_products)}/{user_limit} products"
+        )
+        return ConversationHandler.END
+
+    # User has space, start conversation
     await update.message.reply_text(
         "📦 <b>Aggiungi un nuovo prodotto</b>\n\n"
         "Come vuoi chiamare questo prodotto?\n\n"
@@ -361,7 +382,7 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if messages.should_show_slot_hint(current_product_count, user_limit):
             hint_message = (
                 f"<i>Hai {current_product_count}/{user_limit} prodotti monitorati.</i>\n\n"
-                + messages.slot_hint()
+                + messages.slot_hint(current_product_count, user_limit)
             )
             await update.message.reply_text(hint_message, parse_mode="HTML")
 

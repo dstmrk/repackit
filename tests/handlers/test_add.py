@@ -127,13 +127,27 @@ def test_parse_deadline_invalid_date():
 
 
 @pytest.mark.asyncio
-async def test_start_add():
-    """Test /add command initiates conversation."""
+@patch("handlers.add.database.get_user_product_limit", new_callable=AsyncMock)
+@patch("handlers.add.database.get_user_products", new_callable=AsyncMock)
+@patch("handlers.add.database.add_user", new_callable=AsyncMock)
+async def test_start_add(mock_add_user, mock_get_products, mock_get_limit):
+    """Test /add command initiates conversation when user has space."""
+    # Mock database responses (user has 0/3 products - has space)
+    mock_get_products.return_value = []
+    mock_get_limit.return_value = 3
+
     update = MagicMock()
+    update.effective_user.id = 123
+    update.effective_user.language_code = "it"
     update.message.reply_text = AsyncMock()
     context = MagicMock()
 
     result = await start_add(update, context)
+
+    # Verify database calls were made
+    mock_add_user.assert_called_once_with(user_id=123, language_code="it")
+    mock_get_products.assert_called_once_with(123)
+    mock_get_limit.assert_called_once_with(123)
 
     # Verify it asks for product name (first step in new flow)
     update.message.reply_text.assert_called_once()
@@ -144,6 +158,44 @@ async def test_start_add():
 
     # Verify it returns the correct state
     assert result == WAITING_PRODUCT_NAME
+
+
+@pytest.mark.asyncio
+@patch("handlers.add.database.get_user_product_limit", new_callable=AsyncMock)
+@patch("handlers.add.database.get_user_products", new_callable=AsyncMock)
+@patch("handlers.add.database.add_user", new_callable=AsyncMock)
+async def test_start_add_limit_reached(mock_add_user, mock_get_products, mock_get_limit):
+    """Test /add command blocks when user has reached product limit."""
+    # Mock database responses (user has 3/3 products - limit reached)
+    mock_get_products.return_value = [
+        {"id": 1, "product_name": "Product 1"},
+        {"id": 2, "product_name": "Product 2"},
+        {"id": 3, "product_name": "Product 3"},
+    ]
+    mock_get_limit.return_value = 3
+
+    update = MagicMock()
+    update.effective_user.id = 123
+    update.effective_user.language_code = "it"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+
+    result = await start_add(update, context)
+
+    # Verify database calls were made
+    mock_add_user.assert_called_once_with(user_id=123, language_code="it")
+    mock_get_products.assert_called_once_with(123)
+    mock_get_limit.assert_called_once_with(123)
+
+    # Verify it shows limit reached error
+    update.message.reply_text.assert_called_once()
+    call_args = update.message.reply_text.call_args
+    message = call_args[0][0]
+    assert "Limite raggiunto" in message
+    assert "3/3 prodotti" in message
+
+    # Verify it ends conversation
+    assert result == ConversationHandler.END
 
 
 @pytest.mark.asyncio
