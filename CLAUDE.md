@@ -169,6 +169,11 @@ INITIAL_MAX_PRODUCTS=3        # Slots for new users (no referral)
 PRODUCTS_PER_REFERRAL=3       # Bonus for inviter when invitee adds first product
 INVITED_USER_BONUS=3          # Extra slots for invited user at registration
 
+# Telegram Rate Limiting
+TELEGRAM_MESSAGES_PER_SECOND=30  # Telegram API hard limit (30 messages/second)
+BATCH_SIZE=10                    # Batch size for notifications and broadcasts
+DELAY_BETWEEN_BATCHES=1.0        # Delay in seconds between batches
+
 # Logging
 LOG_LEVEL=INFO         # DEBUG, INFO, WARNING, ERROR, CRITICAL
 ```
@@ -176,6 +181,9 @@ LOG_LEVEL=INFO         # DEBUG, INFO, WARNING, ERROR, CRITICAL
 **Development Setup**:
 - Use Cloudflare Tunnel or ngrok for `WEBHOOK_URL` during local development
 - Keep `.env` gitignored, commit `.env.example` instead
+
+**Configuration Management**:
+All environment variables are centralized in `config.py` using a dataclass for type-safety and validation. Rate limiting settings can be adjusted via environment variables without code changes.
 
 ---
 

@@ -337,6 +337,17 @@ ADMIN_USER_ID=your_telegram_user_id
 # Amazon
 AMAZON_AFFILIATE_TAG=yourtag-21
 
+# Product Limits & Referral System
+DEFAULT_MAX_PRODUCTS=21
+INITIAL_MAX_PRODUCTS=3
+PRODUCTS_PER_REFERRAL=3
+INVITED_USER_BONUS=3
+
+# Telegram Rate Limiting
+TELEGRAM_MESSAGES_PER_SECOND=30  # Telegram API hard limit
+BATCH_SIZE=10  # Batch size for notifications and broadcasts
+DELAY_BETWEEN_BATCHES=1.0  # Delay in seconds between batches
+
 # Logging
 LOG_LEVEL=INFO
 ```
