@@ -243,6 +243,17 @@ def parse_deadline(deadline_input: str) -> date:
                     "Inserisci una data futura!"
                 )
 
+        # Validate it's not beyond 365 days (consistent with days input validation)
+        max_deadline = today + timedelta(days=365)
+        if deadline > max_deadline:
+            days_difference = (deadline - today).days
+            raise ValueError(
+                f"La data specificata ({deadline.strftime('%d/%m/%Y')}) è troppo lontana "
+                f"({days_difference} giorni da oggi). "
+                "Il bot può monitorare prodotti fino a 365 giorni. "
+                f"Inserisci una data entro il {max_deadline.strftime('%d/%m/%Y')}!"
+            )
+
         return deadline
 
     except (ValueError, TypeError) as e:
@@ -255,6 +266,7 @@ def parse_deadline(deadline_input: str) -> date:
                     "La data specificata",
                     "La scadenza è oggi",
                     "Anno deve essere",
+                    "troppo lontana",
                 ]
             ):
                 raise  # Re-raise our custom messages

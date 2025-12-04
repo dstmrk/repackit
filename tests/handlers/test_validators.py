@@ -343,3 +343,36 @@ def test_parse_deadline_with_whitespace():
 
     deadline = validators.parse_deadline("  15-12-2025  ")
     assert deadline == date(2025, 12, 15)
+
+
+def test_parse_deadline_date_exactly_365_days():
+    """Test date exactly 365 days in the future (should pass)."""
+    future_date = date.today() + timedelta(days=365)
+    date_str = future_date.strftime("%d-%m-%Y")
+
+    deadline = validators.parse_deadline(date_str)
+    assert deadline == future_date
+
+
+def test_parse_deadline_date_beyond_365_days():
+    """Test date beyond 365 days (should fail)."""
+    # 366 days (just over the limit)
+    future_date = date.today() + timedelta(days=366)
+    date_str = future_date.strftime("%d-%m-%Y")
+
+    with pytest.raises(ValueError, match="troppo lontana"):
+        validators.parse_deadline(date_str)
+
+    # 400 days (well over the limit)
+    future_date = date.today() + timedelta(days=400)
+    date_str = future_date.strftime("%d-%m-%Y")
+
+    with pytest.raises(ValueError, match="troppo lontana"):
+        validators.parse_deadline(date_str)
+
+    # Far future (e.g., 2 years)
+    future_date = date.today() + timedelta(days=730)
+    date_str = future_date.strftime("%d-%m-%Y")
+
+    with pytest.raises(ValueError, match="troppo lontana"):
+        validators.parse_deadline(date_str)
