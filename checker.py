@@ -4,7 +4,7 @@ import asyncio
 import html
 import logging
 from datetime import UTC, date, datetime
-from urllib.parse import quote_plus
+from urllib.parse import quote
 
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
@@ -345,7 +345,7 @@ async def send_price_drop_notification(
         "Monitora i tuoi acquisti e ti avvisa se il prezzo scende. Provalo!"
     )
     share_url = (
-        f"https://t.me/share/url?url=https://t.me/repackit_bot&text={quote_plus(share_text)}"
+        f"https://t.me/share/url?url=https://t.me/repackit_bot&text={quote(share_text)}"
     )
 
     keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("📢 Dillo a un amico", url=share_url)]])
