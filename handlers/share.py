@@ -1,7 +1,7 @@
 """Handler for /share command."""
 
 import logging
-from urllib.parse import quote_plus
+from urllib.parse import quote
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
@@ -59,7 +59,7 @@ async def share_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "Monitora i prezzi e ricevi notifiche quando scendono. "
         "Usa il mio link per ricevere 6 slot bonus!"
     )
-    share_url = f"https://t.me/share/url?url={referral_link}&text={quote_plus(share_text)}"
+    share_url = f"https://t.me/share/url?url={referral_link}&text={quote(share_text)}"
 
     keyboard = InlineKeyboardMarkup(
         [[InlineKeyboardButton("📤 Condividi con un amico", url=share_url)]]
