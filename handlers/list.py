@@ -90,7 +90,7 @@ async def list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         # Show /share hint if user is running low on slots
         if messages.should_show_slot_hint(len(products), user_limit):
-            message += "\n\n" + messages.slot_hint()
+            message += "\n\n" + messages.slot_hint(len(products), user_limit)
 
         await update.message.reply_text(message, parse_mode="HTML", disable_web_page_preview=True)
 

@@ -42,11 +42,15 @@ def cancel_feedback() -> str:
 # ============================================================================
 
 
-def slot_hint() -> str:
+def slot_hint(current: int, limit: int) -> str:
     """
     Build hint message when user is running low on slots.
 
     Logic: Show hint if user has <3 slots available and limit < max cap (21).
+
+    Args:
+        current: Current number of monitored products
+        limit: User's product slot limit
 
     Returns:
         HTML-formatted hint message
@@ -54,11 +58,20 @@ def slot_hint() -> str:
     Used in: /add (after success), /list (in product list)
 
     Examples:
-        >>> slot_hint()
+        >>> slot_hint(3, 3)
+        '💡 <b>Suggerimento:</b> Hai esaurito gli slot! Usa /share per invitare...'
+        >>> slot_hint(2, 3)
         '💡 <b>Suggerimento:</b> Stai esaurendo gli slot! Usa /share per invitare...'
     """
+    slots_available = limit - current
+
+    if slots_available == 0:
+        status_text = "Hai esaurito gli slot!"
+    else:
+        status_text = "Stai esaurendo gli slot!"
+
     return (
-        "💡 <b>Suggerimento:</b> Stai esaurendo gli slot! "
+        f"💡 <b>Suggerimento:</b> {status_text} "
         "Usa /share per invitare amici e guadagnare più spazio."
     )
 
