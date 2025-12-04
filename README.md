@@ -89,19 +89,19 @@ uv run python bot.py
 cp .env.example .env
 vim .env  # Inserisci le tue credenziali
 
-# 2. Avvia con docker-compose (usa immagine da GHCR)
-docker-compose pull  # Scarica ultima versione
-docker-compose up -d
+# 2. Avvia con docker compose (usa immagine da GHCR)
+docker compose pull  # Scarica ultima versione
+docker compose up -d
 
 # 3. Verifica i logs
-docker-compose logs -f
+docker compose logs -f
 
 # 4. Controlla health status
 curl http://localhost:8444/health
 
 # 5. Aggiorna a nuova versione
-docker-compose pull
-docker-compose up -d
+docker compose pull
+docker compose up -d
 ```
 
 ### Build Locale (Sviluppo)
@@ -110,10 +110,10 @@ Per sviluppare localmente e fare build dell'immagine:
 
 ```bash
 # Usa il file di override per build locale
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 # Oppure crea un alias per comodità
-alias dc-dev='docker-compose -f docker-compose.yml -f docker-compose.dev.yml'
+alias dc-dev='docker compose -f docker-compose.yml -f docker-compose.dev.yml'
 dc-dev up -d
 ```
 
@@ -132,8 +132,8 @@ git push origin v1.0.0
 #    - La tagga anche come :latest
 
 # 3. Gli utenti possono aggiornare con:
-docker-compose pull
-docker-compose up -d
+docker compose pull
+docker compose up -d
 ```
 
 ## Comandi Bot
@@ -358,7 +358,7 @@ LOG_LEVEL=INFO
 
 1. Verifica che `WEBHOOK_URL` sia pubblicamente accessibile (HTTPS)
 2. Controlla webhook status: `curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo`
-3. Verifica logs: `docker-compose logs -f`
+3. Verifica logs: `docker compose logs -f`
 
 ### Scraping fallisce
 
