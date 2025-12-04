@@ -47,7 +47,9 @@ async def start_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             messages.product_limit_reached(len(user_products), user_limit),
             parse_mode="HTML",
         )
-        logger.info(f"User {user_id} blocked at /add start: {len(user_products)}/{user_limit} products")
+        logger.info(
+            f"User {user_id} blocked at /add start: {len(user_products)}/{user_limit} products"
+        )
         return ConversationHandler.END
 
     # User has space, start conversation
