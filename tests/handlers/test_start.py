@@ -56,6 +56,7 @@ async def test_start_handler_new_user(test_db):
     assert "Benvenuto" in message
     assert "/add" in message
     assert "/list" in message
+    assert "/share" in message
     assert call_args[1]["parse_mode"] == "HTML"
 
 

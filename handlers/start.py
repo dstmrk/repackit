@@ -125,6 +125,7 @@ def _build_welcome_message(
         "/list - Visualizza i tuoi prodotti\n"
         "/delete - Rimuovi un prodotto\n"
         "/update - Modifica un prodotto\n"
+        "/share - Invita amici e guadagna più slot\n"
         "/feedback - Invia un feedback\n\n"
         "Usa /help per maggiori informazioni!"
     )
