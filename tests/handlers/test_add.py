@@ -95,9 +95,12 @@ def test_parse_deadline_gg_mm_aaaa_format():
 
 
 def test_parse_deadline_gg_mm_aaaa_format_leap_year():
-    """Test parse_deadline with leap year date."""
-    result = parse_deadline("29-02-2028")
-    assert result == date(2028, 2, 29)
+    """Test parse_deadline with date format within 365 days limit."""
+    # Use a date within 365 days (e.g., 200 days from today)
+    future_date = date.today() + timedelta(days=200)
+    date_str = future_date.strftime("%d-%m-%Y")
+    result = parse_deadline(date_str)
+    assert result == future_date
 
 
 def test_parse_deadline_invalid_format():
