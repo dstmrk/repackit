@@ -8,6 +8,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes
 
 import database
+from utils import messages
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ async def start_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         if not products:
             await update.message.reply_text(
-                "📭 <b>Non hai prodotti da eliminare</b>\n\nUsa /add per aggiungere un prodotto!",
+                messages.no_products_found(),
                 parse_mode="HTML",
             )
             return
@@ -165,12 +166,7 @@ async def delete_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             await database.delete_product(product_id)
 
             # Edit message to show success
-            success_message = (
-                "✅ <b>Prodotto eliminato con successo!</b>\n\n"
-                f"📦 <b>{html.escape(product_name)}</b>\n\n"
-                "Il prodotto non sarà più monitorato.\n"
-                "Usa /list per vedere i tuoi prodotti rimanenti."
-            )
+            success_message = messages.product_deleted_success(html.escape(product_name))
 
             await query.edit_message_text(success_message, parse_mode="HTML")
 
@@ -182,7 +178,7 @@ async def delete_callback_handler(update: Update, context: ContextTypes.DEFAULT_
 
             # Edit message to show cancellation
             await query.edit_message_text(
-                "❌ <b>Operazione annullata</b>\n\nNessun prodotto è stato eliminato.",
+                messages.cancel_operation(),
                 parse_mode="HTML",
             )
 

@@ -2,20 +2,26 @@
 
 import asyncio
 import logging
-import os
 import re
 
 from playwright.async_api import Browser, TimeoutError, async_playwright
+
+from config import get_config
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 # Get affiliate tag from environment
-AMAZON_AFFILIATE_TAG = os.getenv("AMAZON_AFFILIATE_TAG", "")
+
 
 # ASIN pattern: 10 alphanumeric characters
 # Supports: /dp/, /gp/product/, and short links /d/
 ASIN_PATTERN = re.compile(r"/dp/([A-Z0-9]{10})|/gp/product/([A-Z0-9]{10})|/d/([A-Z0-9]{10})")
+cfg = get_config()
+
+# Module-level constant for backward compatibility with tests
+TELEGRAM_TOKEN = cfg.telegram_token
+AMAZON_AFFILIATE_TAG = cfg.amazon_affiliate_tag
 
 # Marketplace pattern: extract domain suffix (it, com, de, fr, co.uk, etc.)
 MARKETPLACE_PATTERN = re.compile(r"amazon\.(?:co\.)?([a-z]{2,3})")
@@ -94,8 +100,8 @@ def build_affiliate_url(asin: str, marketplace: str = "it") -> str:
     Returns:
         Clean affiliate URL: https://amazon.{marketplace}/dp/{asin}?tag={tag}
     """
-    if AMAZON_AFFILIATE_TAG:
-        return f"https://amazon.{marketplace}/dp/{asin}?tag={AMAZON_AFFILIATE_TAG}"
+    if cfg.amazon_affiliate_tag:
+        return f"https://amazon.{marketplace}/dp/{asin}?tag={cfg.amazon_affiliate_tag}"
     else:
         return f"https://amazon.{marketplace}/dp/{asin}"
 

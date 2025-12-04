@@ -745,8 +745,8 @@ async def test_handle_min_savings_product_limit(test_db):
     # Verify error message
     call_args = update.message.reply_text.call_args
     message = call_args[0][0]
-    assert "Limite prodotti raggiunto" in message
-    assert f"{database.INITIAL_MAX_PRODUCTS} prodotti" in message
+    assert "Limite raggiunto" in message
+    assert f"{database.INITIAL_MAX_PRODUCTS}/{database.INITIAL_MAX_PRODUCTS} prodotti" in message
 
     # Verify conversation ended
     assert result == ConversationHandler.END

@@ -14,6 +14,7 @@ from telegram.ext import (
 )
 
 import database
+from utils import messages
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +172,7 @@ async def handle_feedback_confirmation(update: Update, context: ContextTypes.DEF
 
     if callback_data == "feedback_cancel":
         await query.edit_message_text(
-            "❌ <b>Feedback annullato</b>\n\nNessun messaggio è stato inviato.",
+            messages.cancel_feedback(),
             parse_mode="HTML",
         )
         context.user_data.clear()
@@ -193,9 +194,7 @@ async def handle_feedback_confirmation(update: Update, context: ContextTypes.DEF
             feedback_id = await database.add_feedback(user_id, feedback_message)
 
             await query.edit_message_text(
-                "✅ <b>Feedback inviato con successo!</b>\n\n"
-                "Grazie per il tuo feedback! Lo esamineremo al più presto per migliorare il servizio.\n\n"
-                "Il tuo contributo è molto importante per noi! 🙏",
+                messages.feedback_success(),
                 parse_mode="HTML",
             )
 
@@ -213,7 +212,7 @@ async def handle_feedback_confirmation(update: Update, context: ContextTypes.DEF
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancel the conversation."""
     await update.message.reply_text(
-        "❌ <b>Feedback annullato</b>\n\nNessun messaggio è stato inviato.",
+        messages.cancel_feedback(),
         parse_mode="HTML",
     )
     context.user_data.clear()

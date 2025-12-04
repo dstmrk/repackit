@@ -18,15 +18,13 @@ from telegram.warnings import PTBUserWarning
 
 import database
 from handlers import validators
+from utils import messages
 
 # Suppress PTBUserWarning for per_message=False in ConversationHandler
 # This is intentional - we want per-conversation tracking, not per-message
 warnings.filterwarnings("ignore", category=PTBUserWarning)
 
 logger = logging.getLogger(__name__)
-
-# Constants
-CANCEL_MESSAGE = "❌ <b>Operazione annullata</b>\n\nNessuna modifica è stata effettuata."
 
 # Conversation states
 WAITING_PRODUCT_SELECTION, WAITING_FIELD_SELECTION, WAITING_VALUE_INPUT = range(3)
@@ -47,7 +45,7 @@ async def start_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
     if not products:
         await update.message.reply_text(
-            "📭 <b>Non hai prodotti da aggiornare</b>\n\nUsa /add per aggiungere un prodotto!",
+            messages.no_products_found(),
             parse_mode="HTML",
         )
         return ConversationHandler.END
@@ -93,7 +91,7 @@ async def handle_product_selection(update: Update, context: ContextTypes.DEFAULT
     # Handle cancel
     if callback_data == "update_cancel":
         await query.edit_message_text(
-            CANCEL_MESSAGE,
+            messages.cancel_operation(),
             parse_mode="HTML",
         )
         return ConversationHandler.END
@@ -207,7 +205,7 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
     # Handle cancel
     if callback_data == "update_cancel":
         await query.edit_message_text(
-            CANCEL_MESSAGE,
+            messages.cancel_operation(),
             parse_mode="HTML",
         )
         context.user_data.clear()
@@ -276,7 +274,7 @@ async def handle_value_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancel the conversation."""
-    await update.message.reply_text(CANCEL_MESSAGE, parse_mode="HTML")
+    await update.message.reply_text(messages.cancel_operation(), parse_mode="HTML")
     context.user_data.clear()
     return ConversationHandler.END
 

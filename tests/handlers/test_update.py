@@ -61,7 +61,7 @@ async def test_start_update_no_products(test_db):
     # Verify empty message was sent
     call_args = update.message.reply_text.call_args
     message = call_args[0][0]
-    assert "Non hai prodotti" in message
+    assert "Nessun prodotto monitorato" in message
 
     # Verify conversation ended
     assert result == ConversationHandler.END
