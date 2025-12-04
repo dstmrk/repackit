@@ -65,10 +65,9 @@ def slot_hint(current: int, limit: int) -> str:
     """
     slots_available = limit - current
 
-    if slots_available == 0:
-        status_text = "Hai esaurito gli slot!"
-    else:
-        status_text = "Stai esaurendo gli slot!"
+    status_text = (
+        "Hai esaurito gli slot!" if slots_available == 0 else "Stai esaurendo gli slot!"
+    )
 
     return (
         f"💡 <b>Suggerimento:</b> {status_text} "
