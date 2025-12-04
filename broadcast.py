@@ -42,14 +42,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Environment variables
-
-
-# Rate limiting configuration
-MESSAGES_PER_SECOND = 30  # Telegram limit is 30 messages/second
-BATCH_SIZE = 25  # Send in batches to avoid hitting limits
-DELAY_BETWEEN_BATCHES = 1.0  # 1 second delay between batches
-
 
 async def send_message_to_user(user_id: int, message: str) -> bool:
     """
@@ -109,8 +101,8 @@ async def broadcast_message(message: str) -> tuple[int, int]:
     failed_count = 0
 
     # Process users in batches
-    for i in range(0, total_users, BATCH_SIZE):
-        batch = users[i : i + BATCH_SIZE]
+    for i in range(0, total_users, cfg.batch_size):
+        batch = users[i : i + cfg.batch_size]
         batch_results = await asyncio.gather(
             *[send_message_to_user(user["user_id"], message) for user in batch],
             return_exceptions=True,
@@ -126,13 +118,13 @@ async def broadcast_message(message: str) -> tuple[int, int]:
                 failed_count += 1
 
         # Log progress
-        progress = min(i + BATCH_SIZE, total_users)
+        progress = min(i + cfg.batch_size, total_users)
         percentage = (progress / total_users) * 100
         logger.info(f"Progress: {progress}/{total_users} ({percentage:.0f}%)")
 
         # Rate limiting: wait between batches (except for last batch)
-        if i + BATCH_SIZE < total_users:
-            await asyncio.sleep(DELAY_BETWEEN_BATCHES)
+        if i + cfg.batch_size < total_users:
+            await asyncio.sleep(cfg.delay_between_batches)
 
     logger.info(f"Broadcast completed: {sent_count} sent, {failed_count} failed")
     return sent_count, failed_count

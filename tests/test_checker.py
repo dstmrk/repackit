@@ -424,10 +424,10 @@ async def test_check_and_notify_multiple_batches():
     today = date.today()
     future_date = today + timedelta(days=10)
 
-    # Create more than NOTIFICATION_BATCH_SIZE products (default is 5)
+    # Create less than batch_size products (default is 10, using 8 for testing)
     products = []
     current_prices = {}
-    for i in range(8):  # More than batch size
+    for i in range(8):  # Less than batch size, tests single batch
         products.append(
             {
                 "id": i + 1,

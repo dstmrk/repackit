@@ -22,10 +22,6 @@ cfg = get_config()
 # Module-level constant for backward compatibility with tests
 TELEGRAM_TOKEN = cfg.telegram_token
 
-# Rate limiting configuration (to avoid Telegram bans)
-NOTIFICATION_BATCH_SIZE = 10  # Send max 10 notifications at once
-DELAY_BETWEEN_BATCHES = 1.0  # 1 second delay between batches
-
 
 async def _send_notification_safe(bot: Bot, notif: dict) -> bool:
     """
@@ -165,8 +161,8 @@ async def _send_price_drop_notifications_batch(bot: Bot, notifications: list) ->
     """
     stats = {"sent": 0, "errors": 0}
 
-    for i in range(0, len(notifications), NOTIFICATION_BATCH_SIZE):
-        batch = notifications[i : i + NOTIFICATION_BATCH_SIZE]
+    for i in range(0, len(notifications), cfg.batch_size):
+        batch = notifications[i : i + cfg.batch_size]
 
         # Send batch concurrently
         batch_results = await asyncio.gather(
@@ -200,8 +196,8 @@ async def _send_price_drop_notifications_batch(bot: Bot, notifications: list) ->
                 stats["errors"] += 1
 
         # Rate limiting between batches
-        if i + NOTIFICATION_BATCH_SIZE < len(notifications):
-            await asyncio.sleep(DELAY_BETWEEN_BATCHES)
+        if i + cfg.batch_size < len(notifications):
+            await asyncio.sleep(cfg.delay_between_batches)
 
     return stats
 

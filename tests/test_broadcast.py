@@ -161,7 +161,7 @@ async def test_broadcast_message_exception_handling(test_db):
 async def test_broadcast_message_batching(test_db):
     """Test that broadcast processes users in batches."""
     # Add more users than batch size
-    for i in range(30):  # More than BATCH_SIZE (25)
+    for i in range(30):  # More than BATCH_SIZE (10)
         await database.add_user(user_id=100 + i, language_code="it")
 
     with patch("broadcast.send_message_to_user", new_callable=AsyncMock) as mock_send:
@@ -172,8 +172,8 @@ async def test_broadcast_message_batching(test_db):
 
             assert sent == 30
             assert failed == 0
-            # Should have called sleep once (between batch 1 and batch 2)
-            assert mock_sleep.call_count == 1
+            # Should have called sleep 2 times (30 users / 10 per batch = 3 batches, 2 sleeps)
+            assert mock_sleep.call_count == 2
 
 
 @pytest.mark.asyncio
