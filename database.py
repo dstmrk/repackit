@@ -704,36 +704,35 @@ async def get_all_system_status() -> dict[str, dict]:
 
 async def increment_metric(key: str, amount: float = 1.0) -> None:
     """
-    Increment a metric counter in system_status.
+    Increment a metric counter in system_status atomically.
 
     If the key doesn't exist, it will be created with the initial value.
     If it exists, the amount will be added to the current value.
+
+    This operation is atomic - it uses a single SQL statement to avoid
+    race conditions that could occur with separate read-then-write operations.
 
     Args:
         key: Metric key (e.g., "products_total_count", "total_savings_generated")
         amount: Amount to increment by (default: 1.0)
     """
     async with aiosqlite.connect(DATABASE_PATH) as db:
-        # Get current value
-        async with db.execute("SELECT value FROM system_status WHERE key = ?", (key,)) as cursor:
-            row = await cursor.fetchone()
-            current_value = float(row[0]) if row else 0.0
-
-        # Increment and update
-        new_value = current_value + amount
-
+        # Atomic increment using ON CONFLICT DO UPDATE
+        # - If key doesn't exist: INSERT with amount as initial value
+        # - If key exists: UPDATE by adding amount to current value
+        # This is a single atomic SQL operation, no race condition possible
         await db.execute(
             """
             INSERT INTO system_status (key, value, updated_at)
             VALUES (?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(key) DO UPDATE SET
-                value = excluded.value,
+                value = CAST(system_status.value AS REAL) + CAST(excluded.value AS REAL),
                 updated_at = CURRENT_TIMESTAMP
             """,
-            (key, str(new_value)),
+            (key, str(amount)),
         )
         await db.commit()
-        logger.debug(f"Metric incremented: {key} += {amount} (new value: {new_value})")
+        logger.debug(f"Metric incremented: {key} += {amount}")
 
 
 async def get_metric(key: str) -> float:
