@@ -54,6 +54,7 @@ class Config:
     telegram_messages_per_second: int  # Telegram API hard limit (30 msg/sec)
     batch_size: int  # Batch size for notifications and broadcasts
     delay_between_batches: float  # Delay in seconds between batches
+    max_concurrent_telegram_calls: int  # Max concurrent Telegram API calls per batch
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -98,6 +99,7 @@ class Config:
             telegram_messages_per_second=int(os.getenv("TELEGRAM_MESSAGES_PER_SECOND", "30")),
             batch_size=int(os.getenv("BATCH_SIZE", "10")),
             delay_between_batches=float(os.getenv("DELAY_BETWEEN_BATCHES", "1.0")),
+            max_concurrent_telegram_calls=int(os.getenv("MAX_CONCURRENT_TELEGRAM_CALLS", "5")),
         )
 
 

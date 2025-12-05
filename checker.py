@@ -152,6 +152,9 @@ async def _send_price_drop_notifications_batch(bot: Bot, notifications: list) ->
     """
     Send price drop notifications in batches and update database.
 
+    Uses a semaphore to limit concurrent Telegram API calls within each batch,
+    preventing burst rate limiting violations.
+
     Args:
         bot: Telegram Bot instance
         notifications: List of price drop notification dicts
@@ -161,12 +164,19 @@ async def _send_price_drop_notifications_batch(bot: Bot, notifications: list) ->
     """
     stats = {"sent": 0, "errors": 0}
 
+    # Semaphore to limit concurrent Telegram API calls
+    semaphore = asyncio.Semaphore(cfg.max_concurrent_telegram_calls)
+
+    async def send_with_semaphore(notif: dict) -> bool:
+        async with semaphore:
+            return await _send_notification_safe(bot, notif)
+
     for i in range(0, len(notifications), cfg.batch_size):
         batch = notifications[i : i + cfg.batch_size]
 
-        # Send batch concurrently
+        # Send batch with concurrency limit
         batch_results = await asyncio.gather(
-            *[_send_notification_safe(bot, notif) for notif in batch],
+            *[send_with_semaphore(notif) for notif in batch],
             return_exceptions=True,
         )
 
