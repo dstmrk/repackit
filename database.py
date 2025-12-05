@@ -478,6 +478,7 @@ async def get_all_active_products() -> list[dict]:
 
 async def update_product(
     product_id: int,
+    user_id: int,
     product_name: str | None = None,
     price_paid: float | None = None,
     return_deadline: date | None = None,
@@ -486,15 +487,20 @@ async def update_product(
     """
     Update product fields.
 
+    Defense-in-depth: requires both product_id and user_id to match,
+    preventing accidental modification of other users' products even if
+    a bug in the handler passes an incorrect product_id.
+
     Args:
         product_id: Database product ID
+        user_id: Telegram user ID (owner of the product)
         product_name: New product name (optional)
         price_paid: New price paid (optional)
         return_deadline: New return deadline (optional)
         min_savings_threshold: New savings threshold (optional)
 
     Returns:
-        True if product was updated, False if not found
+        True if product was updated, False if not found or not owned by user
     """
     updates = []
     params = []
@@ -518,15 +524,15 @@ async def update_product(
     if not updates:
         return False
 
-    params.append(product_id)
-    query = f"UPDATE products SET {', '.join(updates)} WHERE id = ?"
+    params.extend([product_id, user_id])
+    query = f"UPDATE products SET {', '.join(updates)} WHERE id = ? AND user_id = ?"
 
     async with aiosqlite.connect(DATABASE_PATH) as db:
         cursor = await db.execute(query, params)
         await db.commit()
         updated = cursor.rowcount > 0
         if updated:
-            logger.info(f"Product {product_id} updated")
+            logger.info(f"Product {product_id} updated for user {user_id}")
         return updated
 
 
@@ -547,22 +553,30 @@ async def update_last_notified_price(product_id: int, price: float) -> None:
         logger.debug(f"Product {product_id} last_notified_price updated to {price}")
 
 
-async def delete_product(product_id: int) -> bool:
+async def delete_product(product_id: int, user_id: int) -> bool:
     """
     Delete a product from monitoring.
 
+    Defense-in-depth: requires both product_id and user_id to match,
+    preventing accidental deletion of other users' products even if
+    a bug in the handler passes an incorrect product_id.
+
     Args:
         product_id: Database product ID
+        user_id: Telegram user ID (owner of the product)
 
     Returns:
-        True if product was deleted, False if not found
+        True if product was deleted, False if not found or not owned by user
     """
     async with aiosqlite.connect(DATABASE_PATH) as db:
-        cursor = await db.execute("DELETE FROM products WHERE id = ?", (product_id,))
+        cursor = await db.execute(
+            "DELETE FROM products WHERE id = ? AND user_id = ?",
+            (product_id, user_id),
+        )
         await db.commit()
         deleted = cursor.rowcount > 0
         if deleted:
-            logger.info(f"Product {product_id} deleted")
+            logger.info(f"Product {product_id} deleted for user {user_id}")
         return deleted
 
 

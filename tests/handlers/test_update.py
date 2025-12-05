@@ -501,7 +501,7 @@ async def test_handle_product_selection_product_not_found(test_db):
         price_paid=50.0,
         return_deadline=date.today() + timedelta(days=30),
     )
-    await database.delete_product(product_id)
+    await database.delete_product(product_id, user_id)
 
     # Mock callback query
     update = MagicMock()

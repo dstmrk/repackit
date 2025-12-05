@@ -288,7 +288,7 @@ async def _update_name(product_id: int, value_str: str, user_id: int, message) -
         await message.reply_text(error_msg, parse_mode="HTML")
         return False
 
-    await database.update_product(product_id, product_name=new_name)
+    await database.update_product(product_id, user_id, product_name=new_name)
     await message.reply_text(
         "✅ <b>Nome aggiornato con successo!</b>\n\n"
         f"📦 Nuovo nome: <b>{html.escape(new_name)}</b>",
@@ -309,7 +309,7 @@ async def _update_price(product_id: int, asin: str, value_str: str, user_id: int
         await message.reply_text(error_msg, parse_mode="HTML")
         return False
 
-    await database.update_product(product_id, price_paid=new_price)
+    await database.update_product(product_id, user_id, price_paid=new_price)
     await message.reply_text(
         "✅ <b>Prezzo aggiornato con successo!</b>\n\n"
         f"📦 ASIN: <code>{asin}</code>\n"
@@ -335,7 +335,7 @@ async def _update_deadline(
         )
         return False
 
-    await database.update_product(product_id, return_deadline=new_deadline)
+    await database.update_product(product_id, user_id, return_deadline=new_deadline)
 
     days_remaining = (new_deadline - datetime.now(UTC).date()).days
     await message.reply_text(
@@ -363,7 +363,7 @@ async def _update_threshold(
         await message.reply_text(error_msg, parse_mode="HTML")
         return False
 
-    await database.update_product(product_id, min_savings_threshold=new_threshold)
+    await database.update_product(product_id, user_id, min_savings_threshold=new_threshold)
     await message.reply_text(
         "✅ <b>Soglia aggiornata con successo!</b>\n\n"
         f"📦 ASIN: <code>{asin}</code>\n"
