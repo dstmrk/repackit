@@ -3,9 +3,7 @@
 import asyncio
 import contextlib
 import os
-import tempfile
 from datetime import datetime, timedelta
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -13,28 +11,6 @@ from aiohttp import web
 
 import database
 import health_handler
-
-
-@pytest.fixture
-async def test_db():
-    """Create a temporary test database."""
-    fd, db_path = tempfile.mkstemp(suffix=".db")
-    os.close(fd)
-
-    # Override DATABASE_PATH for testing
-    original_path = database.DATABASE_PATH
-    database.DATABASE_PATH = db_path
-
-    # Initialize database
-    await database.init_db()
-
-    yield db_path
-
-    # Cleanup
-    database.DATABASE_PATH = original_path
-    Path(db_path).unlink(missing_ok=True)
-    Path(f"{db_path}-wal").unlink(missing_ok=True)
-    Path(f"{db_path}-shm").unlink(missing_ok=True)
 
 
 # ============================================================================

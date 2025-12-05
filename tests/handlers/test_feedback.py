@@ -1,9 +1,6 @@
 """Tests for handlers/feedback.py."""
 
-import os
-import tempfile
 from datetime import datetime, timedelta
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -19,25 +16,6 @@ from handlers.feedback import (
     handle_feedback_message,
     start_feedback,
 )
-
-
-@pytest.fixture
-async def test_db():
-    """Create a temporary test database."""
-    fd, db_path = tempfile.mkstemp(suffix=".db")
-    os.close(fd)
-
-    original_path = database.DATABASE_PATH
-    database.DATABASE_PATH = db_path
-
-    await database.init_db()
-
-    yield db_path
-
-    database.DATABASE_PATH = original_path
-    Path(db_path).unlink(missing_ok=True)
-    Path(f"{db_path}-wal").unlink(missing_ok=True)
-    Path(f"{db_path}-shm").unlink(missing_ok=True)
 
 
 @pytest.mark.asyncio
@@ -163,6 +141,9 @@ async def test_handle_feedback_message_long_preview_truncation():
 @pytest.mark.asyncio
 async def test_handle_feedback_confirmation_send_success(test_db):
     """Test handle_feedback_confirmation sends feedback successfully."""
+    # Create user first (required for foreign key constraint)
+    await database.add_user(user_id=123, language_code="it")
+
     update = MagicMock()
     update.callback_query = MagicMock()
     update.callback_query.answer = AsyncMock()

@@ -1,9 +1,6 @@
 """Tests for handlers/update.py with conversational flow."""
 
-import os
-import tempfile
 from datetime import date, timedelta
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -20,25 +17,6 @@ from handlers.update import (
     handle_value_input,
     start_update,
 )
-
-
-@pytest.fixture
-async def test_db():
-    """Create a temporary test database."""
-    fd, db_path = tempfile.mkstemp(suffix=".db")
-    os.close(fd)
-
-    original_path = database.DATABASE_PATH
-    database.DATABASE_PATH = db_path
-
-    await database.init_db()
-
-    yield db_path
-
-    database.DATABASE_PATH = original_path
-    Path(db_path).unlink(missing_ok=True)
-    Path(f"{db_path}-wal").unlink(missing_ok=True)
-    Path(f"{db_path}-shm").unlink(missing_ok=True)
 
 
 # =================================================================================================
