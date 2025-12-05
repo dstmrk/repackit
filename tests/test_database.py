@@ -1,39 +1,11 @@
 """Tests for database operations."""
 
 import asyncio
-import os
-import tempfile
 from datetime import date, timedelta
-from pathlib import Path
 
 import pytest
 
 import database
-
-
-@pytest.fixture
-async def test_db():
-    """Create a temporary test database."""
-    # Create temporary database file
-    fd, db_path = tempfile.mkstemp(suffix=".db")
-    os.close(fd)
-
-    # Override DATABASE_PATH for testing
-    original_path = database.DATABASE_PATH
-    database.DATABASE_PATH = db_path
-
-    # Initialize database
-    await database.init_db()
-
-    yield db_path
-
-    # Cleanup
-    database.DATABASE_PATH = original_path
-    Path(db_path).unlink(missing_ok=True)
-    # Clean up WAL files if they exist
-    Path(f"{db_path}-wal").unlink(missing_ok=True)
-    Path(f"{db_path}-shm").unlink(missing_ok=True)
-
 
 # ============================================================================
 # Initialization tests

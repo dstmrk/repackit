@@ -22,6 +22,85 @@ PRODUCTS_PER_REFERRAL = cfg.products_per_referral
 INVITED_USER_BONUS = cfg.invited_user_bonus
 
 
+class DatabaseConnection:
+    """
+    Manages a persistent database connection for better performance.
+
+    SQLite with WAL mode benefits from a single persistent connection:
+    - Avoids connection setup overhead (pragma parsing, etc.)
+    - WAL mode handles concurrent reads efficiently
+    - Writes are serialized by SQLite anyway
+
+    Usage:
+        db = await get_db()
+        async with db.execute("SELECT ...") as cursor:
+            ...
+    """
+
+    _instance: "DatabaseConnection | None" = None
+    _connection: aiosqlite.Connection | None = None
+
+    def __new__(cls) -> "DatabaseConnection":
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    async def get_connection(self) -> aiosqlite.Connection:
+        """Get the shared database connection, creating it if needed."""
+        if self._connection is None or not self._is_connected():
+            await self._create_connection()
+        return self._connection
+
+    def _is_connected(self) -> bool:
+        """Check if connection is still open."""
+        if self._connection is None:
+            return False
+        try:
+            # aiosqlite connection has _connection attribute pointing to sqlite3.Connection
+            return self._connection._connection is not None
+        except (AttributeError, Exception):
+            return False
+
+    async def _create_connection(self) -> None:
+        """Create a new database connection with optimized settings."""
+        # Ensure data directory exists
+        os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
+
+        self._connection = await aiosqlite.connect(DATABASE_PATH)
+        # Enable WAL mode for better concurrency
+        await self._connection.execute("PRAGMA journal_mode=WAL")
+        # Enable foreign keys
+        await self._connection.execute("PRAGMA foreign_keys=ON")
+        logger.debug("Database connection established")
+
+    async def close(self) -> None:
+        """Close the database connection."""
+        if self._connection is not None:
+            await self._connection.close()
+            self._connection = None
+            logger.debug("Database connection closed")
+
+    @classmethod
+    def reset(cls) -> None:
+        """Reset the singleton instance (for testing)."""
+        cls._instance = None
+        cls._connection = None
+
+
+# Module-level singleton
+_db_manager = DatabaseConnection()
+
+
+async def get_db() -> aiosqlite.Connection:
+    """Get the shared database connection."""
+    return await _db_manager.get_connection()
+
+
+async def close_db() -> None:
+    """Close the shared database connection (call on shutdown)."""
+    await _db_manager.close()
+
+
 async def init_db() -> None:
     """
     Initialize database with required tables.
@@ -29,110 +108,103 @@ async def init_db() -> None:
     Creates users, products, and feedback tables if they don't exist.
     Also creates indexes for optimized queries.
     """
-    # Ensure data directory exists
-    os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
+    db = await get_db()
 
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        # Enable WAL mode for better concurrency
-        await db.execute("PRAGMA journal_mode=WAL")
-
-        # Users table
-        await db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                user_id INTEGER PRIMARY KEY,
-                language_code TEXT,
-                max_products INTEGER DEFAULT NULL,
-                referred_by INTEGER DEFAULT NULL,
-                referral_bonus_given BOOLEAN DEFAULT FALSE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """
+    # Users table
+    await db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            language_code TEXT,
+            max_products INTEGER DEFAULT NULL,
+            referred_by INTEGER DEFAULT NULL,
+            referral_bonus_given BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
+        """
+    )
 
-        # Products table
-        await db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS products (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                product_name TEXT,
-                asin TEXT NOT NULL,
-                marketplace TEXT NOT NULL DEFAULT 'it',
-                price_paid REAL NOT NULL,
-                return_deadline DATE NOT NULL,
-                min_savings_threshold REAL DEFAULT 0,
-                last_notified_price REAL,
-                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(user_id)
-            )
-            """
+    # Products table
+    await db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            product_name TEXT,
+            asin TEXT NOT NULL,
+            marketplace TEXT NOT NULL DEFAULT 'it',
+            price_paid REAL NOT NULL,
+            return_deadline DATE NOT NULL,
+            min_savings_threshold REAL DEFAULT 0,
+            last_notified_price REAL,
+            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
         )
+        """
+    )
 
-        # Feedback table
-        await db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS feedback (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                message TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(user_id)
-            )
-            """
+    # Feedback table
+    await db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            message TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
         )
+        """
+    )
 
-        # System status table (for health checks)
-        await db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS system_status (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """
+    # System status table (for health checks)
+    await db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS system_status (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
+        """
+    )
 
-        # Create indexes for performance
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_user_products ON products(user_id)")
-        await db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_return_deadline ON products(return_deadline)"
-        )
+    # Create indexes for performance
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_user_products ON products(user_id)")
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_return_deadline ON products(return_deadline)")
 
-        # Composite indexes for common query patterns
-        # Scraper queries products by (asin, marketplace) - avoids full table scan
-        await db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_asin_marketplace ON products(asin, marketplace)"
-        )
-        # Cleanup and filtered queries use (user_id, return_deadline)
-        await db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_user_deadline ON products(user_id, return_deadline)"
-        )
+    # Composite indexes for common query patterns
+    # Scraper queries products by (asin, marketplace) - avoids full table scan
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_asin_marketplace ON products(asin, marketplace)"
+    )
+    # Cleanup and filtered queries use (user_id, return_deadline)
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_deadline ON products(user_id, return_deadline)"
+    )
 
-        # Create trigger to enforce product limit at database level
-        # This prevents race conditions where concurrent requests could bypass application-level checks
-        await db.execute("DROP TRIGGER IF EXISTS check_product_limit_before_insert")
-        await db.execute(
-            f"""
-            CREATE TRIGGER check_product_limit_before_insert
-            BEFORE INSERT ON products
-            FOR EACH ROW
-            BEGIN
-                SELECT CASE
-                    WHEN (
-                        SELECT COUNT(*) FROM products WHERE user_id = NEW.user_id
-                    ) >= (
-                        SELECT COALESCE(max_products, {DEFAULT_MAX_PRODUCTS})
-                        FROM users WHERE user_id = NEW.user_id
-                    )
-                    THEN RAISE(ABORT, 'Product limit exceeded')
-                END;
-            END
-            """
-        )
+    # Create trigger to enforce product limit at database level
+    # This prevents race conditions where concurrent requests could bypass application-level checks
+    await db.execute("DROP TRIGGER IF EXISTS check_product_limit_before_insert")
+    await db.execute(
+        f"""
+        CREATE TRIGGER check_product_limit_before_insert
+        BEFORE INSERT ON products
+        FOR EACH ROW
+        BEGIN
+            SELECT CASE
+                WHEN (
+                    SELECT COUNT(*) FROM products WHERE user_id = NEW.user_id
+                ) >= (
+                    SELECT COALESCE(max_products, {DEFAULT_MAX_PRODUCTS})
+                    FROM users WHERE user_id = NEW.user_id
+                )
+                THEN RAISE(ABORT, 'Product limit exceeded')
+            END;
+        END
+        """
+    )
 
-        await db.commit()
-        logger.info(f"Database initialized at {DATABASE_PATH}")
+    await db.commit()
+    logger.info(f"Database initialized at {DATABASE_PATH}")
 
 
 # ============================================================================
@@ -151,19 +223,19 @@ async def add_user(
         language_code: User's language code (e.g., "it", "en")
         referred_by: User ID of the referrer (optional)
     """
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        await db.execute(
-            """
-            INSERT OR IGNORE INTO users (user_id, language_code, referred_by)
-            VALUES (?, ?, ?)
-            """,
-            (user_id, language_code, referred_by),
-        )
-        await db.commit()
-        if referred_by:
-            logger.info(f"User {user_id} added to database (referred by {referred_by})")
-        else:
-            logger.info(f"User {user_id} added to database")
+    db = await get_db()
+    await db.execute(
+        """
+        INSERT OR IGNORE INTO users (user_id, language_code, referred_by)
+        VALUES (?, ?, ?)
+        """,
+        (user_id, language_code, referred_by),
+    )
+    await db.commit()
+    if referred_by:
+        logger.info(f"User {user_id} added to database (referred by {referred_by})")
+    else:
+        logger.info(f"User {user_id} added to database")
 
 
 async def get_user(user_id: int) -> dict | None:
@@ -177,11 +249,11 @@ async def get_user(user_id: int) -> dict | None:
         User dict with keys: user_id, language_code, created_at
         None if user doesn't exist
     """
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)) as cursor:
-            row = await cursor.fetchone()
-            return dict(row) if row else None
+    db = await get_db()
+    db.row_factory = aiosqlite.Row
+    async with db.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)) as cursor:
+        row = await cursor.fetchone()
+        return dict(row) if row else None
 
 
 async def get_all_users() -> list[dict]:
@@ -191,11 +263,11 @@ async def get_all_users() -> list[dict]:
     Returns:
         List of user dicts with keys: user_id, language_code, created_at
     """
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute("SELECT * FROM users") as cursor:
-            rows = await cursor.fetchall()
-            return [dict(row) for row in rows]
+    db = await get_db()
+    db.row_factory = aiosqlite.Row
+    async with db.execute("SELECT * FROM users") as cursor:
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
 
 
 async def get_user_product_limit(user_id: int) -> int:
@@ -233,13 +305,13 @@ async def set_user_max_products(user_id: int, limit: int) -> None:
     # Cap at DEFAULT_MAX_PRODUCTS
     limit = min(limit, DEFAULT_MAX_PRODUCTS)
 
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        await db.execute(
-            "UPDATE users SET max_products = ? WHERE user_id = ?",
-            (limit, user_id),
-        )
-        await db.commit()
-        logger.info(f"User {user_id} max_products set to {limit}")
+    db = await get_db()
+    await db.execute(
+        "UPDATE users SET max_products = ? WHERE user_id = ?",
+        (limit, user_id),
+    )
+    await db.commit()
+    logger.info(f"User {user_id} max_products set to {limit}")
 
 
 async def increment_user_product_limit(user_id: int, amount: int) -> int:
@@ -270,13 +342,13 @@ async def mark_referral_bonus_given(user_id: int) -> None:
     Args:
         user_id: Telegram user ID
     """
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        await db.execute(
-            "UPDATE users SET referral_bonus_given = TRUE WHERE user_id = ?",
-            (user_id,),
-        )
-        await db.commit()
-        logger.info(f"User {user_id} marked as referral bonus given")
+    db = await get_db()
+    await db.execute(
+        "UPDATE users SET referral_bonus_given = TRUE WHERE user_id = ?",
+        (user_id,),
+    )
+    await db.commit()
+    logger.info(f"User {user_id} marked as referral bonus given")
 
 
 # ============================================================================
@@ -308,33 +380,33 @@ async def add_product(
     Returns:
         Product ID (database auto-increment ID)
     """
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        cursor = await db.execute(
-            """
-            INSERT INTO products (
-                user_id, product_name, asin, marketplace, price_paid,
-                return_deadline, min_savings_threshold
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                user_id,
-                product_name,
-                asin,
-                marketplace,
-                price_paid,
-                return_deadline.isoformat(),
-                min_savings_threshold,
-            ),
+    db = await get_db()
+    cursor = await db.execute(
+        """
+        INSERT INTO products (
+            user_id, product_name, asin, marketplace, price_paid,
+            return_deadline, min_savings_threshold
         )
-        await db.commit()
-        product_id = cursor.lastrowid
-        product_display = product_name or f"ASIN {asin}"
-        logger.info(
-            f"Product '{product_display}' from amazon.{marketplace} added for user {user_id} "
-            f"(ID: {product_id})"
-        )
-        return product_id
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            user_id,
+            product_name,
+            asin,
+            marketplace,
+            price_paid,
+            return_deadline.isoformat(),
+            min_savings_threshold,
+        ),
+    )
+    await db.commit()
+    product_id = cursor.lastrowid
+    product_display = product_name or f"ASIN {asin}"
+    logger.info(
+        f"Product '{product_display}' from amazon.{marketplace} added for user {user_id} "
+        f"(ID: {product_id})"
+    )
+    return product_id
 
 
 async def add_product_atomic(
@@ -377,6 +449,9 @@ async def add_product_atomic(
         >>> if is_first:
         >>>     await give_referral_bonus(...)
     """
+    # Use a dedicated connection for atomic operations requiring explicit transaction control.
+    # This avoids "cannot start a transaction within a transaction" errors when using
+    # the shared connection, and allows concurrent atomic operations.
     async with aiosqlite.connect(DATABASE_PATH) as db:
         # Start IMMEDIATE transaction to lock the database for writing
         await db.execute("BEGIN IMMEDIATE")
@@ -440,18 +515,18 @@ async def get_user_products(user_id: int) -> list[dict]:
     Returns:
         List of product dicts with all fields
     """
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            """
-            SELECT * FROM products
-            WHERE user_id = ?
-            ORDER BY added_at DESC
-            """,
-            (user_id,),
-        ) as cursor:
-            rows = await cursor.fetchall()
-            return [dict(row) for row in rows]
+    db = await get_db()
+    db.row_factory = aiosqlite.Row
+    async with db.execute(
+        """
+        SELECT * FROM products
+        WHERE user_id = ?
+        ORDER BY added_at DESC
+        """,
+        (user_id,),
+    ) as cursor:
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
 
 
 async def get_all_active_products() -> list[dict]:
@@ -462,18 +537,18 @@ async def get_all_active_products() -> list[dict]:
         List of product dicts where return_deadline >= today (UTC)
     """
     today = datetime.now(UTC).date().isoformat()
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            """
-            SELECT * FROM products
-            WHERE return_deadline >= ?
-            ORDER BY user_id, added_at
-            """,
-            (today,),
-        ) as cursor:
-            rows = await cursor.fetchall()
-            return [dict(row) for row in rows]
+    db = await get_db()
+    db.row_factory = aiosqlite.Row
+    async with db.execute(
+        """
+        SELECT * FROM products
+        WHERE return_deadline >= ?
+        ORDER BY user_id, added_at
+        """,
+        (today,),
+    ) as cursor:
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
 
 
 async def update_product(
@@ -527,13 +602,13 @@ async def update_product(
     params.extend([product_id, user_id])
     query = f"UPDATE products SET {', '.join(updates)} WHERE id = ? AND user_id = ?"
 
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        cursor = await db.execute(query, params)
-        await db.commit()
-        updated = cursor.rowcount > 0
-        if updated:
-            logger.info(f"Product {product_id} updated for user {user_id}")
-        return updated
+    db = await get_db()
+    cursor = await db.execute(query, params)
+    await db.commit()
+    updated = cursor.rowcount > 0
+    if updated:
+        logger.info(f"Product {product_id} updated for user {user_id}")
+    return updated
 
 
 async def update_last_notified_price(product_id: int, price: float) -> None:
@@ -544,13 +619,13 @@ async def update_last_notified_price(product_id: int, price: float) -> None:
         product_id: Database product ID
         price: Price that was notified to user
     """
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        await db.execute(
-            "UPDATE products SET last_notified_price = ? WHERE id = ?",
-            (price, product_id),
-        )
-        await db.commit()
-        logger.debug(f"Product {product_id} last_notified_price updated to {price}")
+    db = await get_db()
+    await db.execute(
+        "UPDATE products SET last_notified_price = ? WHERE id = ?",
+        (price, product_id),
+    )
+    await db.commit()
+    logger.debug(f"Product {product_id} last_notified_price updated to {price}")
 
 
 async def delete_product(product_id: int, user_id: int) -> bool:
@@ -568,16 +643,16 @@ async def delete_product(product_id: int, user_id: int) -> bool:
     Returns:
         True if product was deleted, False if not found or not owned by user
     """
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        cursor = await db.execute(
-            "DELETE FROM products WHERE id = ? AND user_id = ?",
-            (product_id, user_id),
-        )
-        await db.commit()
-        deleted = cursor.rowcount > 0
-        if deleted:
-            logger.info(f"Product {product_id} deleted for user {user_id}")
-        return deleted
+    db = await get_db()
+    cursor = await db.execute(
+        "DELETE FROM products WHERE id = ? AND user_id = ?",
+        (product_id, user_id),
+    )
+    await db.commit()
+    deleted = cursor.rowcount > 0
+    if deleted:
+        logger.info(f"Product {product_id} deleted for user {user_id}")
+    return deleted
 
 
 async def delete_expired_products() -> int:
@@ -588,12 +663,12 @@ async def delete_expired_products() -> int:
         Number of products deleted
     """
     today = datetime.now(UTC).date().isoformat()
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        cursor = await db.execute("DELETE FROM products WHERE return_deadline < ?", (today,))
-        await db.commit()
-        count = cursor.rowcount
-        logger.info(f"Deleted {count} expired products")
-        return count
+    db = await get_db()
+    cursor = await db.execute("DELETE FROM products WHERE return_deadline < ?", (today,))
+    await db.commit()
+    count = cursor.rowcount
+    logger.info(f"Deleted {count} expired products")
+    return count
 
 
 # ============================================================================
@@ -611,13 +686,13 @@ async def get_last_feedback_time(user_id: int) -> str | None:
     Returns:
         ISO timestamp string of last feedback, or None if user never submitted feedback
     """
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        async with db.execute(
-            "SELECT created_at FROM feedback WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
-            (user_id,),
-        ) as cursor:
-            row = await cursor.fetchone()
-            return row[0] if row else None
+    db = await get_db()
+    async with db.execute(
+        "SELECT created_at FROM feedback WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+        (user_id,),
+    ) as cursor:
+        row = await cursor.fetchone()
+        return row[0] if row else None
 
 
 async def add_feedback(user_id: int, message: str) -> int:
@@ -631,15 +706,15 @@ async def add_feedback(user_id: int, message: str) -> int:
     Returns:
         Feedback ID
     """
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        cursor = await db.execute(
-            "INSERT INTO feedback (user_id, message) VALUES (?, ?)",
-            (user_id, message),
-        )
-        await db.commit()
-        feedback_id = cursor.lastrowid
-        logger.info(f"Feedback {feedback_id} added from user {user_id}")
-        return feedback_id
+    db = await get_db()
+    cursor = await db.execute(
+        "INSERT INTO feedback (user_id, message) VALUES (?, ?)",
+        (user_id, message),
+    )
+    await db.commit()
+    feedback_id = cursor.lastrowid
+    logger.info(f"Feedback {feedback_id} added from user {user_id}")
+    return feedback_id
 
 
 async def get_all_feedback() -> list[dict]:
@@ -649,11 +724,11 @@ async def get_all_feedback() -> list[dict]:
     Returns:
         List of feedback dicts with keys: id, user_id, message, created_at
     """
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute("SELECT * FROM feedback ORDER BY created_at DESC") as cursor:
-            rows = await cursor.fetchall()
-            return [dict(row) for row in rows]
+    db = await get_db()
+    db.row_factory = aiosqlite.Row
+    async with db.execute("SELECT * FROM feedback ORDER BY created_at DESC") as cursor:
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
 
 
 # ============================================================================
@@ -669,19 +744,19 @@ async def update_system_status(key: str, value: str) -> None:
         key: Status key (e.g., "last_scraper_run", "last_checker_run")
         value: Status value (typically ISO timestamp)
     """
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        await db.execute(
-            """
-            INSERT INTO system_status (key, value, updated_at)
-            VALUES (?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(key) DO UPDATE SET
-                value = excluded.value,
-                updated_at = CURRENT_TIMESTAMP
-            """,
-            (key, value),
-        )
-        await db.commit()
-        logger.debug(f"System status updated: {key} = {value}")
+    db = await get_db()
+    await db.execute(
+        """
+        INSERT INTO system_status (key, value, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(key) DO UPDATE SET
+            value = excluded.value,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (key, value),
+    )
+    await db.commit()
+    logger.debug(f"System status updated: {key} = {value}")
 
 
 async def get_system_status(key: str) -> dict | None:
@@ -695,11 +770,11 @@ async def get_system_status(key: str) -> dict | None:
         Dict with keys: key, value, updated_at
         None if key doesn't exist
     """
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute("SELECT * FROM system_status WHERE key = ?", (key,)) as cursor:
-            row = await cursor.fetchone()
-            return dict(row) if row else None
+    db = await get_db()
+    db.row_factory = aiosqlite.Row
+    async with db.execute("SELECT * FROM system_status WHERE key = ?", (key,)) as cursor:
+        row = await cursor.fetchone()
+        return dict(row) if row else None
 
 
 async def get_all_system_status() -> dict[str, dict]:
@@ -709,11 +784,11 @@ async def get_all_system_status() -> dict[str, dict]:
     Returns:
         Dict mapping keys to their status dicts
     """
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute("SELECT * FROM system_status") as cursor:
-            rows = await cursor.fetchall()
-            return {row["key"]: dict(row) for row in rows}
+    db = await get_db()
+    db.row_factory = aiosqlite.Row
+    async with db.execute("SELECT * FROM system_status") as cursor:
+        rows = await cursor.fetchall()
+        return {row["key"]: dict(row) for row in rows}
 
 
 async def increment_metric(key: str, amount: float = 1.0) -> None:
@@ -730,23 +805,23 @@ async def increment_metric(key: str, amount: float = 1.0) -> None:
         key: Metric key (e.g., "products_total_count", "total_savings_generated")
         amount: Amount to increment by (default: 1.0)
     """
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        # Atomic increment using ON CONFLICT DO UPDATE
-        # - If key doesn't exist: INSERT with amount as initial value
-        # - If key exists: UPDATE by adding amount to current value
-        # This is a single atomic SQL operation, no race condition possible
-        await db.execute(
-            """
-            INSERT INTO system_status (key, value, updated_at)
-            VALUES (?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(key) DO UPDATE SET
-                value = CAST(system_status.value AS REAL) + CAST(excluded.value AS REAL),
-                updated_at = CURRENT_TIMESTAMP
-            """,
-            (key, str(amount)),
-        )
-        await db.commit()
-        logger.debug(f"Metric incremented: {key} += {amount}")
+    db = await get_db()
+    # Atomic increment using ON CONFLICT DO UPDATE
+    # - If key doesn't exist: INSERT with amount as initial value
+    # - If key exists: UPDATE by adding amount to current value
+    # This is a single atomic SQL operation, no race condition possible
+    await db.execute(
+        """
+        INSERT INTO system_status (key, value, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(key) DO UPDATE SET
+            value = CAST(system_status.value AS REAL) + CAST(excluded.value AS REAL),
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (key, str(amount)),
+    )
+    await db.commit()
+    logger.debug(f"Metric incremented: {key} += {amount}")
 
 
 async def get_metric(key: str) -> float:
@@ -784,21 +859,21 @@ async def get_stats() -> dict:
         - products_total_count: Total products registered since beginning (promotional metric)
         - total_savings_generated: Total € savings notified to users (promotional metric)
     """
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        # Count users
-        async with db.execute("SELECT COUNT(*) FROM users") as cursor:
-            user_count = (await cursor.fetchone())[0]
+    db = await get_db()
+    # Count users
+    async with db.execute("SELECT COUNT(*) FROM users") as cursor:
+        user_count = (await cursor.fetchone())[0]
 
-        # Count total products (includes duplicates)
-        async with db.execute("SELECT COUNT(*) FROM products") as cursor:
-            product_count = (await cursor.fetchone())[0]
+    # Count total products (includes duplicates)
+    async with db.execute("SELECT COUNT(*) FROM products") as cursor:
+        product_count = (await cursor.fetchone())[0]
 
-        # Count unique products by (asin, marketplace) pair
-        # This matches the scraper's deduplication logic in data_reader.py
-        async with db.execute(
-            "SELECT COUNT(DISTINCT asin || '|' || marketplace) FROM products"
-        ) as cursor:
-            unique_product_count = (await cursor.fetchone())[0]
+    # Count unique products by (asin, marketplace) pair
+    # This matches the scraper's deduplication logic in data_reader.py
+    async with db.execute(
+        "SELECT COUNT(DISTINCT asin || '|' || marketplace) FROM products"
+    ) as cursor:
+        unique_product_count = (await cursor.fetchone())[0]
 
     # Get promotional metrics from system_status
     products_total_count = await get_metric("products_total_count")
