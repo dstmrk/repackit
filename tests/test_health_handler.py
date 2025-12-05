@@ -12,7 +12,6 @@ from aiohttp import web
 import database
 import health_handler
 
-
 # ============================================================================
 # Database system_status tests
 # ============================================================================

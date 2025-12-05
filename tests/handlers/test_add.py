@@ -24,7 +24,6 @@ from handlers.add import (
 )
 from handlers.validators import parse_deadline
 
-
 # ============================================================================
 # parse_deadline tests
 # ============================================================================
