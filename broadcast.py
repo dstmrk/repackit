@@ -80,6 +80,9 @@ async def broadcast_message(message: str) -> tuple[int, int]:
     """
     Broadcast a message to all registered users.
 
+    Uses a semaphore to limit concurrent Telegram API calls within each batch,
+    preventing burst rate limiting violations.
+
     Args:
         message: Message text to broadcast (HTML format - use <b>, <i>, <code> tags)
 
@@ -100,11 +103,18 @@ async def broadcast_message(message: str) -> tuple[int, int]:
     sent_count = 0
     failed_count = 0
 
+    # Semaphore to limit concurrent Telegram API calls
+    semaphore = asyncio.Semaphore(cfg.max_concurrent_telegram_calls)
+
+    async def send_with_semaphore(user_id: int) -> bool:
+        async with semaphore:
+            return await send_message_to_user(user_id, message)
+
     # Process users in batches
     for i in range(0, total_users, cfg.batch_size):
         batch = users[i : i + cfg.batch_size]
         batch_results = await asyncio.gather(
-            *[send_message_to_user(user["user_id"], message) for user in batch],
+            *[send_with_semaphore(user["user_id"]) for user in batch],
             return_exceptions=True,
         )
 
