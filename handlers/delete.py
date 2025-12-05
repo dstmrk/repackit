@@ -162,8 +162,8 @@ async def delete_callback_handler(update: Update, context: ContextTypes.DEFAULT_
 
             product_name = product.get("product_name") or "Prodotto"
 
-            # Delete product from database
-            await database.delete_product(product_id)
+            # Delete product from database (defense-in-depth: verify user owns product)
+            await database.delete_product(product_id, user_id)
 
             # Edit message to show success
             success_message = messages.product_deleted_success(html.escape(product_name))

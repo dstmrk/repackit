@@ -507,7 +507,7 @@ async def test_update_product(test_db):
     )
 
     # Update price
-    success = await database.update_product(product_id, price_paid=55.00)
+    success = await database.update_product(product_id, 123456, price_paid=55.00)
     assert success is True
 
     products = await database.get_user_products(123456)
@@ -515,11 +515,11 @@ async def test_update_product(test_db):
 
     # Update deadline
     new_deadline = date.today() + timedelta(days=40)
-    success = await database.update_product(product_id, return_deadline=new_deadline)
+    success = await database.update_product(product_id, 123456, return_deadline=new_deadline)
     assert success is True
 
     # Update threshold
-    success = await database.update_product(product_id, min_savings_threshold=10.0)
+    success = await database.update_product(product_id, 123456, min_savings_threshold=10.0)
     assert success is True
 
     products = await database.get_user_products(123456)
@@ -529,7 +529,7 @@ async def test_update_product(test_db):
 @pytest.mark.asyncio
 async def test_update_product_nonexistent(test_db):
     """Test updating a product that doesn't exist."""
-    success = await database.update_product(99999, price_paid=50.0)
+    success = await database.update_product(99999, 123456, price_paid=50.0)
     assert success is False
 
 
@@ -568,8 +568,8 @@ async def test_delete_product(test_db):
         123456, "Test Product", "B08N5WRWNW", "it", 59.90, deadline
     )
 
-    # Delete product
-    success = await database.delete_product(product_id)
+    # Delete product (defense-in-depth: verify user owns product)
+    success = await database.delete_product(product_id, 123456)
     assert success is True
 
     # Verify deleted
@@ -580,8 +580,64 @@ async def test_delete_product(test_db):
 @pytest.mark.asyncio
 async def test_delete_product_nonexistent(test_db):
     """Test deleting a product that doesn't exist."""
-    success = await database.delete_product(99999)
+    success = await database.delete_product(99999, 123456)
     assert success is False
+
+
+@pytest.mark.asyncio
+async def test_delete_product_wrong_user(test_db):
+    """Test that a user cannot delete another user's product (defense-in-depth)."""
+    user1 = 111111
+    user2 = 222222
+
+    await database.add_user(user1, "it")
+    await database.add_user(user2, "it")
+
+    deadline = date.today() + timedelta(days=30)
+    product_id = await database.add_product(
+        user1, "User1 Product", "B08N5WRWNW", "it", 59.90, deadline
+    )
+
+    # User2 tries to delete User1's product
+    success = await database.delete_product(product_id, user2)
+    assert success is False
+
+    # Product should still exist
+    products = await database.get_user_products(user1)
+    assert len(products) == 1
+
+    # User1 can delete their own product
+    success = await database.delete_product(product_id, user1)
+    assert success is True
+
+
+@pytest.mark.asyncio
+async def test_update_product_wrong_user(test_db):
+    """Test that a user cannot update another user's product (defense-in-depth)."""
+    user1 = 111111
+    user2 = 222222
+
+    await database.add_user(user1, "it")
+    await database.add_user(user2, "it")
+
+    deadline = date.today() + timedelta(days=30)
+    product_id = await database.add_product(
+        user1, "User1 Product", "B08N5WRWNW", "it", 59.90, deadline
+    )
+
+    # User2 tries to update User1's product
+    success = await database.update_product(product_id, user2, price_paid=10.00)
+    assert success is False
+
+    # Product should still have original price
+    products = await database.get_user_products(user1)
+    assert products[0]["price_paid"] == 59.90
+
+    # User1 can update their own product
+    success = await database.update_product(product_id, user1, price_paid=55.00)
+    assert success is True
+    products = await database.get_user_products(user1)
+    assert products[0]["price_paid"] == 55.00
 
 
 @pytest.mark.asyncio
