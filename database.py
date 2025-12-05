@@ -169,9 +169,7 @@ async def init_db() -> None:
 
     # Create indexes for performance
     await db.execute("CREATE INDEX IF NOT EXISTS idx_user_products ON products(user_id)")
-    await db.execute(
-        "CREATE INDEX IF NOT EXISTS idx_return_deadline ON products(return_deadline)"
-    )
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_return_deadline ON products(return_deadline)")
 
     # Composite indexes for common query patterns
     # Scraper queries products by (asin, marketplace) - avoids full table scan
