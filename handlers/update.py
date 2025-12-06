@@ -119,8 +119,7 @@ async def handle_product_selection(update: Update, context: ContextTypes.DEFAULT
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
-        f"📦 <b>Prodotto selezionato:</b> {html.escape(product_display)}\n\n"
-        "Cosa vuoi modificare?",
+        f"📦 <b>Prodotto selezionato:</b> {html.escape(product_display)}\n\nCosa vuoi modificare?",
         parse_mode="HTML",
         reply_markup=reply_markup,
     )
@@ -281,8 +280,7 @@ async def _update_name(product_id: int, value_str: str, user_id: int, message) -
 
     await database.update_product(product_id, user_id, product_name=new_name)
     await message.reply_text(
-        "✅ <b>Nome aggiornato con successo!</b>\n\n"
-        f"📦 Nuovo nome: <b>{html.escape(new_name)}</b>",
+        f"✅ <b>Nome aggiornato con successo!</b>\n\n📦 Nuovo nome: <b>{html.escape(new_name)}</b>",
         parse_mode="HTML",
     )
     logger.info(

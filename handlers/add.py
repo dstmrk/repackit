@@ -291,7 +291,7 @@ async def _process_first_product_referral_bonus(
         # Referrer already at cap, mark bonus as given anyway
         await database.mark_referral_bonus_given(user_id)
         logger.info(
-            f"User {user_id} first product added but referrer {referrer_id} " "already at max limit"
+            f"User {user_id} first product added but referrer {referrer_id} already at max limit"
         )
 
 

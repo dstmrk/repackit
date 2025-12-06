@@ -1184,8 +1184,8 @@ async def test_handle_min_savings_shows_share_hint_when_low_on_slots(test_db):
     for i in range(4):
         await database.add_product(
             user_id=user_id,
-            product_name=f"Product {i+1}",
-            asin=f"ASIN0000{i+1}",
+            product_name=f"Product {i + 1}",
+            asin=f"ASIN0000{i + 1}",
             marketplace="it",
             price_paid=50.0,
             return_deadline=tomorrow,
@@ -1302,8 +1302,8 @@ async def test_handle_min_savings_no_share_hint_when_at_max_slots(test_db):
     for i in range(19):
         await database.add_product(
             user_id=user_id,
-            product_name=f"Product {i+1}",
-            asin=f"ASIN000{i+1:02d}",
+            product_name=f"Product {i + 1}",
+            asin=f"ASIN000{i + 1:02d}",
             marketplace="it",
             price_paid=50.0,
             return_deadline=tomorrow,
