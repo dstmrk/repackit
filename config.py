@@ -46,6 +46,15 @@ class Config:
     # Health Check
     health_port: int
     health_bind_address: str
+    health_check_max_days: int  # Max days since last task run before considered stale
+
+    # Feedback
+    feedback_min_length: int  # Minimum feedback message length
+    feedback_max_length: int  # Maximum feedback message length
+    feedback_rate_limit_hours: int  # Hours between feedback submissions
+
+    # Scraper
+    scraper_rate_limit_seconds: float  # Delay between Amazon requests
 
     # Logging
     log_level: str
@@ -93,6 +102,13 @@ class Config:
             # Health Check
             health_port=int(os.getenv("HEALTH_PORT", "8444")),
             health_bind_address=os.getenv("HEALTH_BIND_ADDRESS", "0.0.0.0"),
+            health_check_max_days=int(os.getenv("HEALTH_CHECK_MAX_DAYS", "2")),
+            # Feedback
+            feedback_min_length=int(os.getenv("FEEDBACK_MIN_LENGTH", "10")),
+            feedback_max_length=int(os.getenv("FEEDBACK_MAX_LENGTH", "1000")),
+            feedback_rate_limit_hours=int(os.getenv("FEEDBACK_RATE_LIMIT_HOURS", "24")),
+            # Scraper
+            scraper_rate_limit_seconds=float(os.getenv("SCRAPER_RATE_LIMIT_SECONDS", "1.5")),
             # Logging
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             # Telegram Rate Limiting

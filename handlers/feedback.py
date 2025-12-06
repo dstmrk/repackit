@@ -14,14 +14,18 @@ from telegram.ext import (
 )
 
 import database
+from config import get_config
 from utils import messages
 
 logger = logging.getLogger(__name__)
 
-# Constants
-MIN_FEEDBACK_LENGTH = 10
-MAX_FEEDBACK_LENGTH = 1000
-FEEDBACK_RATE_LIMIT_HOURS = 24  # Allow one feedback every 24 hours
+# Load configuration
+cfg = get_config()
+
+# Constants from config
+MIN_FEEDBACK_LENGTH = cfg.feedback_min_length
+MAX_FEEDBACK_LENGTH = cfg.feedback_max_length
+FEEDBACK_RATE_LIMIT_HOURS = cfg.feedback_rate_limit_hours
 
 # Conversation state
 WAITING_FEEDBACK_MESSAGE = 0

@@ -19,9 +19,10 @@ logger = logging.getLogger(__name__)
 ASIN_PATTERN = re.compile(r"/dp/([A-Z0-9]{10})|/gp/product/([A-Z0-9]{10})|/d/([A-Z0-9]{10})")
 cfg = get_config()
 
-# Module-level constant for backward compatibility with tests
+# Module-level constants for backward compatibility with tests
 TELEGRAM_TOKEN = cfg.telegram_token
 AMAZON_AFFILIATE_TAG = cfg.amazon_affiliate_tag
+SCRAPER_RATE_LIMIT_SECONDS = cfg.scraper_rate_limit_seconds
 
 # Marketplace pattern: extract domain suffix (it, com, de, fr, co.uk, etc.)
 MARKETPLACE_PATTERN = re.compile(r"amazon\.(?:co\.)?([a-z]{2,3})")
@@ -237,7 +238,9 @@ def _parse_price(price_text: str) -> float | None:
         return None
 
 
-async def scrape_prices(products: list[dict], rate_limit_seconds: float = 1.5) -> dict[int, float]:
+async def scrape_prices(
+    products: list[dict], rate_limit_seconds: float | None = None
+) -> dict[int, float]:
     """
     Scrape prices for multiple products efficiently.
 
@@ -247,7 +250,7 @@ async def scrape_prices(products: list[dict], rate_limit_seconds: float = 1.5) -
 
     Args:
         products: List of product dicts with keys: id, asin, (optional) marketplace
-        rate_limit_seconds: Delay between requests (default: 1.5s)
+        rate_limit_seconds: Delay between requests (default from config: SCRAPER_RATE_LIMIT_SECONDS)
 
     Returns:
         Dict mapping product_id -> price
@@ -257,6 +260,9 @@ async def scrape_prices(products: list[dict], rate_limit_seconds: float = 1.5) -
         If 10 users monitor the same ASIN, it will be scraped only once,
         and the price will be mapped to all 10 product IDs.
     """
+    if rate_limit_seconds is None:
+        rate_limit_seconds = SCRAPER_RATE_LIMIT_SECONDS
+
     results = {}
 
     # Group products by (asin, marketplace) to deduplicate scraping
