@@ -14,6 +14,8 @@ on:
       - '.dockerignore'
       - '.env.example'
       - 'static/**'
+      - '.github/workflows/**'
+      - '!.github/workflows/ci.yml'  # Still run if ci.yml itself changes
   pull_request:
     branches: [ main, master, develop ]
     paths-ignore:
@@ -27,6 +29,8 @@ on:
       - '.dockerignore'
       - '.env.example'
       - 'static/**'
+      - '.github/workflows/**'
+      - '!.github/workflows/ci.yml'  # Still run if ci.yml itself changes
 
 jobs:
   lint:
