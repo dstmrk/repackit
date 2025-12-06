@@ -616,7 +616,7 @@ I tuoi prodotti monitorati:
    💰 Prezzo pagato: €45.00
    📅 Scadenza reso: 15/05/2025 (tra 176 giorni)
 
-Hai 5/20 prodotti monitorati.
+Hai 5/21 prodotti monitorati.
 Usa /delete per rimuoverne uno, /update per modificarne uno.
 ```
 

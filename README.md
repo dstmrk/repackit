@@ -35,7 +35,7 @@ Un bot Telegram che ti avvisa se il prezzo dei tuoi acquisti Amazon scende duran
 
 - Python 3.11+
 - [uv](https://github.com/astral-sh/uv) per dependency management
-- PostgreSQL/SQLite per database
+- SQLite per database
 - Account bot Telegram (via [@BotFather](https://t.me/botfather))
 
 ## Setup Locale (Sviluppo)
@@ -147,7 +147,7 @@ docker compose up -d
   - Step 3: Prezzo pagato
   - Step 4: Scadenza reso (numero giorni o data gg-mm-aaaa)
   - Step 5: Risparmio minimo per notifica
-- `/list` - **Visualizza prodotti** monitorati (mostra conteggio 5/20)
+- `/list` - **Visualizza prodotti** monitorati (mostra conteggio 5/21)
 - `/delete` - **Rimuovi prodotto** con conferma inline keyboard
   - Mostra lista prodotti con bottoni cliccabili
   - Richiede conferma prima di eliminare
@@ -161,7 +161,7 @@ docker compose up -d
 
 ### Limiti
 
-- **Massimo 20 prodotti** per utente
+- **Massimo 21 prodotti** per utente
 - **Validazione automatica** su tutti gli input
 - **Supporto /cancel** in ogni flusso conversazionale
 
@@ -184,7 +184,7 @@ Bot: ✅ Prodotto aggiunto con successo!
 
 # 2. Visualizza lista
 Utente: /list
-Bot: Hai 1/20 prodotti monitorati. [mostra lista con nomi]
+Bot: Hai 1/21 prodotti monitorati. [mostra lista con nomi]
 
 # 3. Aggiorna prodotto
 Utente: /update
