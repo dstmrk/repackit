@@ -305,7 +305,7 @@ def _print_price_verification(results: dict) -> None:
         if results.get("price_contexts"):
             print(f"\n{' ' * 3}{Colors.BOLD}Sample contexts:{Colors.ENDC}")
             for i, context in enumerate(results["price_contexts"][:3], 1):
-                print(f"{' ' * 5}{i}. \"{context[:80]}...\"")
+                print(f'{" " * 5}{i}. "{context[:80]}..."')
     else:
         print_error("Expected price NOT found in page HTML")
 

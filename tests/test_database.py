@@ -361,8 +361,8 @@ async def test_product_limit_trigger_enforcement(test_db):
     for i in range(3):
         await database.add_product_atomic(
             user_id=123456,
-            product_name=f"Product {i+1}",
-            asin=f"ASIN0000{i+1}",
+            product_name=f"Product {i + 1}",
+            asin=f"ASIN0000{i + 1}",
             marketplace="it",
             price_paid=50.0 + i * 10,
             return_deadline=deadline,

@@ -23,7 +23,6 @@ dev = [
     "pytest>=7.4",
     "pytest-asyncio>=0.21",
     "pytest-cov>=4.1",
-    "black>=23.0",
     "ruff>=0.1",
     "pre-commit>=3.5",
 ]
@@ -39,21 +38,17 @@ only-include = [
     "handlers",
 ]
 
-[tool.black]
-line-length = 100
-target-version = ['py311']
-exclude = '''
-/(
-    \.git
-  | \.venv
-  | __pycache__
-  | data
-)/
-'''
-
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.ruff.format]
+# Use double quotes for strings (consistent with black's default)
+quote-style = "double"
+# Indent with spaces, not tabs
+indent-style = "space"
+# Unix-style line endings
+line-ending = "lf"
 
 [tool.ruff.lint]
 select = [
@@ -68,7 +63,7 @@ select = [
     "SIM",  # flake8-simplify
 ]
 ignore = [
-    "E501",   # line too long (handled by black)
+    "E501",   # line too long (handled by ruff format)
     "SIM117", # nested with statements (prefer explicit nesting in tests)
     "SIM116", # dictionary instead of if/elif (prefer explicit in tests)
 ]

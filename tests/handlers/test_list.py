@@ -235,8 +235,8 @@ async def test_list_handler_shows_share_hint_when_low_on_slots(test_db):
     for i in range(5):
         await database.add_product(
             user_id=123,
-            product_name=f"Product {i+1}",
-            asin=f"ASIN0000{i+1}",
+            product_name=f"Product {i + 1}",
+            asin=f"ASIN0000{i + 1}",
             marketplace="it",
             price_paid=50.0,
             return_deadline=tomorrow,
@@ -269,8 +269,8 @@ async def test_list_handler_no_share_hint_when_enough_slots(test_db):
     for i in range(2):
         await database.add_product(
             user_id=123,
-            product_name=f"Product {i+1}",
-            asin=f"ASIN0000{i+1}",
+            product_name=f"Product {i + 1}",
+            asin=f"ASIN0000{i + 1}",
             marketplace="it",
             price_paid=50.0,
             return_deadline=tomorrow,
@@ -303,8 +303,8 @@ async def test_list_handler_no_share_hint_when_at_max_slots(test_db):
     for i in range(20):
         await database.add_product(
             user_id=123,
-            product_name=f"Product {i+1}",
-            asin=f"ASIN000{i+1:02d}",
+            product_name=f"Product {i + 1}",
+            asin=f"ASIN000{i + 1:02d}",
             marketplace="it",
             price_paid=50.0,
             return_deadline=tomorrow,

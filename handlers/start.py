@@ -48,8 +48,7 @@ async def _parse_referral_code(user_id: int, referral_code: str) -> tuple[int | 
 
     # Referrer doesn't exist
     error_message = (
-        "ℹ️ Il codice di invito che hai usato non è valido "
-        "(l'invitante non risulta esistente).\n\n"
+        "ℹ️ Il codice di invito che hai usato non è valido (l'invitante non risulta esistente).\n\n"
     )
     logger.warning(f"User {user_id} used invalid referral code {referrer_id}")
     return None, error_message
