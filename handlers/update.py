@@ -18,7 +18,7 @@ from telegram.warnings import PTBUserWarning
 
 import database
 from handlers import validators
-from utils import messages
+from utils import keyboards, messages
 
 # Suppress PTBUserWarning for per_message=False in ConversationHandler
 # This is intentional - we want per-conversation tracking, not per-message
@@ -51,20 +51,11 @@ async def start_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         return ConversationHandler.END
 
     # Create inline keyboard with one button per product
-    keyboard = []
-    for idx, product in enumerate(products, start=1):
-        product_name = product.get("product_name") or f"Prodotto #{idx}"
-        price_paid = product["price_paid"]
-
-        button_text = f"{idx}. {html.escape(product_name)} - €{price_paid:.2f}"
-        callback_data = f"update_product_{product['id']}"
-
-        keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
-
-    # Add cancel button
-    keyboard.append([InlineKeyboardButton("❌ Annulla", callback_data="update_cancel")])
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = keyboards.product_list_keyboard(
+        products=products,
+        callback_prefix="update_product",
+        cancel_callback="update_cancel",
+    )
 
     await update.message.reply_text(
         "🔄 <b>Aggiorna un prodotto</b>\n\nSeleziona il prodotto che vuoi modificare:",

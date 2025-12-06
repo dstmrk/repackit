@@ -4,11 +4,11 @@ import html
 import logging
 from datetime import date
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import Update
 from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes
 
 import database
-from utils import messages
+from utils import keyboards, messages
 
 logger = logging.getLogger(__name__)
 
@@ -39,22 +39,11 @@ async def start_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             return
 
         # Build keyboard with product buttons
-        keyboard = []
-        for idx, product in enumerate(products, start=1):
-            product_id = product["id"]
-            product_name = product.get("product_name") or f"Prodotto #{idx}"
-            price_paid = product["price_paid"]
-
-            # Button text shows name and price
-            button_text = f"{idx}. {product_name} - €{price_paid:.2f}"
-            keyboard.append(
-                [InlineKeyboardButton(button_text, callback_data=f"delete_select_{product_id}")]
-            )
-
-        # Add cancel button
-        keyboard.append([InlineKeyboardButton("❌ Annulla", callback_data="delete_cancel_main")])
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        reply_markup = keyboards.product_list_keyboard(
+            products=products,
+            callback_prefix="delete_select",
+            cancel_callback="delete_cancel_main",
+        )
 
         message = (
             "🗑️ <b>Elimina un prodotto</b>\n\n"
@@ -114,17 +103,11 @@ async def delete_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             min_savings = product["min_savings_threshold"] or 0
 
             # Create confirmation keyboard
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        "✅ Sì, elimina", callback_data=f"delete_confirm_{product_id}"
-                    ),
-                    InlineKeyboardButton(
-                        "❌ No, annulla", callback_data=f"delete_cancel_{product_id}"
-                    ),
-                ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
+            reply_markup = keyboards.confirm_cancel_keyboard(
+                confirm_text="✅ Sì, elimina",
+                confirm_callback=f"delete_confirm_{product_id}",
+                cancel_callback=f"delete_cancel_{product_id}",
+            )
 
             # Show confirmation message with product details
             confirmation_message = (

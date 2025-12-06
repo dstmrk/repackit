@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import Update
 from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
@@ -15,7 +15,7 @@ from telegram.ext import (
 
 import database
 from config import get_config
-from utils import messages
+from utils import keyboards, messages
 
 logger = logging.getLogger(__name__)
 
@@ -139,13 +139,11 @@ async def handle_feedback_message(update: Update, context: ContextTypes.DEFAULT_
     context.user_data["feedback_message"] = feedback_message
 
     # Show preview with confirmation buttons
-    keyboard = [
-        [
-            InlineKeyboardButton("✅ Sì, invia", callback_data="feedback_send"),
-            InlineKeyboardButton("❌ No, annulla", callback_data="feedback_cancel"),
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = keyboards.confirm_cancel_keyboard(
+        confirm_text="✅ Sì, invia",
+        confirm_callback="feedback_send",
+        cancel_callback="feedback_cancel",
+    )
 
     # Truncate preview if too long
     preview = feedback_message if len(feedback_message) <= 200 else feedback_message[:200] + "..."
