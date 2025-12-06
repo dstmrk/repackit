@@ -1,4 +1,4 @@
-name: Test
+name: CI
 
 on:
   push:
@@ -10,11 +10,10 @@ on:
       - '.gitattributes'
       - 'Dockerfile'
       - 'docker-compose.yml'
+      - 'docker-compose.dev.yml'
       - '.dockerignore'
       - '.env.example'
       - 'static/**'
-      - '.github/workflows/**'
-      - '!.github/workflows/test.yml'  # Still run if test.yml itself changes
   pull_request:
     branches: [ main, master, develop ]
     paths-ignore:
@@ -24,26 +23,53 @@ on:
       - '.gitattributes'
       - 'Dockerfile'
       - 'docker-compose.yml'
+      - 'docker-compose.dev.yml'
       - '.dockerignore'
       - '.env.example'
       - 'static/**'
-      - '.github/workflows/**'
-      - '!.github/workflows/test.yml'  # Still run if test.yml itself changes
 
 jobs:
-  test:
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Shallow clones should be disabled for better SonarCloud analysis
 
     - name: Install uv
       uses: astral-sh/setup-uv@v4
       with:
         version: "latest"
-        enable-cache: true  # Cache uv dependencies for faster CI
+        enable-cache: true
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: uv sync --extra dev
+
+    - name: Run Black
+      run: uv run black --check .
+
+    - name: Run Ruff
+      run: uv run ruff check .
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # For SonarCloud analysis
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
+        enable-cache: true
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -69,11 +95,9 @@ jobs:
       run: uv run playwright install-deps chromium
 
     - name: Run tests with coverage
-      run: |
-        uv run pytest --cov=. --cov-report=xml --cov-report=term-missing
+      run: uv run pytest --cov=. --cov-report=xml --cov-report=term-missing
 
     - name: Upload coverage to SonarCloud
-      # Skip SonarCloud for Dependabot PRs (no access to secrets)
       if: github.actor != 'dependabot[bot]'
       uses: SonarSource/sonarqube-scan-action@v6
       env:

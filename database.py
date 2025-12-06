@@ -58,7 +58,7 @@ class DatabaseConnection:
         try:
             # aiosqlite connection has _connection attribute pointing to sqlite3.Connection
             return self._connection._connection is not None
-        except (AttributeError, Exception):
+        except Exception:
             return False
 
     async def _create_connection(self) -> None:
