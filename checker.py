@@ -4,14 +4,14 @@ import asyncio
 import html
 import logging
 from datetime import UTC, date, datetime
-from urllib.parse import quote
 
-from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Bot
 from telegram.error import TelegramError
 
 import database
 from config import get_config
 from data_reader import build_affiliate_url, scrape_prices
+from utils import keyboards
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -354,9 +354,11 @@ async def send_price_drop_notification(
         f"🎉 Ho appena risparmiato €{savings:.2f} su Amazon grazie a @repackit_bot! "
         "Monitora i tuoi acquisti e ti avvisa se il prezzo scende. Provalo!"
     )
-    share_url = f"https://t.me/share/url?url=https://t.me/repackit_bot&text={quote(share_text)}"
 
-    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("📢 Dillo a un amico", url=share_url)]])
+    keyboard = keyboards.share_button(
+        text="📢 Dillo a un amico",
+        share_message=share_text,
+    )
 
     # Send message
     try:
