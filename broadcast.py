@@ -15,12 +15,12 @@ import logging
 import sys
 from datetime import UTC, datetime
 
-import httpx
 from dotenv import load_dotenv
 
 import database
 from config import get_config
 from utils.logging_config import setup_rotating_file_handler
+from utils.retry import httpx_post_with_retry
 
 # Load environment variables
 load_dotenv()
@@ -47,6 +47,8 @@ async def send_message_to_user(user_id: int, message: str) -> bool:
     """
     Send a message to a specific user via Telegram Bot API.
 
+    Uses retry with exponential backoff for transient network errors.
+
     Args:
         user_id: Telegram user ID
         message: Message text to send (HTML format - use <b>, <i>, <code> tags)
@@ -61,18 +63,18 @@ async def send_message_to_user(user_id: int, message: str) -> bool:
         "parse_mode": "HTML",
     }
 
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(url, json=payload)
-            if response.status_code == 200:
-                return True
-            else:
-                logger.warning(
-                    f"Failed to send to user {user_id}: HTTP {response.status_code} - {response.text}"
-                )
-                return False
-    except Exception as e:
-        logger.error(f"Error sending to user {user_id}: {e}")
+    response = await httpx_post_with_retry(url, payload, timeout=10.0)
+
+    if response is None:
+        logger.error(f"Failed to send to user {user_id}: request failed after retries")
+        return False
+
+    if response.status_code == 200:
+        return True
+    else:
+        logger.warning(
+            f"Failed to send to user {user_id}: HTTP {response.status_code} - {response.text}"
+        )
         return False
 
 

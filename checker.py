@@ -12,6 +12,7 @@ import database
 from config import get_config
 from data_reader import build_affiliate_url, scrape_prices
 from utils import keyboards
+from utils.retry import retry_with_backoff
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -360,14 +361,16 @@ async def send_price_drop_notification(
         share_message=share_text,
     )
 
-    # Send message
+    # Send message with retry for transient errors
     try:
-        await bot.send_message(
-            chat_id=user_id,
-            text=message,
-            parse_mode="HTML",
-            disable_web_page_preview=False,
-            reply_markup=keyboard,
+        await retry_with_backoff(
+            lambda: bot.send_message(
+                chat_id=user_id,
+                text=message,
+                parse_mode="HTML",
+                disable_web_page_preview=False,
+                reply_markup=keyboard,
+            )
         )
     except TelegramError as e:
         logger.error(f"Failed to send message to user {user_id}: {e}")
