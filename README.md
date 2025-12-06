@@ -1,8 +1,7 @@
 # RepackIt Bot 🤖📦
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
-[![Unit Tests](https://github.com/dstmrk/repackit/actions/workflows/test.yml/badge.svg)](https://github.com/dstmrk/repackit/actions/workflows/test.yml)
-[![Lint](https://github.com/dstmrk/repackit/actions/workflows/lint.yml/badge.svg)](https://github.com/dstmrk/repackit/actions/workflows/lint.yml)
+[![CI](https://github.com/dstmrk/repackit/actions/workflows/ci.yml/badge.svg)](https://github.com/dstmrk/repackit/actions/workflows/ci.yml)
 [![Docker Build](https://github.com/dstmrk/repackit/actions/workflows/docker.yml/badge.svg)](https://github.com/dstmrk/repackit/actions/workflows/docker.yml)
 [![Docker Publish](https://github.com/dstmrk/repackit/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/dstmrk/repackit/actions/workflows/docker-publish.yml)
 [![Docker Image Version](https://ghcr-badge.egpl.dev/dstmrk/repackit/latest_tag?trim=major&label=latest)](https://github.com/dstmrk/repackit/pkgs/container/repackit)
@@ -36,7 +35,7 @@ Un bot Telegram che ti avvisa se il prezzo dei tuoi acquisti Amazon scende duran
 
 - Python 3.11+
 - [uv](https://github.com/astral-sh/uv) per dependency management
-- PostgreSQL/SQLite per database
+- SQLite per database
 - Account bot Telegram (via [@BotFather](https://t.me/botfather))
 
 ## Setup Locale (Sviluppo)
@@ -148,7 +147,7 @@ docker compose up -d
   - Step 3: Prezzo pagato
   - Step 4: Scadenza reso (numero giorni o data gg-mm-aaaa)
   - Step 5: Risparmio minimo per notifica
-- `/list` - **Visualizza prodotti** monitorati (mostra conteggio 5/20)
+- `/list` - **Visualizza prodotti** monitorati (mostra conteggio 5/21)
 - `/delete` - **Rimuovi prodotto** con conferma inline keyboard
   - Mostra lista prodotti con bottoni cliccabili
   - Richiede conferma prima di eliminare
@@ -162,7 +161,7 @@ docker compose up -d
 
 ### Limiti
 
-- **Massimo 20 prodotti** per utente
+- **Massimo 21 prodotti** per utente
 - **Validazione automatica** su tutti gli input
 - **Supporto /cancel** in ogni flusso conversazionale
 
@@ -185,7 +184,7 @@ Bot: ✅ Prodotto aggiunto con successo!
 
 # 2. Visualizza lista
 Utente: /list
-Bot: Hai 1/20 prodotti monitorati. [mostra lista con nomi]
+Bot: Hai 1/21 prodotti monitorati. [mostra lista con nomi]
 
 # 3. Aggiorna prodotto
 Utente: /update
@@ -228,7 +227,7 @@ uv run pytest --cov=. --cov-fail-under=80
 
 ```bash
 # Format code
-uv run black .
+uv run ruff format .
 
 # Lint code
 uv run ruff check --fix .
@@ -258,7 +257,11 @@ repackit/
 │   ├── update.py          # Update product (conversational flow)
 │   ├── feedback.py        # Send feedback (with validation)
 │   └── validators.py      # Shared validation logic
-├── tests/                  # Unit tests (91%+ coverage)
+├── utils/                  # Utility modules
+│   ├── keyboards.py       # Inline keyboard builders
+│   ├── logging_config.py  # Shared logging configuration
+│   └── retry.py           # Retry with exponential backoff
+├── tests/                  # Unit tests (97%+ coverage)
 │   └── handlers/          # Handler tests
 ├── data/                   # Persistent data (gitignored)
 │   ├── repackit.db        # SQLite database
@@ -267,8 +270,7 @@ repackit/
 ├── Dockerfile              # Multi-stage build
 ├── docker-compose.yml      # Production orchestration
 ├── .github/workflows/      # CI/CD pipelines
-│   ├── test.yml           # Unit tests
-│   ├── lint.yml           # Code quality (black + ruff)
+│   ├── ci.yml             # Unified lint + test (ruff format + ruff check + pytest)
 │   └── docker.yml         # Docker build
 ├── CLAUDE.md              # Complete technical documentation
 └── README.md              # This file
@@ -348,6 +350,10 @@ TELEGRAM_MESSAGES_PER_SECOND=30  # Telegram API hard limit
 BATCH_SIZE=10  # Batch size for notifications and broadcasts
 DELAY_BETWEEN_BATCHES=1.0  # Delay in seconds between batches
 
+# Retry Settings (exponential backoff)
+TELEGRAM_MAX_RETRIES=3  # Max retry attempts for transient errors
+TELEGRAM_RETRY_BASE_DELAY=1.0  # Base delay in seconds (doubles each retry)
+
 # Logging
 LOG_LEVEL=INFO
 ```
@@ -384,7 +390,7 @@ LOG_LEVEL=INFO
 
 - ✅ Test pass (`pytest`)
 - ✅ Coverage ≥80% (`pytest --cov`)
-- ✅ Linting pass (`black` + `ruff`)
+- ✅ Linting pass (`ruff format` + `ruff check`)
 - ✅ Docstrings per funzioni pubbliche
 - ✅ Type hints sulle signatures
 

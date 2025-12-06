@@ -20,7 +20,7 @@
 - **Telegram Library**: `python-telegram-bot` (webhook mode)
 - **Web Scraping**: Playwright (headless mode)
 - **Database**: SQLite
-- **Code Quality**: Black (formatter) + Ruff (linter)
+- **Code Quality**: Ruff (formatter + linter)
 - **Testing**: pytest with ≥80% coverage
 - **CI/CD**: SonarCloud integration
 - **Containerization**: Docker with multi-stage builds
@@ -45,12 +45,18 @@ repackit/
 │   ├── delete.py
 │   ├── update.py
 │   └── feedback.py
+├── utils/                    # Utility modules
+│   ├── keyboards.py          # Inline keyboard builders
+│   ├── logging_config.py     # Shared logging configuration
+│   └── retry.py              # Retry with exponential backoff
 ├── tests/                    # Unit tests mirroring src structure
 │   ├── test_bot.py
 │   ├── test_data_reader.py
 │   ├── test_checker.py
 │   ├── test_product_cleanup.py
 │   ├── test_broadcast.py
+│   ├── utils/                # Utility tests
+│   │   └── test_retry.py
 │   └── handlers/
 │       ├── test_start.py
 │       └── ...
@@ -64,8 +70,7 @@ repackit/
 ├── Dockerfile                # Multi-stage build
 ├── docker-compose.yml        # Production orchestration
 ├── .github/workflows/        # CI/CD pipelines
-│   ├── test.yml
-│   ├── lint.yml
+│   ├── ci.yml                # Unified lint + test workflow
 │   └── docker.yml
 ├── .pre-commit-config.yaml   # Local git hooks
 └── CLAUDE.md                 # This file
@@ -173,6 +178,10 @@ INVITED_USER_BONUS=3          # Extra slots for invited user at registration
 TELEGRAM_MESSAGES_PER_SECOND=30  # Telegram API hard limit (30 messages/second)
 BATCH_SIZE=10                    # Batch size for notifications and broadcasts
 DELAY_BETWEEN_BATCHES=1.0        # Delay in seconds between batches
+
+# Retry Settings (exponential backoff)
+TELEGRAM_MAX_RETRIES=3           # Max retry attempts for transient errors
+TELEGRAM_RETRY_BASE_DELAY=1.0    # Base delay in seconds (doubles each retry)
 
 # Logging
 LOG_LEVEL=INFO         # DEBUG, INFO, WARNING, ERROR, CRITICAL
@@ -607,7 +616,7 @@ I tuoi prodotti monitorati:
    💰 Prezzo pagato: €45.00
    📅 Scadenza reso: 15/05/2025 (tra 176 giorni)
 
-Hai 5/20 prodotti monitorati.
+Hai 5/21 prodotti monitorati.
 Usa /delete per rimuoverne uno, /update per modificarne uno.
 ```
 
@@ -1107,7 +1116,7 @@ async def test_invalid_referral_code_handling()
 async def test_self_referral_ignored()
 ```
 
-All 302 tests pass with 97.9% coverage.
+All 347 tests pass with 97% coverage.
 
 ---
 
@@ -1181,7 +1190,7 @@ uv run python broadcast.py "Your message here"
 ### Code Quality Checks
 ```bash
 # Format code
-uv run black .
+uv run ruff format .
 
 # Lint code
 uv run ruff check --fix .
@@ -1199,7 +1208,7 @@ uv run pytest --cov=. --cov-fail-under=80
 git add .
 git commit -m "feat: add product monitoring"
 
-# Hooks will run black + ruff automatically
+# Hooks will run ruff format + ruff check automatically
 # If checks fail, fix issues and commit again
 ```
 
@@ -1244,21 +1253,17 @@ volumes:
 
 ## CI/CD Pipelines (GitHub Actions)
 
-### 1. `test.yml` - Unit Tests
+### 1. `ci.yml` - Unified Lint + Test
 - Runs on every push/PR
-- Executes `pytest --cov=. --cov-fail-under=80`
+- **Lint job**: Runs `ruff format --check .` and `ruff check .`
+- **Test job**: Executes `pytest --cov=. --cov-report=xml`
 - Uploads coverage to SonarCloud
 
-### 2. `lint.yml` - Code Quality
-- Runs `black --check .`
-- Runs `ruff check .`
-- Fails if code isn't formatted
-
-### 3. `docker.yml` - Container Build
+### 2. `docker.yml` - Container Build
 - Builds Docker image
 - Pushes to registry on main branch
 
-### 4. SonarCloud Integration
+### 3. SonarCloud Integration
 - Enforces ≥80% code coverage
 - Detects code smells, bugs, vulnerabilities
 - Configured via `sonar-project.properties`
@@ -1543,9 +1548,12 @@ name = "repackit"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
-    "python-telegram-bot[webhooks]>=20.0",
+    "python-telegram-bot[webhooks]>=21.0",
     "playwright>=1.40",
     "aiosqlite>=0.19",
+    "python-dotenv>=1.0",
+    "httpx>=0.25",
+    "aiohttp>=3.9",
 ]
 
 [project.optional-dependencies]
@@ -1553,19 +1561,22 @@ dev = [
     "pytest>=7.4",
     "pytest-asyncio>=0.21",
     "pytest-cov>=4.1",
-    "black>=23.0",
     "ruff>=0.1",
     "pre-commit>=3.5",
 ]
 
-[tool.black]
-line-length = 100
-target-version = ['py311']
-
 [tool.ruff]
 line-length = 100
-select = ["E", "F", "I", "N", "W"]
-ignore = ["E501"]  # Line too long (handled by black)
+target-version = "py311"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
+ignore = ["E501", "SIM117", "SIM116"]  # Line too long handled by ruff format
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -1620,13 +1631,13 @@ Create detailed bug reports with:
 2. Create feature branch: `git checkout -b feature/amazing-feature`
 3. Write tests for new functionality
 4. Ensure coverage ≥80%
-5. Run linters: `black` + `ruff`
+5. Run linters: `ruff format` + `ruff check`
 6. Submit PR with clear description
 
 ### Code Review Checklist
 - [ ] Tests pass (`pytest`)
 - [ ] Coverage ≥80% (`pytest --cov`)
-- [ ] Linting passes (`black --check` + `ruff check`)
+- [ ] Linting passes (`ruff format --check` + `ruff check`)
 - [ ] Docstrings for public functions
 - [ ] Type hints on function signatures
 - [ ] Logs use appropriate levels
@@ -1666,7 +1677,7 @@ A: No, SQLite doesn't support concurrent writes. Use single instance or migrate 
 
 ---
 
-**Last Updated**: 2024-11-18
+**Last Updated**: 2024-12-06
 **Maintained By**: @dstmrk
 
 ---
