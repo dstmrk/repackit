@@ -65,6 +65,10 @@ class Config:
     delay_between_batches: float  # Delay in seconds between batches
     max_concurrent_telegram_calls: int  # Max concurrent Telegram API calls per batch
 
+    # Retry Settings
+    telegram_max_retries: int  # Max retry attempts for transient errors
+    telegram_retry_base_delay: float  # Base delay in seconds (doubles each retry)
+
     @classmethod
     def from_env(cls) -> "Config":
         """
@@ -116,6 +120,9 @@ class Config:
             batch_size=int(os.getenv("BATCH_SIZE", "10")),
             delay_between_batches=float(os.getenv("DELAY_BETWEEN_BATCHES", "1.0")),
             max_concurrent_telegram_calls=int(os.getenv("MAX_CONCURRENT_TELEGRAM_CALLS", "5")),
+            # Retry Settings
+            telegram_max_retries=int(os.getenv("TELEGRAM_MAX_RETRIES", "3")),
+            telegram_retry_base_delay=float(os.getenv("TELEGRAM_RETRY_BASE_DELAY", "1.0")),
         )
 
 
