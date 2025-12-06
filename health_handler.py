@@ -16,12 +16,10 @@ logger = logging.getLogger(__name__)
 # Load configuration
 cfg = get_config()
 
-# Module-level constant for backward compatibility with tests
+# Module-level constants for backward compatibility with tests
 HEALTH_PORT = cfg.health_port
 HEALTH_BIND_ADDRESS = cfg.health_bind_address
-
-# Health check thresholds
-MAX_DAYS_SINCE_LAST_RUN = 2  # Consider stale if task hasn't run in 2 days
+MAX_DAYS_SINCE_LAST_RUN = cfg.health_check_max_days
 
 
 def _format_datetime(dt: datetime) -> str:
