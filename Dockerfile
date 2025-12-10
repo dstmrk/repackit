@@ -85,10 +85,6 @@ RUN playwright install chromium && \
 # Expose ports
 EXPOSE 8443 8444
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8444/health', timeout=5.0)" || exit 1
-
 # Switch to root for entrypoint execution only
 # IMPORTANT: The entrypoint immediately drops privileges to repackit user (uid 1000)
 # This is necessary to handle Docker volume permissions automatically on startup
