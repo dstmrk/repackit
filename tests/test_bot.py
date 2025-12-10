@@ -99,8 +99,8 @@ async def test_run_scraper_no_products():
                 # Verify scrape_prices was NOT called
                 mock_scrape.assert_not_called()
 
-                # Verify system status was NOT updated
-                mock_status.assert_not_called()
+                # System status is updated at START (before checking products)
+                mock_status.assert_called_once()
 
 
 @pytest.mark.asyncio

@@ -24,13 +24,13 @@ async def cleanup_expired_products() -> dict:
     """
     logger.info("Starting product cleanup")
 
+    # Update system status at the START to reflect actual scheduled time
+    timestamp = datetime.now(UTC).isoformat()
+    await database.update_system_status("last_cleanup_run", timestamp)
+
     try:
         # Delete expired products
         deleted_count = await database.delete_expired_products()
-
-        # Update system status for health check
-        timestamp = datetime.now(UTC).isoformat()
-        await database.update_system_status("last_cleanup_run", timestamp)
 
         logger.info(f"Cleanup completed: {deleted_count} expired products removed")
 
