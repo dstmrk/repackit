@@ -82,6 +82,9 @@ async def run_scraper() -> None:
     try:
         logger.info("Starting scheduled scraper run")
 
+        # Update system status at the START to reflect actual scheduled time
+        await database.update_system_status("last_scraper_run", datetime.now(UTC).isoformat())
+
         # Get all active products
         products = await database.get_all_active_products()
 
@@ -92,9 +95,6 @@ async def run_scraper() -> None:
         # Scrape prices
         results = await scrape_prices(products)
         logger.info(f"Scraper completed: {len(results)}/{len(products)} prices scraped")
-
-        # Update system status
-        await database.update_system_status("last_scraper_run", datetime.now(UTC).isoformat())
 
     except Exception as e:
         logger.error(f"Error in scraper task: {e}", exc_info=True)

@@ -233,6 +233,9 @@ async def check_and_notify() -> dict:
     """
     logger.info("Starting price check process")
 
+    # Update system status at the START to reflect actual scheduled time
+    await database.update_system_status("last_checker_run", datetime.now(UTC).isoformat())
+
     stats = {"total_products": 0, "scraped": 0, "notifications_sent": 0, "errors": 0}
 
     try:
@@ -273,9 +276,6 @@ async def check_and_notify() -> dict:
             result_stats = await _send_price_drop_notifications_batch(bot, price_drop_notifications)
             stats["notifications_sent"] += result_stats["sent"]
             stats["errors"] += result_stats["errors"]
-
-        # Update system status
-        await database.update_system_status("last_checker_run", datetime.now(UTC).isoformat())
 
         logger.info(
             f"Price check completed: {stats['notifications_sent']} notifications sent, "

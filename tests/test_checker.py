@@ -23,8 +23,8 @@ async def test_check_and_notify_no_products():
             assert stats["total_products"] == 0
             assert stats["scraped"] == 0
             assert stats["notifications_sent"] == 0
-            # System status should not be updated when no products
-            mock_update_status.assert_not_called()
+            # System status is updated at START (before checking products)
+            mock_update_status.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -215,8 +215,9 @@ async def test_check_and_notify_no_telegram_token():
 
     with patch("checker.database.get_all_active_products", return_value=products):
         with patch("checker.scrape_prices", return_value={1: 35.00}):
-            with patch("checker.TELEGRAM_TOKEN", ""):
-                stats = await checker.check_and_notify()
+            with patch("checker.database.update_system_status"):
+                with patch("checker.TELEGRAM_TOKEN", ""):
+                    stats = await checker.check_and_notify()
 
     assert stats["errors"] == 1
     assert stats["notifications_sent"] == 0
@@ -411,11 +412,14 @@ async def test_check_and_notify_notification_exception():
 async def test_check_and_notify_general_exception():
     """Test general exception handling in check_and_notify."""
     # Simulate database failure
-    with patch("checker.database.get_all_active_products", side_effect=Exception("Database error")):
-        stats = await checker.check_and_notify()
+    with patch("checker.database.update_system_status"):
+        with patch(
+            "checker.database.get_all_active_products", side_effect=Exception("Database error")
+        ):
+            stats = await checker.check_and_notify()
 
-        # Should return stats with error
-        assert stats["errors"] >= 1
+            # Should return stats with error
+            assert stats["errors"] >= 1
 
 
 @pytest.mark.asyncio
