@@ -1215,21 +1215,17 @@ async def test_handle_min_savings_shows_share_hint_when_low_on_slots(test_db):
     products = await database.get_user_products(user_id)
     assert len(products) == 5
 
-    # Verify TWO messages were sent: success + hint
-    assert update.message.reply_text.call_count == 2
+    # Verify ONE message was sent with both success + hint combined
+    assert update.message.reply_text.call_count == 1
 
-    # Verify first message is success
-    first_call = update.message.reply_text.call_args_list[0]
-    first_message = first_call[0][0]
-    assert "✅" in first_message
-    assert "Fifth Product" in first_message
-
-    # Verify second message is hint
-    second_call = update.message.reply_text.call_args_list[1]
-    second_message = second_call[0][0]
-    assert "5/6 prodotti" in second_message
-    assert "/share" in second_message
-    assert "Stai esaurendo gli slot" in second_message
+    # Verify single message contains both success and hint
+    call = update.message.reply_text.call_args_list[0]
+    message = call[0][0]
+    assert "✅" in message
+    assert "Fifth Product" in message
+    assert "5/6 prodotti" in message
+    assert "/share" in message
+    assert "Stai esaurendo gli slot" in message
 
 
 @pytest.mark.asyncio

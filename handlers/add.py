@@ -364,7 +364,7 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if is_first_product:
             await _process_first_product_referral_bonus(user_id, context)
 
-        # Build and send success message
+        # Build success message
         days_remaining = (return_deadline - datetime.now(UTC).date()).days
         message = messages.product_added_success(
             html.escape(product_name),
@@ -374,17 +374,17 @@ async def handle_min_savings(update: Update, context: ContextTypes.DEFAULT_TYPE)
             days_remaining,
             min_savings,
         )
-        await update.message.reply_text(message, parse_mode="HTML")
 
-        # Show /share hint if user is running low on slots (same logic as /list)
+        # Append slot hint if user is running low on slots (same logic as /list)
         # Note: user_products was fetched before insert, so add 1 for the new product
         current_product_count = len(user_products) + 1
         if messages.should_show_slot_hint(current_product_count, user_limit):
-            hint_message = (
-                f"<i>Hai {current_product_count}/{user_limit} prodotti monitorati.</i>\n\n"
+            message += (
+                f"\n\n<i>Hai {current_product_count}/{user_limit} prodotti monitorati.</i>\n"
                 + messages.slot_hint(current_product_count, user_limit)
             )
-            await update.message.reply_text(hint_message, parse_mode="HTML")
+
+        await update.message.reply_text(message, parse_mode="HTML")
 
         logger.info(
             f"Product added for user {user_id}: name={product_name}, ASIN={asin}, "
