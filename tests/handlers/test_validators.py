@@ -262,19 +262,25 @@ def test_parse_deadline_from_days():
 
 def test_parse_deadline_from_date_gg_mm_aaaa():
     """Test parsing deadline from date format gg-mm-aaaa."""
-    # Future date with dash
-    deadline = validators.parse_deadline("15-12-2025")
-    assert deadline == date(2025, 12, 15)
+    # Future date with dash (use a date 60 days from now to ensure it's always future)
+    future_date = date.today() + timedelta(days=60)
+    date_str_dash = future_date.strftime("%d-%m-%Y")
+    deadline = validators.parse_deadline(date_str_dash)
+    assert deadline == future_date
 
     # Future date with slash
-    deadline = validators.parse_deadline("15/12/2025")
-    assert deadline == date(2025, 12, 15)
+    date_str_slash = future_date.strftime("%d/%m/%Y")
+    deadline = validators.parse_deadline(date_str_slash)
+    assert deadline == future_date
 
 
 def test_parse_deadline_from_date_aaaa_mm_gg():
     """Test parsing deadline from ISO date format aaaa-mm-gg."""
-    deadline = validators.parse_deadline("2025-12-15")
-    assert deadline == date(2025, 12, 15)
+    # Use a date 90 days from now to ensure it's always future
+    future_date = date.today() + timedelta(days=90)
+    date_str = future_date.strftime("%Y-%m-%d")
+    deadline = validators.parse_deadline(date_str)
+    assert deadline == future_date
 
 
 def test_parse_deadline_invalid_days():
@@ -341,8 +347,11 @@ def test_parse_deadline_with_whitespace():
     deadline = validators.parse_deadline("  30  ")
     assert deadline == date.today() + timedelta(days=30)
 
-    deadline = validators.parse_deadline("  15-12-2025  ")
-    assert deadline == date(2025, 12, 15)
+    # Use a date 45 days from now to ensure it's always future
+    future_date = date.today() + timedelta(days=45)
+    date_str = future_date.strftime("%d-%m-%Y")
+    deadline = validators.parse_deadline(f"  {date_str}  ")
+    assert deadline == future_date
 
 
 def test_parse_deadline_date_exactly_365_days():
