@@ -67,8 +67,11 @@ def test_parse_deadline_days_above_range():
 
 def test_parse_deadline_gg_mm_aaaa_format():
     """Test parse_deadline with gg-mm-aaaa date format."""
-    result = parse_deadline("25-12-2025")
-    assert result == date(2025, 12, 25)
+    # Use a dynamic future date to avoid test failures as time passes
+    future_date = date.today() + timedelta(days=100)
+    date_str = future_date.strftime("%d-%m-%Y")
+    result = parse_deadline(date_str)
+    assert result == future_date
 
 
 def test_parse_deadline_gg_mm_aaaa_format_leap_year():
@@ -88,8 +91,11 @@ def test_parse_deadline_invalid_format():
 
 def test_parse_deadline_iso_format():
     """Test parse_deadline with ISO format (yyyy-mm-dd) for /update compatibility."""
-    result = parse_deadline("2025-12-25")
-    assert result == date(2025, 12, 25)
+    # Use a dynamic future date to avoid test failures as time passes
+    future_date = date.today() + timedelta(days=150)
+    date_str = future_date.strftime("%Y-%m-%d")
+    result = parse_deadline(date_str)
+    assert result == future_date
 
 
 def test_parse_deadline_invalid_date():
