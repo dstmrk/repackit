@@ -127,9 +127,9 @@ async def send_telegram_message_with_retry(
 async def httpx_post_with_retry(
     url: str,
     payload: dict,
-    timeout: float = 10.0,
     max_retries: int | None = None,
     base_delay: float | None = None,
+    request_timeout: float = 10.0,
 ) -> httpx.Response | None:
     """
     Make an HTTP POST request with retry logic for transient errors.
@@ -137,26 +137,30 @@ async def httpx_post_with_retry(
     Args:
         url: URL to POST to
         payload: JSON payload
-        timeout: Request timeout in seconds
         max_retries: Maximum retry attempts (default from config)
         base_delay: Base delay in seconds (default from config)
+        request_timeout: Request timeout in seconds (default: 10.0)
 
     Returns:
         httpx.Response on success, None on failure
     """
 
     async def do_request() -> httpx.Response:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            return await client.post(url, json=payload)
+        async with asyncio.timeout(request_timeout):
+            async with httpx.AsyncClient() as client:
+                return await client.post(url, json=payload)
+
+    # Add TimeoutError to retryable exceptions for timeout context manager
+    retryable_exceptions = RETRYABLE_HTTPX_ERRORS + (asyncio.TimeoutError,)
 
     try:
         return await retry_with_backoff(
             do_request,
             max_retries=max_retries,
             base_delay=base_delay,
-            retryable_exceptions=RETRYABLE_HTTPX_ERRORS,
+            retryable_exceptions=retryable_exceptions,
         )
-    except RETRYABLE_HTTPX_ERRORS as e:
+    except retryable_exceptions as e:
         logger.error(f"HTTP request failed after retries: {e}")
         return None
     except Exception as e:
