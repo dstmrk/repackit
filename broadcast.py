@@ -63,7 +63,7 @@ async def send_message_to_user(user_id: int, message: str) -> bool:
         "parse_mode": "HTML",
     }
 
-    response = await httpx_post_with_retry(url, payload, timeout=10.0)
+    response = await httpx_post_with_retry(url, payload, request_timeout=10.0)
 
     if response is None:
         logger.error(f"Failed to send to user {user_id}: request failed after retries")

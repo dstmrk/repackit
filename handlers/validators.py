@@ -194,13 +194,7 @@ def parse_deadline(deadline_input: str) -> date:
 
     # Try parsing as number of days
     try:
-        days = int(deadline_input)
-        if days < 1 or days > 365:
-            raise ValueError(
-                "Il numero di giorni deve essere tra 1 e 365. "
-                "Il bot ha bisogno di almeno 1 giorno per monitorare il prezzo!"
-            )
-        return datetime.now(UTC).date() + timedelta(days=days)
+        return _parse_days_to_deadline(deadline_input)
     except ValueError as e:
         # If it's our specific error about days range, re-raise it
         if "giorni deve essere" in str(e):
@@ -208,14 +202,36 @@ def parse_deadline(deadline_input: str) -> date:
         # Otherwise, it's not a number, fall through to try date format
 
     # Try parsing as date (gg-mm-aaaa or gg/mm/aaaa)
-    # Split by '-' or '/'
-    parts = re.split(r"[-/]", deadline_input)
+    return _parse_date_string_to_deadline(deadline_input)
+
+
+def _parse_days_to_deadline(days_str: str) -> date:
+    """Parse deadline from number of days (1-365)."""
+    days = int(days_str)
+    if days < 1 or days > 365:
+        raise ValueError(
+            "Il numero di giorni deve essere tra 1 e 365. "
+            "Il bot ha bisogno di almeno 1 giorno per monitorare il prezzo!"
+        )
+    return datetime.now(UTC).date() + timedelta(days=days)
+
+
+def _parse_date_string_to_deadline(date_str: str) -> date:
+    """Parse deadline from date string (gg-mm-aaaa or aaaa-mm-gg)."""
+    parts = re.split(r"[-/]", date_str)
 
     if len(parts) != 3:
         raise ValueError(
             "Formato non valido. Usa giorni (es. 30) o data gg-mm-aaaa (es. 09-05-2025)"
         )
 
+    deadline = _extract_date_from_parts(parts)
+    _validate_deadline_range(deadline)
+    return deadline
+
+
+def _extract_date_from_parts(parts: list[str]) -> date:
+    """Extract date object from date parts, handling multiple formats."""
     try:
         # Handle both gg-mm-aaaa and aaaa-mm-gg formats
         # Check if first part is 4 digits (aaaa-mm-gg)
@@ -227,50 +243,40 @@ def parse_deadline(deadline_input: str) -> date:
         else:
             raise ValueError("Anno deve essere nel formato a 4 cifre (aaaa)")
 
-        deadline = date(year, month, day)
-
-        # Validate it's in the future (must be at least tomorrow, using UTC)
-        today = datetime.now(UTC).date()
-        if deadline <= today:
-            if deadline == today:
-                raise ValueError(
-                    "La scadenza è oggi. Il bot ha bisogno di almeno 1 giorno "
-                    "per monitorare il prezzo. Inserisci una data da domani in poi!"
-                )
-            else:
-                raise ValueError(
-                    f"La data specificata ({deadline.strftime('%d/%m/%Y')}) è nel passato. "
-                    "Inserisci una data futura!"
-                )
-
-        # Validate it's not beyond 365 days (consistent with days input validation)
-        max_deadline = today + timedelta(days=365)
-        if deadline > max_deadline:
-            days_difference = (deadline - today).days
-            raise ValueError(
-                f"La data specificata ({deadline.strftime('%d/%m/%Y')}) è troppo lontana "
-                f"({days_difference} giorni da oggi). "
-                "Il bot può monitorare prodotti fino a 365 giorni. "
-                f"Inserisci una data entro il {max_deadline.strftime('%d/%m/%Y')}!"
-            )
-
-        return deadline
+        return date(year, month, day)
 
     except (ValueError, TypeError) as e:
         # Re-raise specific error messages
-        if isinstance(e, ValueError):
-            error_msg = str(e)
-            if any(
-                phrase in error_msg
-                for phrase in [
-                    "La data specificata",
-                    "La scadenza è oggi",
-                    "Anno deve essere",
-                    "troppo lontana",
-                ]
-            ):
-                raise  # Re-raise our custom messages
+        if isinstance(e, ValueError) and "Anno deve essere" in str(e):
+            raise
         # Generic error for invalid dates
         raise ValueError(
             "Data non valida. Usa formato gg-mm-aaaa (es. 09-05-2025) o giorni (es. 30)"
         ) from None
+
+
+def _validate_deadline_range(deadline: date) -> None:
+    """Validate deadline is in acceptable range (tomorrow to 365 days)."""
+    today = datetime.now(UTC).date()
+
+    if deadline <= today:
+        if deadline == today:
+            raise ValueError(
+                "La scadenza è oggi. Il bot ha bisogno di almeno 1 giorno "
+                "per monitorare il prezzo. Inserisci una data da domani in poi!"
+            )
+        raise ValueError(
+            f"La data specificata ({deadline.strftime('%d/%m/%Y')}) è nel passato. "
+            "Inserisci una data futura!"
+        )
+
+    # Validate it's not beyond 365 days (consistent with days input validation)
+    max_deadline = today + timedelta(days=365)
+    if deadline > max_deadline:
+        days_difference = (deadline - today).days
+        raise ValueError(
+            f"La data specificata ({deadline.strftime('%d/%m/%Y')}) è troppo lontana "
+            f"({days_difference} giorni da oggi). "
+            "Il bot può monitorare prodotti fino a 365 giorni. "
+            f"Inserisci una data entro il {max_deadline.strftime('%d/%m/%Y')}!"
+        )
