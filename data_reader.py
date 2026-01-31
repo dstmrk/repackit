@@ -112,9 +112,7 @@ async def scrape_price(asin: str, marketplace: str = "it") -> float | None:
     return results.get(0)
 
 
-async def scrape_prices(
-    products: list[dict], rate_limit_seconds: float | None = None
-) -> dict[int, float]:
+async def scrape_prices(products: list[dict]) -> dict[int, float]:
     """
     Fetch prices for multiple products via Amazon Creator API.
 
@@ -123,7 +121,6 @@ async def scrape_prices(
 
     Args:
         products: List of product dicts with keys: id, asin, (optional) marketplace
-        rate_limit_seconds: Unused, kept for backward compatibility
 
     Returns:
         Dict mapping product_id -> price
