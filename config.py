@@ -37,6 +37,11 @@ class Config:
     # Amazon Affiliate
     amazon_affiliate_tag: str
 
+    # Amazon Creator API
+    amazon_client_id: str
+    amazon_client_secret: str
+    amazon_credential_version: str
+
     # Product Limits & Referral System
     default_max_products: int
     initial_max_products: int
@@ -52,9 +57,6 @@ class Config:
     feedback_min_length: int  # Minimum feedback message length
     feedback_max_length: int  # Maximum feedback message length
     feedback_rate_limit_hours: int  # Hours between feedback submissions
-
-    # Scraper
-    scraper_rate_limit_seconds: float  # Delay between Amazon requests
 
     # Logging
     log_level: str
@@ -98,6 +100,10 @@ class Config:
             admin_user_id=os.getenv("ADMIN_USER_ID"),
             # Amazon Affiliate
             amazon_affiliate_tag=os.getenv("AMAZON_AFFILIATE_TAG", ""),
+            # Amazon Creator API
+            amazon_client_id=os.getenv("AMAZON_CLIENT_ID", ""),
+            amazon_client_secret=os.getenv("AMAZON_CLIENT_SECRET", ""),
+            amazon_credential_version=os.getenv("AMAZON_CREDENTIAL_VERSION", "2.2"),
             # Product Limits & Referral
             default_max_products=int(os.getenv("DEFAULT_MAX_PRODUCTS", "21")),
             initial_max_products=int(os.getenv("INITIAL_MAX_PRODUCTS", "3")),
@@ -111,8 +117,6 @@ class Config:
             feedback_min_length=int(os.getenv("FEEDBACK_MIN_LENGTH", "10")),
             feedback_max_length=int(os.getenv("FEEDBACK_MAX_LENGTH", "1000")),
             feedback_rate_limit_hours=int(os.getenv("FEEDBACK_RATE_LIMIT_HOURS", "24")),
-            # Scraper
-            scraper_rate_limit_seconds=float(os.getenv("SCRAPER_RATE_LIMIT_SECONDS", "1.5")),
             # Logging
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             # Telegram Rate Limiting
