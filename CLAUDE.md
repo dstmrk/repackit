@@ -18,7 +18,7 @@
 - **Language**: Python 3.11+
 - **Package Manager**: `uv` (not pip)
 - **Telegram Library**: `python-telegram-bot` (webhook mode)
-- **Web Scraping**: Playwright (headless mode)
+- **Amazon Price Data**: Amazon Creator API (OAuth 2.0)
 - **Database**: SQLite
 - **Code Quality**: Ruff (formatter + linter)
 - **Testing**: pytest with ≥80% coverage
@@ -32,7 +32,8 @@
 ```
 repackit/
 ├── bot.py                    # Main bot with webhook + scheduler
-├── data_reader.py            # Amazon scraper (Playwright)
+├── amazon_api.py             # Amazon Creator API client (OAuth + GetItems)
+├── data_reader.py            # Amazon price fetcher (via Creator API)
 ├── checker.py                # Price comparison & notifications
 ├── product_cleanup.py        # Removes expired products
 ├── broadcast.py              # Admin-only manual broadcast script
@@ -168,6 +169,11 @@ ADMIN_USER_ID=123456789  # Telegram user ID for broadcast.py script verification
 # Amazon Affiliate
 AMAZON_AFFILIATE_TAG=yourtag-21  # Amazon affiliate tag for monetization
 
+# Amazon Creator API
+AMAZON_CLIENT_ID=your-client-id          # Credential Id from Creator API CSV
+AMAZON_CLIENT_SECRET=your-client-secret  # Secret from Creator API CSV
+AMAZON_CREDENTIAL_VERSION=2.2            # 2.1=NA, 2.2=EU, 2.3=FE
+
 # Product Limits & Referral System
 DEFAULT_MAX_PRODUCTS=21       # Max cap for all users
 INITIAL_MAX_PRODUCTS=3        # Slots for new users (no referral)
@@ -223,12 +229,38 @@ async def schedule_scraper():
 
 ---
 
-### 2. `data_reader.py` - Amazon Scraper
+### 2. `amazon_api.py` - Amazon Creator API Client
+
+**Responsibilities**:
+- OAuth 2.0 token management (Cognito) with automatic caching and refresh
+- Batch product lookups via GetItems API (max 10 ASINs per request)
+- Price extraction from `offersV2` response (prefers BuyBox winner)
+
+**Authentication**:
+- Uses client credentials flow (client_id + client_secret)
+- Tokens cached for 1 hour (with 60s refresh buffer)
+- Regional endpoints: NA (2.1), EU (2.2), FE (2.3)
+
+**Key Class: `AmazonCreatorAPI`**:
+```python
+api = get_api_client()  # Singleton
+prices = await api.get_items(["B08N5WRWNW", "B09B2SBHQK"], marketplace="it")
+# Returns: {"B08N5WRWNW": 59.49, "B09B2SBHQK": 45.00}
+```
+
+**Price Extraction Logic**:
+1. Look for BuyBox winner listing (`isBuyBoxWinner: true`)
+2. Fallback to first listing with a price
+3. Extract `offersV2.listings[].price.money.amount`
+
+---
+
+### 3. `data_reader.py` - Amazon Price Fetcher
 
 **Responsibilities**:
 - Parse ASIN from Amazon URLs (supports multiple formats)
-- Scrape current price using Playwright
-- Handle anti-bot measures gracefully
+- Fetch current prices via Creator API (through `amazon_api.py`)
+- Deduplicate API calls (same ASIN across multiple users = 1 API call)
 
 **ASIN Parsing** (Modular for Future Marketplaces):
 ```python
@@ -240,32 +272,23 @@ def extract_asin(url: str) -> tuple[str, str]:
     - amazon.it/gp/product/B08N5WRWNW → ("B08N5WRWNW", "it")
     """
     # Regex pattern supporting .it, .com, .de, .fr, etc.
-    # Currently only .it is scraped, but code is prepared for expansion
 ```
 
-**Scraping Strategy**:
-- **Headless Playwright**: Fast, lightweight
-- **Rate Limiting**: 1-2 second delay between requests
-- **Error Handling**: Skip failed scrapes, log as WARNING, retry next day
-- **User Agent Rotation**: Randomize to avoid detection (future enhancement)
-
-**Async Pattern**:
-```python
-async def scrape_products(products: list) -> dict:
-    """Scrapes all products concurrently with rate limiting."""
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        # Concurrent scraping with semaphore control
-```
+**API Strategy**:
+- **Batch Requests**: Groups ASINs by marketplace, sends batched API calls (max 10/request)
+- **Deduplication**: If 10 users monitor the same ASIN, it's fetched only once
+- **Error Handling**: Skip failed fetches, log as WARNING, retry next day
 
 **Can Run Standalone**:
 ```bash
-uv run python data_reader.py  # Manual scraping execution
+uv run python data_reader.py                    # Fetch all products from DB
+uv run python data_reader.py B08N5WRWNW         # Fetch single ASIN (amazon.it)
+uv run python data_reader.py B08N5WRWNW de      # Fetch single ASIN (amazon.de)
 ```
 
 ---
 
-### 3. `checker.py` - Price Comparison & Notifications
+### 4. `checker.py` - Price Comparison & Notifications
 
 **Responsibilities**:
 - Compare scraped prices vs. `price_paid`
@@ -349,7 +372,7 @@ uv run python checker.py  # Manual check execution
 
 ---
 
-### 4. `product_cleanup.py` - Expired Product Removal
+### 5. `product_cleanup.py` - Expired Product Removal
 
 **Responsibilities**:
 - Run daily at `CLEANUP_HOUR` (default: 02:00)
@@ -363,7 +386,7 @@ uv run python product_cleanup.py  # Manual cleanup
 
 ---
 
-### 5. `broadcast.py` - Admin Broadcast Script
+### 6. `broadcast.py` - Admin Broadcast Script
 
 **Responsibilities**:
 - Send broadcast messages to all registered users
@@ -395,7 +418,7 @@ uv run python broadcast.py "Messaggio da inviare a tutti gli utenti"
 
 ---
 
-### 6. `health_handler.py` - Health Check Endpoint
+### 7. `health_handler.py` - Health Check Endpoint
 
 **Responsibilities**:
 - HTTP server for monitoring bot health
@@ -498,7 +521,7 @@ start_health_server()  # Non-blocking, runs in daemon thread
 
 ---
 
-### 7. `handlers/` - Command Handlers
+### 8. `handlers/` - Command Handlers
 
 Each command in a separate file for maintainability.
 
@@ -1239,8 +1262,8 @@ FROM python:3.11-slim AS builder
 
 FROM python:3.11-slim AS runtime
 # Copy only necessary files
-# Install Playwright browsers
-# Run as non-root user
+# No browser dependencies needed (uses Amazon Creator API)
+# Run as non-root user (via gosu privilege drop)
 ```
 
 ### Volume Persistence
@@ -1277,10 +1300,13 @@ Mirror the source structure in `tests/`:
 ```
 tests/
 ├── test_bot.py
+├── test_amazon_api.py
 ├── test_data_reader.py
 ├── test_checker.py
 ├── test_product_cleanup.py
 ├── test_broadcast.py
+├── utils/
+│   └── test_retry.py
 └── handlers/
     ├── test_start.py
     ├── test_add.py
@@ -1289,7 +1315,7 @@ tests/
 
 ### Testing Principles
 1. **Unit Tests**: Test each function in isolation
-2. **Mocking**: Mock external dependencies (Telegram API, Playwright, database)
+2. **Mocking**: Mock external dependencies (Telegram API, Amazon Creator API, database)
 3. **Coverage**: Every new feature must include tests
 4. **Fixtures**: Use pytest fixtures for common setups (db, bot instance)
 
@@ -1363,31 +1389,24 @@ def build_affiliate_url(asin: str, marketplace: str = "it") -> str:
 - Works across all Amazon marketplaces (.it, .com, .de, etc.)
 - URL is short and user-friendly for Telegram messages
 
-### Price Scraping Selectors
-Amazon's HTML structure (subject to change):
-```python
-# Primary selectors (try in order):
-PRICE_SELECTORS = [
-    '.a-price .a-offscreen',          # Most common
-    '#priceblock_ourprice',           # Legacy
-    '#priceblock_dealprice',          # Deal price
-    '.a-price-whole',                 # Separated integer part
-]
-```
+### Amazon Creator API
 
-### Anti-Bot Measures
-1. **User-Agent Rotation**: Randomize browser fingerprint
-2. **Rate Limiting**: 1-2s delay between requests
-3. **Error Handling**: Graceful degradation if blocked
-4. **Future**: Proxy rotation if needed
+Price data is fetched via the official Amazon Creator API (replaced Playwright scraping).
 
-### Playwright Configuration
-```python
-browser = await p.chromium.launch(
-    headless=True,
-    args=['--no-sandbox', '--disable-dev-shm-usage']  # Docker compatibility
-)
-```
+**Authentication**: OAuth 2.0 client credentials via Amazon Cognito
+**Endpoint**: `https://creatorsapi.amazon/catalog/v1/getItems`
+**Resources requested**: `offersV2.listings.price`, `offersV2.listings.availability`, `offersV2.listings.condition`, `offersV2.listings.isBuyBoxWinner`, `itemInfo.title`
+
+**Regional token endpoints**:
+- NA (version 2.1): `creatorsapi.auth.us-east-1.amazoncognito.com`
+- EU (version 2.2): `creatorsapi.auth.eu-south-2.amazoncognito.com`
+- FE (version 2.3): `creatorsapi.auth.us-west-2.amazoncognito.com`
+
+**Benefits over Playwright scraping**:
+- No browser dependency (~500MB savings in Docker image)
+- Reliable structured data (no HTML parsing fragility)
+- Official API with proper rate limits
+- Batch requests (up to 10 ASINs per call)
 
 ---
 
@@ -1395,15 +1414,15 @@ browser = await p.chromium.launch(
 
 ### Phase 1 (Current)
 - [x] Basic product monitoring (ASIN, price, deadline)
-- [x] Daily scraping + notifications
+- [x] Daily price checking + notifications
 - [x] User commands (add, list, delete, update)
 - [x] Cleanup of expired products
 - [x] Viral growth strategy ("Momento di Gloria" share button)
 - [x] Referral system with slot rewards (Dropbox-style gamification)
+- [x] Amazon Creator API integration (replaced Playwright scraping)
 
 ### Phase 2 (Planned)
 - [ ] Multi-marketplace support (.com, .de, .fr, .es, .uk)
-- [ ] Amazon Affiliate API integration (avoid scraping)
 - [ ] Price history graphs (optional, requires storage)
 - [ ] User preferences (notification time, language)
 
@@ -1422,10 +1441,11 @@ browser = await p.chromium.launch(
 2. Verify webhook is set: `curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo`
 3. Check logs: `docker-compose logs -f` or `tail -f data/repackit.log`
 
-### Scraping Failures
-1. Check if Amazon changed HTML structure (update selectors)
-2. Verify Playwright browsers installed: `uv run playwright install chromium`
-3. Test manually: `uv run python data_reader.py`
+### Price Fetch Failures
+1. Verify Amazon Creator API credentials in `.env` (`AMAZON_CLIENT_ID`, `AMAZON_CLIENT_SECRET`)
+2. Check API token endpoint connectivity (see regional endpoints in `amazon_api.py`)
+3. Test manually: `uv run python data_reader.py <ASIN>`
+4. Check logs for API errors (401 = bad credentials, 429 = rate limited)
 
 ### Database Locked Errors
 SQLite doesn't support high concurrency. If errors occur:
@@ -1497,10 +1517,10 @@ def parse_deadline(user_input: str, purchase_date: datetime) -> datetime:
 ### Error Handling
 ```python
 try:
-    price = await scrape_price(asin)
-except PlaywrightError as e:
-    logger.warning(f"Scraping failed for {asin}: {e}")
-    return None  # Skip and retry tomorrow
+    prices = await api_client.get_items(asins, marketplace)
+except AmazonCreatorAPIError as e:
+    logger.warning(f"API call failed: {e}")
+    return {}  # Skip and retry tomorrow
 except Exception as e:
     logger.error(f"Unexpected error: {e}")
     raise
@@ -1549,7 +1569,6 @@ version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
     "python-telegram-bot[webhooks]>=21.0",
-    "playwright>=1.40",
     "aiosqlite>=0.19",
     "python-dotenv>=1.0",
     "httpx>=0.25",
@@ -1605,15 +1624,14 @@ testpaths = ["tests"]
   CREATE INDEX idx_return_deadline ON products(return_deadline);
   ```
 
-### Scraping
-- Use connection pooling for Playwright
-- Concurrent scraping with `asyncio.gather()` + semaphore
-- Cache ASIN → product name mappings (optional)
+### API
+- Batch ASINs per request (max 10, handled automatically by `amazon_api.py`)
+- OAuth token caching (1 hour, with 60s refresh buffer)
+- Deduplication: same ASIN across multiple users = 1 API call
 
 ### Memory
-- Limit concurrent scraping tasks (e.g., max 10 simultaneous)
-- Close Playwright browser after batch completion
-- Use streaming for large datasets
+- No browser dependency (lightweight HTTP-only client)
+- Minimal memory footprint compared to previous Playwright-based approach
 
 ---
 
@@ -1673,7 +1691,7 @@ A: No, SQLite doesn't support concurrent writes. Use single instance or migrate 
 - **Reference Project**: https://github.com/dstmrk/octotracker
 - **Telegram Bot API**: https://core.telegram.org/bots/api
 - **python-telegram-bot Docs**: https://docs.python-telegram-bot.org/
-- **Playwright Docs**: https://playwright.dev/python/
+- **Amazon Creator API Docs**: https://programma-affiliazione.amazon.it/creatorsapi/docs/en-us/get-started/using-sdk
 
 ---
 
