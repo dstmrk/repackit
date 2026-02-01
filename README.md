@@ -61,16 +61,10 @@ uv sync --extra dev
 
 ```bash
 cp .env.example .env
-# Modifica .env con i tuoi valori
+# Modifica .env con i tuoi valori (incluse credenziali Amazon Creator API)
 ```
 
-### 4. Installa Playwright browsers
-
-```bash
-uv run playwright install chromium
-```
-
-### 5. Avvia il bot
+### 4. Avvia il bot
 
 ```bash
 # Per sviluppo locale, usa un tunnel (ngrok, Cloudflare Tunnel, etc.)
@@ -242,7 +236,8 @@ uv run pre-commit run --all-files
 ```
 repackit/
 ├── bot.py                  # Main bot (webhook + scheduler)
-├── data_reader.py          # Amazon scraper (Playwright)
+├── amazon_api.py           # Amazon Creator API client
+├── data_reader.py          # Amazon price fetcher (via Creator API)
 ├── checker.py              # Price comparison & notifications
 ├── product_cleanup.py      # Expired products removal
 ├── broadcast.py            # Admin broadcast script
@@ -338,6 +333,9 @@ ADMIN_USER_ID=your_telegram_user_id
 
 # Amazon
 AMAZON_AFFILIATE_TAG=yourtag-21
+AMAZON_CLIENT_ID=your-client-id
+AMAZON_CLIENT_SECRET=your-client-secret
+AMAZON_CREDENTIAL_VERSION=2.2  # 2.1=NA, 2.2=EU, 2.3=FE
 
 # Product Limits & Referral System
 DEFAULT_MAX_PRODUCTS=21
@@ -366,11 +364,11 @@ LOG_LEVEL=INFO
 2. Controlla webhook status: `curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo`
 3. Verifica logs: `docker compose logs -f`
 
-### Scraping fallisce
+### Fetch prezzi fallisce
 
-1. Verifica Playwright browsers installati: `uv run playwright install chromium`
-2. Testa manualmente: `uv run python data_reader.py`
-3. Controlla se Amazon ha cambiato HTML structure
+1. Verifica credenziali Amazon Creator API in `.env`
+2. Testa manualmente: `uv run python data_reader.py <ASIN>`
+3. Controlla i log per errori API (autenticazione, rate limit, etc.)
 
 ### Database locked
 
