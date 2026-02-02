@@ -1,16 +1,18 @@
-"""Amazon data reader for price fetching via Creator API."""
+"""Amazon data reader for price scraping."""
 
 import asyncio
 import logging
 import re
 
-from amazon_api import get_api_client
+from playwright.async_api import Browser, TimeoutError, async_playwright
+
 from config import get_config
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 # Get affiliate tag from environment
+
 
 # ASIN pattern: 10 alphanumeric characters
 # Supports: /dp/, /gp/product/, and short links /d/
@@ -20,9 +22,31 @@ cfg = get_config()
 # Module-level constants for backward compatibility with tests
 TELEGRAM_TOKEN = cfg.telegram_token
 AMAZON_AFFILIATE_TAG = cfg.amazon_affiliate_tag
+SCRAPER_RATE_LIMIT_SECONDS = cfg.scraper_rate_limit_seconds
 
 # Marketplace pattern: extract domain suffix (it, com, de, fr, co.uk, etc.)
 MARKETPLACE_PATTERN = re.compile(r"amazon\.(?:co\.)?([a-z]{2,3})")
+
+# Price selectors to try in order (Amazon's HTML structure changes frequently)
+# More specific selectors first to avoid capturing wrong prices (variants, other sellers, etc.)
+PRICE_SELECTORS = [
+    # Desktop buy box - most specific
+    "#corePriceDisplay_desktop_feature_div .a-price[data-a-color='price'] .a-offscreen",
+    # Core price section with explicit price color
+    "#corePrice_feature_div .a-price[data-a-color='price'] .a-offscreen",
+    # Buy box with large text (typical of main price)
+    ".a-section.a-spacing-none.aok-align-center .a-price[data-a-size='xl'] .a-offscreen",
+    # Mobile buy box
+    "#corePriceDisplay_mobile_feature_div .a-price .a-offscreen",
+    # Generic core price (less specific, but still better than completely generic)
+    "#corePrice_feature_div .a-price .a-offscreen",
+    # Legacy selectors (old Amazon layout)
+    "#priceblock_ourprice",
+    "#priceblock_dealprice",
+    # Fallback to generic selector (may pick wrong price, but better than nothing)
+    ".a-price .a-offscreen",
+    ".a-price-whole",  # Separated price (need to combine with decimal)
+]
 
 
 def extract_asin(url: str) -> tuple[str, str]:
@@ -85,7 +109,7 @@ def build_affiliate_url(asin: str, marketplace: str = "it") -> str:
 
 async def scrape_price(asin: str, marketplace: str = "it") -> float | None:
     """
-    Fetch current price from Amazon via Creator API (convenience wrapper for single product).
+    Scrape current price from Amazon product page (convenience wrapper for manual testing).
 
     This is a thin wrapper around scrape_prices() for convenience when testing single products.
     For production use with multiple products, use scrape_prices() directly for better performance.
@@ -96,7 +120,7 @@ async def scrape_price(asin: str, marketplace: str = "it") -> float | None:
 
     Returns:
         Current price as float (e.g., 59.90)
-        None if price cannot be fetched
+        None if price cannot be scraped
 
     Example:
         >>> price = await scrape_price("B08N5WRWNW", "it")
@@ -105,35 +129,144 @@ async def scrape_price(asin: str, marketplace: str = "it") -> float | None:
     # Create a fake product dict for scrape_prices()
     fake_product = {"id": 0, "asin": asin, "marketplace": marketplace}
 
-    # Use scrape_prices with single product (benefits from batch API, optimized logic)
+    # Use scrape_prices with single product (benefits from shared browser, optimized logic)
     results = await scrape_prices([fake_product])
 
     # Return price or None
     return results.get(0)
 
 
-async def scrape_prices(products: list[dict]) -> dict[int, float]:
+async def _scrape_single_price(browser: Browser, asin: str, marketplace: str) -> float | None:
     """
-    Fetch prices for multiple products via Amazon Creator API.
+    Internal function to scrape price using existing browser instance.
 
-    Uses the Creator API for efficient batch lookups. Each unique ASIN is fetched
-    only once, even if multiple users are monitoring the same product.
+    Args:
+        browser: Playwright browser instance
+        asin: Amazon Standard Identification Number
+        marketplace: Country code
+
+    Returns:
+        Price as float or None if not found
+    """
+    url = f"https://amazon.{marketplace}/dp/{asin}"
+
+    try:
+        # Create new page
+        page = await browser.new_page()
+
+        # Set realistic user agent to avoid detection
+        await page.set_extra_http_headers(
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+        )
+
+        # Navigate to product page
+        logger.debug(f"Scraping {url}")
+        await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+
+        # Try each price selector
+        price_text = None
+        for i, selector in enumerate(PRICE_SELECTORS, 1):
+            try:
+                element = await page.wait_for_selector(selector, timeout=2000)
+                if element:
+                    price_text = await element.inner_text()
+                    if price_text:
+                        logger.info(f"Found price with selector #{i} '{selector}': {price_text}")
+                        break
+            except TimeoutError:
+                logger.debug(f"Selector #{i} '{selector}' not found, trying next...")
+                continue
+
+        await page.close()
+
+        if not price_text:
+            logger.warning(f"Could not find price for ASIN {asin} on amazon.{marketplace}")
+            return None
+
+        # Parse price from text (handle various formats)
+        price = _parse_price(price_text)
+        if price:
+            logger.info(f"Successfully scraped price for {asin}: €{price}")
+        return price
+
+    except Exception as e:
+        logger.error(f"Error scraping {asin} from amazon.{marketplace}: {e}", exc_info=True)
+        return None
+
+
+def _parse_price(price_text: str) -> float | None:
+    """
+    Parse price from text, supporting both Italian and English formats.
+
+    Handles: "€59,90", "59.90", "1.999,99", "$1,999.99", price ranges.
+
+    Args:
+        price_text: Raw price text from page (e.g., "€59,90" or "$59.90")
+
+    Returns:
+        Price as float or None if parsing fails
+    """
+    try:
+        # Remove currency symbols and whitespace
+        cleaned = price_text.strip().replace("€", "").replace("$", "").replace(" ", "")
+
+        # Auto-detect format: decimal separator is always rightmost
+        last_comma = cleaned.rfind(",")
+        last_dot = cleaned.rfind(".")
+
+        if last_comma > last_dot:
+            # Italian format: "1.999,99" → remove dots, comma becomes decimal
+            cleaned = cleaned.replace(".", "").replace(",", ".")
+        elif last_dot > last_comma:
+            # English format: "1,999.99" → remove commas, dot is already decimal
+            cleaned = cleaned.replace(",", "")
+
+        # Extract first number (handles ranges: "59.90 - 69.90")
+        match = re.search(r"(\d+\.?\d*)", cleaned)
+        if match:
+            price = float(match.group(1))
+            if 0.01 <= price <= 999999:
+                return price
+            logger.warning(f"Price {price} out of reasonable range from '{price_text}'")
+
+        return None
+    except (ValueError, AttributeError) as e:
+        logger.warning(f"Could not parse price from '{price_text}': {e}")
+        return None
+
+
+async def scrape_prices(
+    products: list[dict], rate_limit_seconds: float | None = None
+) -> dict[int, float]:
+    """
+    Scrape prices for multiple products efficiently.
+
+    Uses a single browser instance and applies rate limiting to avoid detection.
+    Optimizes scraping by deduplicating ASINs - each unique ASIN is scraped only once,
+    even if multiple users are monitoring the same product.
 
     Args:
         products: List of product dicts with keys: id, asin, (optional) marketplace
+        rate_limit_seconds: Delay between requests (default from config: SCRAPER_RATE_LIMIT_SECONDS)
 
     Returns:
         Dict mapping product_id -> price
-        Products that failed to fetch are omitted from result
+        Products that failed to scrape are omitted from result
 
     Example:
-        If 10 users monitor the same ASIN, it will be fetched only once,
+        If 10 users monitor the same ASIN, it will be scraped only once,
         and the price will be mapped to all 10 product IDs.
     """
-    results: dict[int, float] = {}
+    if rate_limit_seconds is None:
+        rate_limit_seconds = SCRAPER_RATE_LIMIT_SECONDS
 
-    # Group products by (asin, marketplace) to deduplicate fetching
-    asin_to_product_ids: dict[tuple[str, str], list[int]] = {}
+    results = {}
+
+    # Group products by (asin, marketplace) to deduplicate scraping
+    asin_to_product_ids = {}
     for product in products:
         product_id = product["id"]
         asin = product["asin"]
@@ -146,44 +279,38 @@ async def scrape_prices(products: list[dict]) -> dict[int, float]:
 
     unique_asins = list(asin_to_product_ids.keys())
     logger.info(
-        f"Fetching {len(unique_asins)} unique ASINs for {len(products)} total products "
+        f"Scraping {len(unique_asins)} unique ASINs for {len(products)} total products "
         f"(deduplication saved {len(products) - len(unique_asins)} requests)"
     )
 
-    # Group by marketplace for batched API calls
-    marketplace_groups: dict[str, list[str]] = {}
-    for asin, marketplace in unique_asins:
-        if marketplace not in marketplace_groups:
-            marketplace_groups[marketplace] = []
-        marketplace_groups[marketplace].append(asin)
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-dev-shm-usage"],  # Docker compatibility
+        )
 
-    # Fetch prices from API grouped by marketplace
-    api_client = get_api_client()
-    asin_prices: dict[str, dict[str, float | None]] = {}
-
-    for marketplace, asins in marketplace_groups.items():
         try:
-            prices = await api_client.get_items(asins, marketplace)
-            asin_prices[marketplace] = prices
-            logger.info(
-                f"API returned prices for {sum(1 for p in prices.values() if p is not None)}"
-                f"/{len(asins)} ASINs on amazon.{marketplace}"
-            )
-        except Exception as e:
-            logger.error(f"API call failed for marketplace {marketplace}: {e}", exc_info=True)
-            asin_prices[marketplace] = {}
+            for i, (asin, marketplace) in enumerate(unique_asins):
+                # Scrape price once for this ASIN
+                price = await _scrape_single_price(browser, asin, marketplace)
 
-    # Map API results back to product IDs
-    for (asin, marketplace), product_ids in asin_to_product_ids.items():
-        marketplace_prices = asin_prices.get(marketplace, {})
-        price = marketplace_prices.get(asin)
+                # Map price to all product IDs that share this ASIN
+                if price is not None:
+                    product_ids = asin_to_product_ids[(asin, marketplace)]
+                    for product_id in product_ids:
+                        results[product_id] = price
+                    logger.debug(
+                        f"ASIN {asin} (€{price:.2f}) mapped to {len(product_ids)} product(s)"
+                    )
 
-        if price is not None:
-            for product_id in product_ids:
-                results[product_id] = price
-            logger.debug(f"ASIN {asin} (€{price:.2f}) mapped to {len(product_ids)} product(s)")
+                # Rate limiting: wait before next request
+                if i < len(unique_asins) - 1:  # Don't wait after last ASIN
+                    await asyncio.sleep(rate_limit_seconds)
 
-    logger.info(f"Fetched {len(results)}/{len(products)} products successfully")
+        finally:
+            await browser.close()
+
+    logger.info(f"Scraped {len(results)}/{len(products)} products successfully")
     return results
 
 
@@ -222,24 +349,24 @@ if __name__ == "__main__":
 
         print("\n" + "=" * 70)
 
-    async def _fetch_single_product(asin: str, marketplace: str):
-        """Fetch a single product by ASIN."""
-        print(f"SINGLE PRODUCT FETCH: {asin} (amazon.{marketplace})")
+    async def _scrape_single_product(asin: str, marketplace: str):
+        """Scrape a single product by ASIN."""
+        print(f"SINGLE PRODUCT SCRAPE: {asin} (amazon.{marketplace})")
         print("=" * 70)
 
         price = await scrape_price(asin, marketplace)
         if price:
             print(f"✅ Price: €{price:.2f}")
         else:
-            print("❌ Failed to fetch price")
+            print("❌ Failed to scrape price")
             print("\nPossible reasons:")
             print(f"  - ASIN not found on amazon.{marketplace}")
-            print("  - API credentials not configured")
-            print("  - API rate limit reached")
+            print("  - Network error")
+            print("  - Amazon blocked the request")
 
-    async def _fetch_all_products():
-        """Fetch all products from database."""
-        print("ALL PRODUCTS FETCH (from database)")
+    async def _scrape_all_products():
+        """Scrape all products from database."""
+        print("ALL PRODUCTS SCRAPE (from database)")
         print("=" * 70)
 
         # Initialize database
@@ -250,7 +377,7 @@ if __name__ == "__main__":
 
         if not products:
             print("❌ No active products found in database")
-            print("\nTo fetch a single product, use:")
+            print("\nTo scrape a single product, use:")
             print("  python data_reader.py <ASIN> [marketplace]")
             print("\nExamples:")
             print("  python data_reader.py B08N5WRWNW")
@@ -259,12 +386,12 @@ if __name__ == "__main__":
 
         print(f"Found {len(products)} active products\n")
 
-        # Fetch all prices
+        # Scrape all prices
         results = await scrape_prices(products)
 
         # Show results
         print("\n" + "=" * 70)
-        print("FETCH RESULTS")
+        print("SCRAPING RESULTS")
         print("=" * 70)
 
         for product in products:
@@ -278,7 +405,7 @@ if __name__ == "__main__":
                 print(f"   Price: €{price:.2f}")
             else:
                 print(f"\n❌ {product_name} ({asin})")
-                print("   Failed to fetch")
+                print("   Failed to scrape")
 
         # Calculate success rate
         success_count = sum(1 for p in results.values() if p is not None)
@@ -290,18 +417,18 @@ if __name__ == "__main__":
         print("=" * 70)
 
     async def main():
-        """Main function for manual testing and fetching."""
+        """Main function for manual testing and scraping."""
         # Always show ASIN extraction test
         _print_asin_extraction_test()
 
-        # Mode 1: Fetch single ASIN from command line
+        # Mode 1: Scrape single ASIN from command line
         if len(sys.argv) > 1:
             asin = sys.argv[1]
             marketplace = sys.argv[2] if len(sys.argv) > 2 else "it"
-            await _fetch_single_product(asin, marketplace)
-        # Mode 2: Fetch all products from database
+            await _scrape_single_product(asin, marketplace)
+        # Mode 2: Scrape all products from database
         else:
-            await _fetch_all_products()
+            await _scrape_all_products()
 
     # Run async main
     asyncio.run(main())

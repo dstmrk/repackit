@@ -19,9 +19,30 @@ RUN uv venv /opt/venv && \
 # Stage 2: Runtime - Minimal production image
 FROM python:3.11-slim
 
-# Install minimal system dependencies and create non-root user
+# Install system dependencies for Playwright and create non-root user
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    fonts-liberation \
+    gnupg \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libatspi2.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libwayland-client0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxkbcommon0 \
+    libxrandr2 \
+    wget \
+    xdg-utils \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -m -u 1000 repackit \
     && mkdir -p /app \
@@ -51,8 +72,15 @@ chown -R 1000:1000 /app/data 2>/dev/null || true\n\
 exec gosu 1000:1000 "$@"' > /entrypoint.sh && \
     chmod +x /entrypoint.sh
 
+# Switch to non-root user for Playwright installation
+USER repackit
+
 # Activate virtual environment
 ENV PATH="/opt/venv/bin:$PATH"
+
+# Install Playwright browsers (as non-root user)
+RUN playwright install chromium && \
+    playwright install-deps chromium || true
 
 # Expose ports
 EXPOSE 8443 8444
