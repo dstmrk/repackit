@@ -11,6 +11,7 @@ authors = [
 
 dependencies = [
     "python-telegram-bot[webhooks]>=21.0",
+    "playwright>=1.40",
     "aiosqlite>=0.19",
     "python-dotenv>=1.0",
     "httpx>=0.25",

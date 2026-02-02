@@ -37,10 +37,8 @@ class Config:
     # Amazon Affiliate
     amazon_affiliate_tag: str
 
-    # Amazon Creator API
-    amazon_client_id: str
-    amazon_client_secret: str
-    amazon_credential_version: str
+    # Scraper
+    scraper_rate_limit_seconds: float  # Delay between Amazon requests
 
     # Product Limits & Referral System
     default_max_products: int
@@ -100,10 +98,8 @@ class Config:
             admin_user_id=os.getenv("ADMIN_USER_ID"),
             # Amazon Affiliate
             amazon_affiliate_tag=os.getenv("AMAZON_AFFILIATE_TAG", ""),
-            # Amazon Creator API
-            amazon_client_id=os.getenv("AMAZON_CLIENT_ID", ""),
-            amazon_client_secret=os.getenv("AMAZON_CLIENT_SECRET", ""),
-            amazon_credential_version=os.getenv("AMAZON_CREDENTIAL_VERSION", "2.2"),
+            # Scraper
+            scraper_rate_limit_seconds=float(os.getenv("SCRAPER_RATE_LIMIT_SECONDS", "1.5")),
             # Product Limits & Referral
             default_max_products=int(os.getenv("DEFAULT_MAX_PRODUCTS", "21")),
             initial_max_products=int(os.getenv("INITIAL_MAX_PRODUCTS", "3")),
