@@ -10,7 +10,7 @@ authors = [
 ]
 
 dependencies = [
-    "python-telegram-bot[webhooks]>=21.0",
+    "python-telegram-bot[webhooks]>=22.7",
     "playwright>=1.40",
     "aiosqlite>=0.19",
     "python-dotenv>=1.0",
