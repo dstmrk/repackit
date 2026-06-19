@@ -39,6 +39,7 @@ class Config:
 
     # Scraper
     scraper_rate_limit_seconds: float  # Delay between Amazon requests
+    obscura_cdp_endpoint: str  # CDP endpoint of the obscura headless browser sidecar
 
     # Product Limits & Referral System
     default_max_products: int
@@ -100,6 +101,7 @@ class Config:
             amazon_affiliate_tag=os.getenv("AMAZON_AFFILIATE_TAG", ""),
             # Scraper
             scraper_rate_limit_seconds=float(os.getenv("SCRAPER_RATE_LIMIT_SECONDS", "1.5")),
+            obscura_cdp_endpoint=os.getenv("OBSCURA_CDP_ENDPOINT", "http://127.0.0.1:9222"),
             # Product Limits & Referral
             default_max_products=int(os.getenv("DEFAULT_MAX_PRODUCTS", "21")),
             initial_max_products=int(os.getenv("INITIAL_MAX_PRODUCTS", "3")),

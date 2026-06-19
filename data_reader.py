@@ -284,10 +284,12 @@ async def scrape_prices(
     )
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-dev-shm-usage"],  # Docker compatibility
-        )
+        # Connect to the obscura headless browser sidecar over the Chrome DevTools
+        # Protocol instead of launching a bundled Chromium. obscura is a lightweight
+        # Rust CDP server (~70MB / ~30MB RAM vs ~300MB Chromium) that runs alongside
+        # the bot. Closing the browser below only disconnects this client; the sidecar
+        # stays alive and is reused by the next scheduled run.
+        browser = await p.chromium.connect_over_cdp(cfg.obscura_cdp_endpoint)
 
         try:
             for i, (asin, marketplace) in enumerate(unique_asins):

@@ -61,7 +61,7 @@ uv sync --extra dev
 
 ```bash
 cp .env.example .env
-# Modifica .env con i tuoi valori (incluse credenziali Amazon Creator API)
+# Modifica .env con i tuoi valori
 ```
 
 ### 4. Avvia il bot
@@ -236,8 +236,7 @@ uv run pre-commit run --all-files
 ```
 repackit/
 ├── bot.py                  # Main bot (webhook + scheduler)
-├── amazon_api.py           # Amazon Creator API client
-├── data_reader.py          # Amazon price fetcher (via Creator API)
+├── data_reader.py          # Amazon price scraper (Playwright CDP -> obscura)
 ├── checker.py              # Price comparison & notifications
 ├── product_cleanup.py      # Expired products removal
 ├── broadcast.py            # Admin broadcast script
@@ -333,9 +332,9 @@ ADMIN_USER_ID=your_telegram_user_id
 
 # Amazon
 AMAZON_AFFILIATE_TAG=yourtag-21
-AMAZON_CLIENT_ID=your-client-id
-AMAZON_CLIENT_SECRET=your-client-secret
-AMAZON_CREDENTIAL_VERSION=2.2  # 2.1=NA, 2.2=EU, 2.3=FE
+
+# Price Scraping (obscura headless browser sidecar)
+OBSCURA_CDP_ENDPOINT=http://127.0.0.1:9222
 
 # Product Limits & Referral System
 DEFAULT_MAX_PRODUCTS=21
@@ -366,9 +365,12 @@ LOG_LEVEL=INFO
 
 ### Fetch prezzi fallisce
 
-1. Verifica credenziali Amazon Creator API in `.env`
+1. Verifica che il sidecar obscura sia attivo: il container lo avvia all'avvio
+   (log in `data/obscura.log`); l'endpoint CDP è `OBSCURA_CDP_ENDPOINT`
+   (default `http://127.0.0.1:9222`)
 2. Testa manualmente: `uv run python data_reader.py <ASIN>`
-3. Controlla i log per errori API (autenticazione, rate limit, etc.)
+   (richiede un'istanza obscura raggiungibile: `obscura serve --port 9222`)
+3. Controlla i log per errori di scraping (selettore prezzo non trovato, timeout, blocco Amazon)
 
 ### Database locked
 

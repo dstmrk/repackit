@@ -16,33 +16,33 @@ RUN uv venv /opt/venv && \
     . /opt/venv/bin/activate && \
     uv pip install -e .
 
+# Download the obscura headless browser binary (pinned release).
+# obscura is a lightweight, CDP-compatible headless browser written in Rust that
+# replaces the bundled Chromium previously installed via Playwright. Playwright is
+# kept only as a CDP *client* that connects to this binary at runtime.
+ARG OBSCURA_VERSION=v0.1.8
+ARG TARGETARCH
+RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates && \
+    rm -rf /var/lib/apt/lists/* && \
+    case "${TARGETARCH:-amd64}" in \
+      amd64) OBSCURA_ARCH=x86_64 ;; \
+      arm64) OBSCURA_ARCH=aarch64 ;; \
+      *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
+    wget -qO /tmp/obscura.tar.gz \
+      "https://github.com/h4ckf0r0day/obscura/releases/download/${OBSCURA_VERSION}/obscura-${OBSCURA_ARCH}-linux.tar.gz" && \
+    mkdir -p /opt/obscura && tar xzf /tmp/obscura.tar.gz -C /opt/obscura && \
+    rm /tmp/obscura.tar.gz && \
+    chmod +x /opt/obscura/obscura /opt/obscura/obscura-worker
+
 # Stage 2: Runtime - Minimal production image
 FROM python:3.11-slim
 
-# Install system dependencies for Playwright and create non-root user
+# Install minimal system dependencies and create non-root user.
+# No browser/X11 libraries are needed anymore: price scraping talks to the obscura
+# sidecar over CDP instead of launching a local Chromium.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
-    fonts-liberation \
-    gnupg \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libatspi2.0-0 \
-    libcups2 \
-    libdbus-1-3 \
-    libdrm2 \
-    libgbm1 \
-    libgtk-3-0 \
-    libnspr4 \
-    libnss3 \
-    libwayland-client0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxkbcommon0 \
-    libxrandr2 \
-    wget \
-    xdg-utils \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -m -u 1000 repackit \
     && mkdir -p /app \
@@ -54,44 +54,45 @@ WORKDIR /app
 # Copy virtual environment from builder (read-only for all users)
 COPY --from=builder --chown=root:root --chmod=555 /opt/venv /opt/venv
 
+# Copy the obscura headless browser binaries (browser + render worker)
+COPY --from=builder --chmod=555 /opt/obscura/obscura /usr/local/bin/obscura
+COPY --from=builder --chmod=555 /opt/obscura/obscura-worker /usr/local/bin/obscura-worker
+
 # Copy application code (read-only for security - prevents tampering)
 COPY --chown=root:root --chmod=555 pyproject.toml ./
 COPY --chown=root:root --chmod=555 *.py ./
 COPY --chown=root:root --chmod=555 handlers/ ./handlers/
 COPY --chown=root:root --chmod=555 utils/ ./utils/
 
-# Install gosu and create entrypoint script in a single layer
-# This reduces image size and satisfies SonarCloud S7031
+# Install gosu and create the entrypoint script in a single layer.
+# The entrypoint starts the obscura CDP sidecar in the background (as the non-root
+# repackit user), waits for it to accept connections, then drops privileges and
+# launches the bot. This reduces image size and satisfies SonarCloud S7031.
 RUN apt-get update && apt-get install -y --no-install-recommends gosu && rm -rf /var/lib/apt/lists/* && \
-    echo '#!/bin/bash\n\
-set -e\n\
-# Create data directory with correct ownership (runs as root)\n\
-mkdir -p /app/data\n\
-chown -R 1000:1000 /app/data 2>/dev/null || true\n\
-# Drop privileges and execute main command as repackit user\n\
-exec gosu 1000:1000 "$@"' > /entrypoint.sh && \
+    printf '%s\n' \
+    '#!/bin/bash' \
+    'set -e' \
+    '# Create data directory with correct ownership (runs as root)' \
+    'mkdir -p /app/data' \
+    'chown -R 1000:1000 /app/data 2>/dev/null || true' \
+    'OBSCURA_PORT="${OBSCURA_PORT:-9222}"' \
+    '# Start the obscura headless browser sidecar in the background (non-root)' \
+    'gosu 1000:1000 obscura serve --port "${OBSCURA_PORT}" --stealth >/app/data/obscura.log 2>&1 &' \
+    '# Wait for the CDP endpoint to accept connections before starting the bot' \
+    'for _ in $(seq 1 30); do (echo > "/dev/tcp/127.0.0.1/${OBSCURA_PORT}") >/dev/null 2>&1 && break; sleep 0.5; done' \
+    '# Drop privileges and execute the main command as the repackit user' \
+    'exec gosu 1000:1000 "$@"' \
+    > /entrypoint.sh && \
     chmod +x /entrypoint.sh
-
-# Switch to non-root user for Playwright installation
-USER repackit
 
 # Activate virtual environment
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Install Playwright browsers (as non-root user)
-RUN playwright install chromium && \
-    playwright install-deps chromium || true
-
 # Expose ports
 EXPOSE 8443 8444
 
-# Switch to root for entrypoint execution only
-# IMPORTANT: The entrypoint immediately drops privileges to repackit user (uid 1000)
-# This is necessary to handle Docker volume permissions automatically on startup
-# The actual bot process runs as non-root user for security
-USER root
-
-# Set entrypoint to handle permissions, then drop to repackit user
+# Set entrypoint to start the obscura sidecar and handle permissions, then drop
+# to the repackit user. The bot process itself runs as non-root (uid 1000).
 ENTRYPOINT ["/entrypoint.sh"]
 
 # Run the bot (executed as repackit user via entrypoint)

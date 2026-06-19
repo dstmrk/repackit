@@ -18,7 +18,7 @@
 - **Language**: Python 3.11+
 - **Package Manager**: `uv` (not pip)
 - **Telegram Library**: `python-telegram-bot` (webhook mode)
-- **Amazon Price Data**: Amazon Creator API (OAuth 2.0)
+- **Amazon Price Data**: Web scraping via Playwright (CDP) + obscura headless browser
 - **Database**: SQLite
 - **Code Quality**: Ruff (formatter + linter)
 - **Testing**: pytest with ≥80% coverage
@@ -32,8 +32,7 @@
 ```
 repackit/
 ├── bot.py                    # Main bot with webhook + scheduler
-├── amazon_api.py             # Amazon Creator API client (OAuth + GetItems)
-├── data_reader.py            # Amazon price fetcher (via Creator API)
+├── data_reader.py            # Amazon price scraper (Playwright CDP -> obscura sidecar)
 ├── checker.py                # Price comparison & notifications
 ├── product_cleanup.py        # Removes expired products
 ├── broadcast.py              # Admin-only manual broadcast script
@@ -169,10 +168,8 @@ ADMIN_USER_ID=123456789  # Telegram user ID for broadcast.py script verification
 # Amazon Affiliate
 AMAZON_AFFILIATE_TAG=yourtag-21  # Amazon affiliate tag for monetization
 
-# Amazon Creator API
-AMAZON_CLIENT_ID=your-client-id          # Credential Id from Creator API CSV
-AMAZON_CLIENT_SECRET=your-client-secret  # Secret from Creator API CSV
-AMAZON_CREDENTIAL_VERSION=2.2            # 2.1=NA, 2.2=EU, 2.3=FE
+# Price Scraping (obscura headless browser sidecar)
+OBSCURA_CDP_ENDPOINT=http://127.0.0.1:9222  # CDP endpoint of the obscura sidecar
 
 # Product Limits & Referral System
 DEFAULT_MAX_PRODUCTS=21       # Max cap for all users
@@ -229,38 +226,32 @@ async def schedule_scraper():
 
 ---
 
-### 2. `amazon_api.py` - Amazon Creator API Client
+### 2. obscura - Headless Browser Sidecar
+
+Price scraping does not launch a bundled Chromium. Instead, Playwright connects over the
+Chrome DevTools Protocol to **obscura**, a lightweight CDP-compatible headless browser
+(Rust) that runs as a background sidecar inside the container.
 
 **Responsibilities**:
-- OAuth 2.0 token management (Cognito) with automatic caching and refresh
-- Batch product lookups via GetItems API (max 10 ASINs per request)
-- Price extraction from `offersV2` response (prefers BuyBox winner)
+- Render Amazon product pages (runs V8 / page JavaScript)
+- Serve a CDP endpoint (`ws://127.0.0.1:9222/devtools/browser`) for Playwright clients
+- Provide DOM querying used by `wait_for_selector` / `inner_text`
 
-**Authentication**:
-- Uses client credentials flow (client_id + client_secret)
-- Tokens cached for 1 hour (with 60s refresh buffer)
-- Regional endpoints: NA (2.1), EU (2.2), FE (2.3)
-
-**Key Class: `AmazonCreatorAPI`**:
-```python
-api = get_api_client()  # Singleton
-prices = await api.get_items(["B08N5WRWNW", "B09B2SBHQK"], marketplace="it")
-# Returns: {"B08N5WRWNW": 59.49, "B09B2SBHQK": 45.00}
-```
-
-**Price Extraction Logic**:
-1. Look for BuyBox winner listing (`isBuyBoxWinner: true`)
-2. Fallback to first listing with a price
-3. Extract `offersV2.listings[].price.money.amount`
+**Lifecycle**:
+- Started by the Docker entrypoint: `obscura serve --port 9222 --stealth`
+- A persistent server: each scrape connects via `connect_over_cdp`, works, then
+  disconnects (`browser.close()`); the sidecar stays alive and is reused
+- Configured via `OBSCURA_CDP_ENDPOINT` (default `http://127.0.0.1:9222`)
+- Binary pinned in the `Dockerfile` (`OBSCURA_VERSION`)
 
 ---
 
-### 3. `data_reader.py` - Amazon Price Fetcher
+### 3. `data_reader.py` - Amazon Price Scraper
 
 **Responsibilities**:
 - Parse ASIN from Amazon URLs (supports multiple formats)
-- Fetch current prices via Creator API (through `amazon_api.py`)
-- Deduplicate API calls (same ASIN across multiple users = 1 API call)
+- Scrape current prices via Playwright (CDP -> obscura), reading `PRICE_SELECTORS`
+- Deduplicate scrapes (same ASIN across multiple users = 1 fetch)
 
 **ASIN Parsing** (Modular for Future Marketplaces):
 ```python
@@ -274,10 +265,11 @@ def extract_asin(url: str) -> tuple[str, str]:
     # Regex pattern supporting .it, .com, .de, .fr, etc.
 ```
 
-**API Strategy**:
-- **Batch Requests**: Groups ASINs by marketplace, sends batched API calls (max 10/request)
-- **Deduplication**: If 10 users monitor the same ASIN, it's fetched only once
-- **Error Handling**: Skip failed fetches, log as WARNING, retry next day
+**Scraping Strategy**:
+- **Single connection**: one CDP connection to the obscura sidecar per run, pages opened
+  sequentially with rate limiting (`SCRAPER_RATE_LIMIT_SECONDS`)
+- **Deduplication**: If 10 users monitor the same ASIN, it's scraped only once
+- **Error Handling**: Skip failed scrapes, log as WARNING, retry next day
 
 **Can Run Standalone**:
 ```bash
@@ -1261,9 +1253,9 @@ FROM python:3.11-slim AS builder
 # Install uv and dependencies
 
 FROM python:3.11-slim AS runtime
-# Copy only necessary files
-# No browser dependencies needed (uses Amazon Creator API)
-# Run as non-root user (via gosu privilege drop)
+# Copy only necessary files + the obscura headless browser binary
+# No Chromium/X11 libraries needed (scraping talks to the obscura sidecar over CDP)
+# Entrypoint starts `obscura serve` in the background, then drops to non-root via gosu
 ```
 
 ### Volume Persistence
@@ -1300,7 +1292,6 @@ Mirror the source structure in `tests/`:
 ```
 tests/
 ├── test_bot.py
-├── test_amazon_api.py
 ├── test_data_reader.py
 ├── test_checker.py
 ├── test_product_cleanup.py
@@ -1315,7 +1306,7 @@ tests/
 
 ### Testing Principles
 1. **Unit Tests**: Test each function in isolation
-2. **Mocking**: Mock external dependencies (Telegram API, Amazon Creator API, database)
+2. **Mocking**: Mock external dependencies (Telegram API, Playwright/obscura, database)
 3. **Coverage**: Every new feature must include tests
 4. **Fixtures**: Use pytest fixtures for common setups (db, bot instance)
 
@@ -1389,24 +1380,28 @@ def build_affiliate_url(asin: str, marketplace: str = "it") -> str:
 - Works across all Amazon marketplaces (.it, .com, .de, etc.)
 - URL is short and user-friendly for Telegram messages
 
-### Amazon Creator API
+### Price Scraping (obscura + Playwright CDP)
 
-Price data is fetched via the official Amazon Creator API (replaced Playwright scraping).
+Price data is scraped from Amazon product pages. `data_reader.py` drives a headless
+browser via Playwright, reading the price from `PRICE_SELECTORS` (a prioritized list of
+CSS selectors covering Amazon's frequently-changing layouts).
 
-**Authentication**: OAuth 2.0 client credentials via Amazon Cognito
-**Endpoint**: `https://creatorsapi.amazon/catalog/v1/getItems`
-**Resources requested**: `offersV2.listings.price`, `offersV2.listings.availability`, `offersV2.listings.condition`, `offersV2.listings.isBuyBoxWinner`, `itemInfo.title`
+**Browser engine**: instead of launching a bundled Chromium, Playwright connects over the
+Chrome DevTools Protocol (`p.chromium.connect_over_cdp(OBSCURA_CDP_ENDPOINT)`) to
+[**obscura**](https://github.com/h4ckf0r0day/obscura) — a lightweight, CDP-compatible
+headless browser written in Rust. obscura runs V8, executes page JavaScript, and exposes
+DOM queries (`wait_for_selector` / `inner_text`) just like Chromium.
 
-**Regional token endpoints**:
-- NA (version 2.1): `creatorsapi.auth.us-east-1.amazoncognito.com`
-- EU (version 2.2): `creatorsapi.auth.eu-south-2.amazoncognito.com`
-- FE (version 2.3): `creatorsapi.auth.us-west-2.amazoncognito.com`
+**Deployment**: the Docker container starts `obscura serve --port 9222 --stealth` as a
+background sidecar (see entrypoint in `Dockerfile`). Each scheduled scrape connects, does
+its work, and disconnects (`browser.close()`); the sidecar stays alive and is reused.
 
-**Benefits over Playwright scraping**:
-- No browser dependency (~500MB savings in Docker image)
-- Reliable structured data (no HTML parsing fragility)
-- Official API with proper rate limits
-- Batch requests (up to 10 ASINs per call)
+**Why obscura over bundled Chromium**:
+- Much smaller footprint: ~70MB binary / ~30MB RAM vs ~300MB Chromium + ~200MB RAM,
+  and no `libX*`/font/audio system libraries in the image
+- Built-in anti-detection / stealth mode
+- Keeps the existing scraping logic (selectors, dedup, rate limiting) unchanged —
+  Playwright is retained purely as a lightweight CDP client
 
 ---
 
@@ -1419,7 +1414,7 @@ Price data is fetched via the official Amazon Creator API (replaced Playwright s
 - [x] Cleanup of expired products
 - [x] Viral growth strategy ("Momento di Gloria" share button)
 - [x] Referral system with slot rewards (Dropbox-style gamification)
-- [x] Amazon Creator API integration (replaced Playwright scraping)
+- [x] Price scraping via Playwright CDP + obscura headless browser (replaced bundled Chromium)
 
 ### Phase 2 (Planned)
 - [ ] Multi-marketplace support (.com, .de, .fr, .es, .uk)
@@ -1442,10 +1437,13 @@ Price data is fetched via the official Amazon Creator API (replaced Playwright s
 3. Check logs: `docker-compose logs -f` or `tail -f data/repackit.log`
 
 ### Price Fetch Failures
-1. Verify Amazon Creator API credentials in `.env` (`AMAZON_CLIENT_ID`, `AMAZON_CLIENT_SECRET`)
-2. Check API token endpoint connectivity (see regional endpoints in `amazon_api.py`)
-3. Test manually: `uv run python data_reader.py <ASIN>`
-4. Check logs for API errors (401 = bad credentials, 429 = rate limited)
+1. Verify the obscura sidecar is running (`data/obscura.log`) and reachable at
+   `OBSCURA_CDP_ENDPOINT` (default `http://127.0.0.1:9222`)
+2. Confirm the CDP endpoint responds: `curl http://127.0.0.1:9222/json/version`
+3. Test manually: `uv run python data_reader.py <ASIN>` (needs an obscura instance:
+   `obscura serve --port 9222`)
+4. Check logs for scraping issues (price selector not matched, navigation timeout,
+   Amazon blocking the request)
 
 ### Database Locked Errors
 SQLite doesn't support high concurrency. If errors occur:
@@ -1517,9 +1515,9 @@ def parse_deadline(user_input: str, purchase_date: datetime) -> datetime:
 ### Error Handling
 ```python
 try:
-    prices = await api_client.get_items(asins, marketplace)
-except AmazonCreatorAPIError as e:
-    logger.warning(f"API call failed: {e}")
+    prices = await scrape_prices(products)
+except TimeoutError as e:
+    logger.warning(f"Scrape timed out: {e}")
     return {}  # Skip and retry tomorrow
 except Exception as e:
     logger.error(f"Unexpected error: {e}")
@@ -1624,14 +1622,14 @@ testpaths = ["tests"]
   CREATE INDEX idx_return_deadline ON products(return_deadline);
   ```
 
-### API
-- Batch ASINs per request (max 10, handled automatically by `amazon_api.py`)
-- OAuth token caching (1 hour, with 60s refresh buffer)
-- Deduplication: same ASIN across multiple users = 1 API call
+### Scraping
+- Deduplication: same ASIN across multiple users = 1 scrape
+- Rate limiting between requests (`SCRAPER_RATE_LIMIT_SECONDS`) to avoid detection
+- obscura `--stealth` mode for built-in anti-detection
 
 ### Memory
-- No browser dependency (lightweight HTTP-only client)
-- Minimal memory footprint compared to previous Playwright-based approach
+- obscura sidecar (~30MB RAM) instead of a bundled Chromium (~200MB+)
+- Smaller Docker image: no Chromium browser or `libX*`/font/audio system libraries
 
 ---
 
@@ -1691,7 +1689,8 @@ A: No, SQLite doesn't support concurrent writes. Use single instance or migrate 
 - **Reference Project**: https://github.com/dstmrk/octotracker
 - **Telegram Bot API**: https://core.telegram.org/bots/api
 - **python-telegram-bot Docs**: https://docs.python-telegram-bot.org/
-- **Amazon Creator API Docs**: https://programma-affiliazione.amazon.it/creatorsapi/docs/en-us/get-started/using-sdk
+- **obscura (headless browser)**: https://github.com/h4ckf0r0day/obscura
+- **Playwright (Python) Docs**: https://playwright.dev/python/
 
 ---
 
