@@ -265,8 +265,8 @@ async def test_scrape_prices_multiple_products():
         with patch("data_reader.async_playwright") as mock_playwright:
             # Mock playwright context manager
             mock_browser = AsyncMock()
-            mock_playwright.return_value.__aenter__.return_value.chromium.launch = AsyncMock(
-                return_value=mock_browser
+            mock_playwright.return_value.__aenter__.return_value.chromium.connect_over_cdp = (
+                AsyncMock(return_value=mock_browser)
             )
             mock_browser.close = AsyncMock()
 
@@ -293,8 +293,8 @@ async def test_scrape_prices_with_custom_marketplace():
     with patch("data_reader._scrape_single_price", side_effect=mock_scrape):
         with patch("data_reader.async_playwright") as mock_playwright:
             mock_browser = AsyncMock()
-            mock_playwright.return_value.__aenter__.return_value.chromium.launch = AsyncMock(
-                return_value=mock_browser
+            mock_playwright.return_value.__aenter__.return_value.chromium.connect_over_cdp = (
+                AsyncMock(return_value=mock_browser)
             )
             mock_browser.close = AsyncMock()
 
@@ -330,8 +330,8 @@ async def test_scrape_prices_deduplication():
     with patch("data_reader._scrape_single_price", side_effect=mock_scrape):
         with patch("data_reader.async_playwright") as mock_playwright:
             mock_browser = AsyncMock()
-            mock_playwright.return_value.__aenter__.return_value.chromium.launch = AsyncMock(
-                return_value=mock_browser
+            mock_playwright.return_value.__aenter__.return_value.chromium.connect_over_cdp = (
+                AsyncMock(return_value=mock_browser)
             )
             mock_browser.close = AsyncMock()
 
@@ -376,8 +376,8 @@ async def test_scrape_prices_deduplication_different_marketplaces():
     with patch("data_reader._scrape_single_price", side_effect=mock_scrape):
         with patch("data_reader.async_playwright") as mock_playwright:
             mock_browser = AsyncMock()
-            mock_playwright.return_value.__aenter__.return_value.chromium.launch = AsyncMock(
-                return_value=mock_browser
+            mock_playwright.return_value.__aenter__.return_value.chromium.connect_over_cdp = (
+                AsyncMock(return_value=mock_browser)
             )
             mock_browser.close = AsyncMock()
 
