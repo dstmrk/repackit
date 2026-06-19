@@ -498,10 +498,10 @@ async def add_product_atomic(
 
             return product_id, is_first_product
 
-        except Exception as e:
+        except Exception:
             # Rollback on any error
             await db.rollback()
-            logger.error(f"Error in add_product_atomic for user {user_id}: {e}", exc_info=True)
+            logger.exception(f"Error in add_product_atomic for user {user_id}")
             raise
 
 

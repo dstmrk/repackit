@@ -196,8 +196,8 @@ async def main():  # pragma: no cover
     except KeyboardInterrupt:
         logger.warning("Broadcast interrupted by user")
         sys.exit(1)
-    except Exception as e:
-        logger.error(f"Broadcast failed: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Broadcast failed")
         sys.exit(1)
 
 

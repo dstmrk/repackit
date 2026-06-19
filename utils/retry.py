@@ -114,9 +114,9 @@ async def send_telegram_message_with_retry(
             max_retries=max_retries,
             base_delay=base_delay,
         )
-    except RETRYABLE_TELEGRAM_ERRORS as e:
+    except RETRYABLE_TELEGRAM_ERRORS:
         # All retries exhausted
-        logger.error(f"Failed to send message to user {user_id} after retries: {e}")
+        logger.exception(f"Failed to send message to user {user_id} after retries")
         return None
     except Exception as e:
         # Non-retryable error (user blocked bot, chat not found, etc.)
@@ -160,9 +160,9 @@ async def httpx_post_with_retry(
             base_delay=base_delay,
             retryable_exceptions=retryable_exceptions,
         )
-    except retryable_exceptions as e:
-        logger.error(f"HTTP request failed after retries: {e}")
+    except retryable_exceptions:
+        logger.exception("HTTP request failed after retries")
         return None
-    except Exception as e:
-        logger.error(f"HTTP request failed with non-retryable error: {e}")
+    except Exception:
+        logger.exception("HTTP request failed with non-retryable error")
         return None

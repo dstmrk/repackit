@@ -8,13 +8,21 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 # Set working directory
 WORKDIR /app
 
-# Copy dependency files (README.md needed by hatchling)
-COPY pyproject.toml README.md ./
+# Copy dependency manifests. uv.lock pins every (transitive) dependency to an
+# exact, hash-verified version (README.md is needed by hatchling metadata).
+COPY pyproject.toml uv.lock README.md ./
 
-# Install dependencies in a virtual environment
+# Install locked dependencies into an isolated virtual environment.
+#   --frozen         : use the committed uv.lock as-is (no version re-resolution)
+#   --only-binary    : install pre-built wheels only, never build sdists / run setup scripts
+#   --require-hashes : verify every artifact against the hashes pinned in the lockfile
+# The application is launched via `python bot.py` from /app (all modules are
+# top-level), so the project package itself does not need to be installed -- only
+# its locked dependencies.
 RUN uv venv /opt/venv && \
-    . /opt/venv/bin/activate && \
-    uv pip install -e .
+    uv export --frozen --no-dev --no-emit-project --format requirements-txt -o /tmp/requirements.txt && \
+    VIRTUAL_ENV=/opt/venv uv pip install --no-deps --only-binary :all: --require-hashes -r /tmp/requirements.txt && \
+    rm /tmp/requirements.txt
 
 # Download the obscura headless browser binary (pinned release).
 # obscura is a lightweight, CDP-compatible headless browser written in Rust that

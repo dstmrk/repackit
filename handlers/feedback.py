@@ -204,8 +204,8 @@ async def handle_feedback_confirmation(update: Update, context: ContextTypes.DEF
                 f"Feedback {feedback_id} saved from user {user_id} ({len(feedback_message)} chars)"
             )
 
-        except Exception as e:
-            logger.error(f"Error saving feedback from user {user_id}: {e}", exc_info=True)
+        except Exception:
+            logger.exception(f"Error saving feedback from user {user_id}")
             await query.edit_message_text("❌ Errore nel salvare il feedback. Riprova più tardi.")
 
         context.user_data.clear()

@@ -29,8 +29,8 @@ async def share_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     try:
         current_slots = await database.get_user_product_limit(user_id)
         max_slots = database.DEFAULT_MAX_PRODUCTS
-    except Exception as e:
-        logger.error(f"Error getting user slots for {user_id}: {e}", exc_info=True)
+    except Exception:
+        logger.exception(f"Error getting user slots for {user_id}")
         await update.message.reply_text(
             "❌ Errore nel recuperare i tuoi dati. Riprova più tardi.", parse_mode="HTML"
         )

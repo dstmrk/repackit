@@ -167,8 +167,8 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         existing_user = await database.get_user(user_id)
         if not existing_user:
             await _register_new_user(user_id, language_code, referred_by)
-    except Exception as e:
-        logger.error(f"Error registering user {user_id}: {e}", exc_info=True)
+    except Exception:
+        logger.exception(f"Error registering user {user_id}")
 
     # Build and send welcome message
     welcome_message = _build_welcome_message(
