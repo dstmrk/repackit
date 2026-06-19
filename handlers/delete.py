@@ -52,8 +52,8 @@ async def start_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         await update.message.reply_text(message, parse_mode="HTML", reply_markup=reply_markup)
 
-    except Exception as e:
-        logger.error(f"Error in start_delete for user {user_id}: {e}", exc_info=True)
+    except Exception:
+        logger.exception(f"Error in start_delete for user {user_id}")
         await update.message.reply_text("❌ Errore nel processare la richiesta. Riprova più tardi.")
 
 
@@ -165,8 +165,8 @@ async def delete_callback_handler(update: Update, context: ContextTypes.DEFAULT_
                 parse_mode="HTML",
             )
 
-    except Exception as e:
-        logger.error(f"Error in delete_callback_handler for user {user_id}: {e}", exc_info=True)
+    except Exception:
+        logger.exception(f"Error in delete_callback_handler for user {user_id}")
         await query.edit_message_text("❌ Errore nell'elaborare la risposta. Riprova più tardi.")
 
 

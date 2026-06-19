@@ -171,7 +171,7 @@ async def health_check_handler(request: web.Request) -> web.Response:
             charset="utf-8",
         )
     except Exception as e:
-        logger.error(f"Health check error: {e}", exc_info=True)
+        logger.exception("Health check error")
         error_data = {"status": "error", "message": str(e)}
         json_str = json.dumps(error_data, indent=2, ensure_ascii=False)
         return web.Response(

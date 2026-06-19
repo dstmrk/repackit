@@ -255,8 +255,8 @@ async def handle_value_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             # Keep in same state to retry
             return WAITING_VALUE_INPUT
 
-    except Exception as e:
-        logger.error(f"Error in handle_value_input for user {user_id}: {e}", exc_info=True)
+    except Exception:
+        logger.exception(f"Error in handle_value_input for user {user_id}")
         await update.message.reply_text("❌ Errore nell'aggiornare il prodotto. Riprova più tardi.")
         context.user_data.clear()
         return ConversationHandler.END

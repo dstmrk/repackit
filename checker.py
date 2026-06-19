@@ -49,8 +49,8 @@ async def _send_notification_safe(bot: Bot, notif: dict) -> bool:
             return_deadline=notif["return_deadline"],
         )
         return True
-    except Exception as e:
-        logger.error(f"Failed to send notification to user {notif['user_id']}: {e}", exc_info=True)
+    except Exception:
+        logger.exception(f"Failed to send notification to user {notif['user_id']}")
         return False
 
 

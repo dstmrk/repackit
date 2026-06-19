@@ -192,8 +192,8 @@ async def _scrape_single_price(browser: Browser, asin: str, marketplace: str) ->
             logger.info(f"Successfully scraped price for {asin}: €{price}")
         return price
 
-    except Exception as e:
-        logger.error(f"Error scraping {asin} from amazon.{marketplace}: {e}", exc_info=True)
+    except Exception:
+        logger.exception(f"Error scraping {asin} from amazon.{marketplace}")
         return None
 
 
