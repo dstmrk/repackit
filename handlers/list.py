@@ -94,8 +94,8 @@ async def list_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         await update.message.reply_text(message, parse_mode="HTML", disable_web_page_preview=True)
 
-    except Exception as e:
-        logger.error(f"Error in list_handler for user {user_id}: {e}", exc_info=True)
+    except Exception:
+        logger.exception(f"Error in list_handler for user {user_id}")
         await update.message.reply_text(
             "❌ Errore nel recuperare i tuoi prodotti. Riprova più tardi."
         )

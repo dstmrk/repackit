@@ -96,8 +96,8 @@ async def run_scraper() -> None:
         results = await scrape_prices(products)
         logger.info(f"Scraper completed: {len(results)}/{len(products)} prices scraped")
 
-    except Exception as e:
-        logger.error(f"Error in scraper task: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error in scraper task")
 
 
 async def run_checker() -> None:
@@ -109,8 +109,8 @@ async def run_checker() -> None:
             f"Checker completed: {stats['notifications_sent']} notifications sent, "
             f"{stats['errors']} errors"
         )
-    except Exception as e:
-        logger.error(f"Error in checker task: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error in checker task")
 
 
 async def run_cleanup() -> None:
@@ -119,8 +119,8 @@ async def run_cleanup() -> None:
         logger.info("Starting scheduled cleanup run")
         result = await product_cleanup.cleanup_expired_products()
         logger.info(f"Cleanup completed: {result['deleted']} expired products removed")
-    except Exception as e:
-        logger.error(f"Error in cleanup task: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error in cleanup task")
 
 
 async def schedule_task(task_name: str, hour: int, task_func) -> None:  # pragma: no cover
@@ -296,5 +296,5 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")
-    except Exception as e:
-        logger.error(f"Fatal error: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Fatal error")

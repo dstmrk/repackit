@@ -282,8 +282,8 @@ async def check_and_notify() -> dict:
             f"{stats['errors']} errors"
         )
 
-    except Exception as e:
-        logger.error(f"Error in check_and_notify: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error in check_and_notify")
         stats["errors"] += 1
 
     return stats
@@ -372,8 +372,8 @@ async def send_price_drop_notification(
                 reply_markup=keyboard,
             )
         )
-    except TelegramError as e:
-        logger.error(f"Failed to send message to user {user_id}: {e}")
+    except TelegramError:
+        logger.exception(f"Failed to send message to user {user_id}")
         raise
 
 

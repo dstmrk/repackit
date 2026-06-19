@@ -39,8 +39,8 @@ async def cleanup_expired_products() -> dict:
             "timestamp": timestamp,
         }
 
-    except Exception as e:
-        logger.error(f"Error during cleanup: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error during cleanup")
         raise
 
 
