@@ -22,14 +22,17 @@ RUN uv venv /opt/venv && \
 # kept only as a CDP *client* that connects to this binary at runtime.
 ARG OBSCURA_VERSION=v0.1.8
 ARG TARGETARCH
-RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates && \
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
     rm -rf /var/lib/apt/lists/* && \
     case "${TARGETARCH:-amd64}" in \
       amd64) OBSCURA_ARCH=x86_64 ;; \
       arm64) OBSCURA_ARCH=aarch64 ;; \
       *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
     esac && \
-    wget -qO /tmp/obscura.tar.gz \
+    # Follow GitHub's release redirect, but restrict both the initial request and
+    # any redirect target to HTTPS so it can never be downgraded to an insecure URL.
+    curl --proto '=https' --proto-redir '=https' -fsSL \
+      -o /tmp/obscura.tar.gz \
       "https://github.com/h4ckf0r0day/obscura/releases/download/${OBSCURA_VERSION}/obscura-${OBSCURA_ARCH}-linux.tar.gz" && \
     mkdir -p /opt/obscura && tar xzf /tmp/obscura.tar.gz -C /opt/obscura && \
     rm /tmp/obscura.tar.gz && \
